@@ -14,30 +14,33 @@ A match consists of 1000 hands between two bots. The bot with the most chips at 
 A single poker hand is one complete round of play, from dealing cards to awarding the pot. Each hand:
 
 - Starts with dealing hole cards
-- Progresses through up to 4 betting streets
+- Progresses through up to 5 betting streets
 - Ends when either:
   - One player folds
   - All betting is complete and remaining players show their cards (showdown)
 
 ### Streets
 
-A street is one complete round of betting. Each hand has up to 4 streets:
+A street is one complete round of betting. Each hand has up to 5 streets, with the discard street being unique to this year's variant:
 
 - **Pre-flop** (Street 0):
   - Players receive their hole cards
   - Small blind (1 chip) and big blind (2 chips) are posted
   - First round of betting occurs
 
-- **Flop** (Street 1):
+- **Discard** (Street 1):
   - Three community cards are dealt
+  - Each player discards down to two cards
+  - Discarded cards are revealed to all players 
+ 
+- **Flop** (Street 2):
   - Second round of betting occurs
-  - Players may use the discard action
 
-- **Turn** (Street 2):
+- **Turn** (Street 3):
   - Fourth community card is dealt
   - Third round of betting occurs
 
-- **River** (Street 3):
+- **River** (Street 4):
   - Final community card is dealt
   - Final round of betting occurs
   - If no one folds, showdown occurs
@@ -55,7 +58,7 @@ A street is one complete round of betting. Each hand has up to 4 streets:
 - **Check**: Pass the action when no additional bet is required
 - **Call**: Match the current bet amount
 - **Raise**: Increase the current bet amount
-- **Discard**: Exchange one hole card for a new one (tournament-specific rule)
+- **Discard**: Discard three cards from a five card hand (tournament-specific rule)
 
 > See the [Gym Environment Documentation](/docs/gym-env#action-space) for technical implementation details.
 
@@ -98,7 +101,7 @@ The following terms are commonly used in the API:
 
 ### Observation Dictionary Keys
 
-- `street`: Current betting round (0-3)
+- `street`: Current betting round (0-4)
 - `acting_agent`: Which player acts next (0 or 1)
 - `my_cards`: Your hole cards
 - `community_cards`: Visible shared cards
