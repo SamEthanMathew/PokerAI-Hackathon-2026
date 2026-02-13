@@ -7,343 +7,43 @@ import json
 import logging
 import time
 import traceback
-from typing import Any, Dict, Optional, Tuple, List, TypedDict
-from collections import defaultdict
-from deprecated import deprecated
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import requests
 
+
 from gym_env import PokerEnv
 
-NUM_PLAYERS = 6
 TIME_LIMIT_SECONDS = 1500
 GET_ACTION_ENDPOINT = "/get_action"
 SEND_OBS_ENDPOINT = "/post_observation"
-MAX_AGENT_FAILURES = 3
 
-
-class MatchResult(TypedDict):
-    # TODO change this to handle 6 players accordingly
-    """Standardized match result structure"""
-    status: str  # 'completed', 'timeout', or 'error'
-    result: str  # 'win', 'loss', 'tie', or 'invalid'
-    rewards: List[float]
-    time_used: List[float]
-    error: Optional[str] = None
 
 class AgentFailure(Exception):
     """Custom exception for tracking agent failures"""
 
     pass
 
+
 class AgentFailureTracker:
     def __init__(self):
-        self.failed_attempts = {i: 0 for i in range(NUM_PLAYERS)}
+        self.failed_attempts = {0: 0, 1: 0}
+        self.MAX_FAILURES = 3
 
     def record_failure(self, player_id: int):
         self.failed_attempts[player_id] += 1
 
-        # Check for all players failing
-        all_failed = all(attempts > MAX_AGENT_FAILURES for attempts in self.failed_attempts.values())
-        if all_failed:
+        # Check for both players failing
+        if self.failed_attempts[0] >= self.MAX_FAILURES and self.failed_attempts[1] >= self.MAX_FAILURES:
             raise AgentFailure("Both players have failed multiple times")
 
         # Check for single player persistent failure
-        if self.failed_attempts[player_id] >= MAX_AGENT_FAILURES:
+        if self.failed_attempts[player_id] >= self.MAX_FAILURES:
             raise AgentFailure(f"Player {player_id} has failed {self.MAX_FAILURES} times")
 
     def record_success(self, player_id: int):
         self.failed_attempts[player_id] = 0
-
-
-class AgentAPIClient:
-    """Handles API communication with agents"""
-    def __init__(
-        self,
-        logger: logging.Logger,
-        failure_tracker: AgentFailureTracker,
-        max_retries: int = 5,
-        base_delay: float = 1.0,
-        timeout: float = 5.0
-    ):
-        self.logger = logger
-        self.failure_tracker = failure_tracker
-        self.max_retries = max_retries
-        self.base_delay = base_delay
-        self.timeout = timeout
-
-    def call(
-        self,
-        method: str,
-        base_url: str,
-        endpoint: str,
-        payload: Dict[str, Any],
-        player_id: int,
-    ) -> Dict[str, Any]:
-        """Make an API call with retry logic and failure tracking"""
-        for attempt in range(self.max_retries):
-            try:
-                response = requests.request(
-                    method,
-                    base_url + endpoint,
-                    json=payload,
-                    timeout=self.timeout
-                )
-                response.raise_for_status()
-                self.failure_tracker.record_success(player_id)
-                return response.json()
-                
-            except (
-                requests.exceptions.ConnectionError,
-                requests.exceptions.Timeout,
-                requests.exceptions.HTTPError,
-            ) as e:
-                if attempt == self.max_retries - 1:
-                    self.failure_tracker.record_failure(player_id)
-                    self.logger.error(f"Player {player_id} failed API call after {self.max_retries} attempts: {str(e)}")
-                    raise
-
-                delay = self.base_delay * (2 ** attempt)
-                self.logger.debug(f"Player {player_id} API call failed, retrying in {delay}s (attempt {attempt + 1}/{self.max_retries})")
-                time.sleep(delay)
-
-
-class PayloadPreparer:
-    """Prepares payloads for API calls"""
-    
-    @staticmethod
-    def convert_numpy(value: Any) -> Any:
-        """Recursively convert numpy types to Python native types"""
-        if isinstance(value, np.integer):
-            return int(value)
-        elif isinstance(value, np.floating):
-            return float(value)
-        elif isinstance(value, np.ndarray):
-            return value.tolist()
-        elif isinstance(value, dict):
-            return {k: PayloadPreparer.convert_numpy(v) for k, v in value.items()}
-        elif isinstance(value, list):
-            return [PayloadPreparer.convert_numpy(item) for item in value]
-        return value
-
-    @staticmethod
-    def prepare(
-        obs: Dict[str, Any],
-        reward: float,
-        terminated: bool,
-        truncated: bool,
-        info: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        """
-        Prepare the payload for API calls by converting numpy arrays and values to Python native types.
-
-        Args:
-            obs (Dict[str, Any]): The observation dictionary.
-            reward (float): The reward value.
-            terminated (bool): Whether the episode has terminated.
-            truncated (bool): Whether the episode has been truncated.
-            info (Dict[str, Any]): Additional information.
-
-        Returns:
-            Dict[str, Any]: The prepared payload.
-        """
-        return {
-            "observation": {k: PayloadPreparer.convert_numpy(v) for k, v in obs.items()},
-            "reward": float(reward),
-            "terminated": terminated,
-            "truncated": truncated,
-            "info": PayloadPreparer.convert_numpy(info),
-        }
-
-
-class PokerMatch:
-    """Manages a complete poker match between multiple agents"""
-    # TODO set up logging for errors and game state changes
-    # TODO implement the csv writer path
-    #   - define new headers for csv file
-    # TODO Handle when agenet disconnects and should continue gamne
-    
-    def __init__(
-        self,
-        base_urls: List[str],
-        logger: logging.Logger,
-        team_names: Optional[List[str]] = None,
-        csv_path: str = "./match.csv"
-    ):
-        
-        self.base_urls = base_urls
-        self.num_players = NUM_PLAYERS # NOTE might change later
-        self.logger = logger
-        self.team_names = team_names or [f"Player {i}" for i in range(self.num_players)]
-        self.csv_path = csv_path
-        
-        self.env = PokerEnv()
-        
-        # Initialize trackers
-        self.bankrolls = [0.0] * self.num_players
-        self.time_used = [0.0] * self.num_players
-        self.failure_tracker = AgentFailureTracker(self.num_players)
-        
-        # Initialize helpers
-        self.api_client = AgentAPIClient(logger, self.failure_tracker)
-    
-    def run(self, num_hands = 1000) -> MatchResult:
-        
-        for hand_number in num_hands:
-            self._play_hand(hand_number)
-        
-        return self._create_result('completed')
-            
-    def _play_hand(self, hand_number: int):
-        """Play a single hand of poker"""
-        
-        small_blind_player = hand_number % self.num_players
-
-        # Initialize hand
-        observations, info = self.env.reset(options={"small_blind_player": small_blind_player})
-        info["hand_number"] = hand_number
-        rewards = [0.0] * self.num_players
-        terminated = truncated = False
-        
-        # Add time info to observations
-        self._update_time_info(observations)
-        
-        # Main game loop
-        while not terminated:
-            action = self._get_action_from_active_player(observations, rewards, terminated, truncated, info)
-            self._broadcast_to_inactive_players(observations, rewards, terminated, truncated, info)
-            
-            # Step environment
-            # NOTE in the case that a player dies how should `PokerEnv` handle it? -dylan 
-            observations, rewards, terminated, truncated, info = self.env.step(action=action["action"])
-            info["hand_number"] = hand_number
-            self._update_time_info(observations)
-        
-        # Send final observations
-        self._send_final_observations(observations, rewards, terminated, truncated, info)
-
-        # Update bankrolls
-        for i, reward in enumerate(rewards):
-            self.bankrolls[i] += reward
-            
-    def _get_action_from_active_player(
-        self,
-        observations: List[Dict[str, Any]],
-        rewards: List[float],
-        terminated: bool,
-        truncated: bool,
-        info: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Get action from the currently active player"""
-        acting_player = observations[0]["acting_agent"]
-        obs = observations[acting_player]
-        url = self.base_urls[acting_player]
-        
-        payload = self.payload_preparer.prepare(obs, rewards[acting_player], terminated, truncated, info)
-        
-        start_time = time.time()
-        action = self.api_client.call("GET", url, GET_ACTION_ENDPOINT, payload, acting_player)
-        elapsed = time.time() - start_time
-        
-        self.time_used[acting_player] += elapsed
-        
-        if self.time_used[acting_player] > TIME_LIMIT_SECONDS:
-            raise TimeoutError(f"Player {acting_player} exceeded time limit")
-        
-        return action
-        
-    def _broadcast_to_inactive_players(
-        self,
-        observations: List[Dict[str, Any]],
-        rewards: List[float],
-        terminated: bool,
-        truncated: bool,
-        info: Dict[str, Any]
-    ) -> None:
-        """Send observations to all inactive players"""
-        acting_player = observations[0]["acting_agent"]
-        
-        for player_id in range(self.num_players):
-            if player_id != acting_player:
-                obs = observations[player_id]
-                url = self.base_urls[player_id]
-                payload = self.payload_preparer.prepare(obs, rewards[player_id], terminated, truncated, info)
-                self.api_client.call("POST", url, SEND_OBS_ENDPOINT, payload, player_id)
-
-    def _send_final_observations(
-        self,
-        observations: List[Dict[str, Any]],
-        rewards: List[float],
-        terminated: bool,
-        truncated: bool,
-        info: Dict[str, Any]
-    ) -> None:
-        """Send final observations to all players after hand completes"""
-        for player_id in range(self.num_players):
-            obs = observations[player_id]
-            url = self.base_urls[player_id]
-            payload = self.payload_preparer.prepare(obs, rewards[player_id], terminated, truncated, info)
-            self.api_client.call("POST", url, SEND_OBS_ENDPOINT, payload, player_id)
-    
-    def _update_time_info(self, observations: List[Dict[str, Any]]) -> None:
-        """Add time usage information to observations"""
-        for i, obs in enumerate(observations):
-            obs["time_used"] = self.time_used[i]
-            obs["time_left"] = TIME_LIMIT_SECONDS - self.time_used[i]
-    
-    def _create_result(
-        self,
-        status: str,
-        disqualified_player: Optional[int] = None,
-        error: Optional[str] = None
-    ) -> MatchResult:
-        """Create a standardized match result"""
-        # TODO Handle disconnected players
-        # should be ranked based on who disconnected first?
-        raise NotImplementedError()
-    
-    def _handle_agent_failure(player_id: int):
-        # TODO
-        raise NotImplementedError()
-        
-
-
-
-def run_api_match(
-    base_urls: List[str],
-    logger: logging.Logger,
-    num_hands: int = 1000,
-    csv_path: str = "./match.csv",
-    team_names: Optional[List[str]] = None,
-) -> Dict[str, Any]:
-    """
-    Run a match between multiple API-based agents.
-    
-    Args:
-        base_urls: List of base URLs for each agent's API
-        logger: Logger instance
-        num_hands: Number of hands to play
-        csv_path: Path to save match CSV log
-        team_names: Optional list of team names for logging
-    
-    Returns:
-        Dictionary containing match results
-    """
-    assert(len(base_urls) == NUM_PLAYERS)
-    
-    match = PokerMatch(base_urls, logger, team_names, num_hands, csv_path)
-    result = match.run()
-    
-    # Convert dataclass to dict for backward compatibility
-    # TODO change this to correct match result
-    return {
-        "status": result.status,
-        "result": result.result,
-        "rewards": result.rewards,
-        "time_used": result.time_used,
-        **({"error": result.error} if result.error else {})
-    }
 
 
 # Create a global instance
@@ -355,7 +55,7 @@ def get_street_name(street_num: int) -> str:
     street_names = {0: "Pre-Flop", 1: "Flop", 2: "Turn", 3: "River"}
     return street_names.get(street_num, f"Unknown-{street_num}")
 
-@deprecated(category=DeprecationWarning)
+
 def prepare_payload(
     obs: Dict[str, Any],
     reward: float,
@@ -401,7 +101,7 @@ def prepare_payload(
         "info": _convert_numpy(info),
     }
 
-@deprecated(category=DeprecationWarning)
+
 def call_agent_api(
     method: str,
     base_url: str,
@@ -448,6 +148,8 @@ def call_agent_api(
 
                 delay = base_delay * (2**attempt)
                 logger.info(f"Backing off for {delay} seconds before retry {attempt + 1}")
+                if 'response' in locals() and response is not None:
+                    logger.info(f"Validation Error Details: {response.text}")
                 time.sleep(delay)
 
     except Exception as e:
@@ -456,10 +158,9 @@ def call_agent_api(
         raise
 
 
-bankrolls = [0] * NUM_PLAYERS  # Track total bankrolls across all hands
+bankrolls = [0, 0]  # Track total bankrolls across all hands
 
-# TODO: fix csv writer once, 6 player support is finished
-@deprecated(category=DeprecationWarning)
+
 def run_api_match(
     base_url_0: str,
     base_url_1: str,
@@ -482,6 +183,8 @@ def run_api_match(
         "team_1_bankroll",
         "action_type",
         "action_amount",
+        "action_keep_1",
+        "action_keep_2",
         "team_0_cards",
         "team_1_cards",
         "board_cards",
@@ -493,17 +196,17 @@ def run_api_match(
 
     with open(csv_path, "w", newline="") as csv_file:
         # Comment header
-        writer = None
-        # csv_file.write(f"Team 0: {team_0_name}, Team 1: {team_1_name}\n")
+        csv_file.write(f"# Team 0: {team_0_name}, Team 1: {team_1_name}\n")
 
-        # writer = csv.DictWriter(csv_file, fieldnames=csv_headers)
-        # writer.writeheader()
+        writer = csv.DictWriter(csv_file, fieldnames=csv_headers)
+        writer.writeheader()
 
         def format_error(e):
             return f'ERROR Raised: "{str(e)}". Stacktrace:\n{traceback.format_exc()}'
 
         for hand_number in range(num_hands):
             env = PokerEnv(logger=logger)  # env for a single hand
+            (obs0, obs1), info = env.reset()
             try:
                 res = play_hand(env, base_url_0, base_url_1, logger, writer, hand_number)
                 bankrolls[0] += res["bot0_reward"]
@@ -538,93 +241,120 @@ def run_api_match(
 
 time_used_0 = 0.0
 time_used_1 = 0.0
-time_used = [0.0] * NUM_PLAYERS
 
-# TODO handle if there exists less than 6 players at the table
-@deprecated(category=DeprecationWarning)
+
 def play_hand(
-    env: PokerEnv, 
-    base_urls: List[str], # for 6 players
-    logger: logging.Logger, 
-    writer: csv.DictWriter, 
-    hand_number: int
+    env: PokerEnv, base_url_0: str, base_url_1: str, logger: logging.Logger, writer: csv.DictWriter, hand_number: int
 ):
-    
-    global bankrolls, time_used
-    
-    small_blind_player = hand_number % NUM_PLAYERS
+    """
+    Play a single hand in the given environment instance.
+    This function loops until the single hand terminates.
+    """
+    global time_used_0, time_used_1, bankrolls
+
+    small_blind_player = hand_number % 2
 
     # Initialize per-hand variables
-    observations, info = env.reset(options={"small_blind_player": small_blind_player})
+    (obs0, obs1), info = env.reset(options={"small_blind_player": small_blind_player})
     info["hand_number"] = hand_number
-    
-    assert len(observations) == NUM_PLAYERS
-    
-    rewards = [0] * NUM_PLAYERS
+    reward0 = reward1 = 0
     terminated = truncated = False
-    
-    for i, obs in enumerate(observations):
-        obs["time_used"] = time_used[i]
-        obs["time_left"] = TIME_LIMIT_SECONDS - time_used[i]
+    obs0["time_used"] = time_used_0
+    obs0["time_left"] = TIME_LIMIT_SECONDS - time_used_0
 
+    obs1["time_used"] = time_used_1
+    obs1["time_left"] = TIME_LIMIT_SECONDS - time_used_1
+
+    obs1["opp_last_action"] = "None"
+    obs0["opp_last_action"] = "None"
+
+    bot_0_last_move: Optional[PokerEnv.ActionType] = None
+    bot_1_last_move: Optional[PokerEnv.ActionType] = None
 
     # Loop until hand terminates
     while not terminated:
-        # TODO keep logs for bot history inside state
-        action = None
-        for player, (obs, url) in enumerate(zip(observations, base_urls)):
-            bot_payload = prepare_payload(obs, rewards[i], terminated, truncated, info)
-            if player == obs['acting_agent']:
-                action_start = time.time()
-                action = call_agent_api("GET", url, GET_ACTION_ENDPOINT, bot_payload, logger, player)
-                action_duration = time.time() - action_start
-                time_used[player] += action_duration
-                if time_used[player] > TIME_LIMIT_SECONDS:
-                    raise TimeoutError(f"Player {player} exceeded time limit")
-                              
-            # broadcast to other players
-            else:
-                # maybe do something with the return value? -dylan
-                call_agent_api("POST", url, SEND_OBS_ENDPOINT, bot_payload, logger, player)
-                
-        # TODO: Update log action to be consistent with 6-player game
-        # # Log action
-        # current_state = {
-        #     "hand_number": hand_number,
-        #     "street": get_street_name(obs0["street"]),
-        #     "active_team": obs0["acting_agent"],
-        #     "team_0_bankroll": bankrolls[0],
-        #     "team_1_bankroll": bankrolls[1],
-        #     "team_0_cards": [env.int_card_to_str(c) for c in env.player_cards[0] if c != -1],
-        #     "team_1_cards": [env.int_card_to_str(c) for c in env.player_cards[1] if c != -1],
-        #     "board_cards": [env.int_card_to_str(c) for c in env.community_cards[: obs0["street"] + 2] if c != -1],
-        #     "team_0_discarded": env.int_card_to_str(env.discarded_cards[0]) if env.discarded_cards[0] != -1 else "",
-        #     "team_1_discarded": env.int_card_to_str(env.discarded_cards[1]) if env.discarded_cards[1] != -1 else "",
-        #     "team_0_bet": obs0["my_bet"] if obs0["acting_agent"] == 0 else obs0["opp_bet"],
-        #     "team_1_bet": obs1["my_bet"] if obs1["acting_agent"] == 1 else obs1["opp_bet"],
-        #     "action_type": action_type.name,
-        #     "action_amount": action["action"][1],
-        # }
-        # writer.writerow(current_state)
+        bot0_payload = prepare_payload(obs0, reward0, terminated, truncated, info)
+        bot1_payload = prepare_payload(obs1, reward1, terminated, truncated, info)
+
+        current_player = obs0["acting_agent"]
+        current_payload = bot0_payload if current_player == 0 else bot1_payload
+        observer_payload = bot1_payload if current_player == 0 else bot0_payload
+        current_url = base_url_0 if current_player == 0 else base_url_1
+        observer_url = base_url_1 if current_player == 0 else base_url_0
+
+        action_start = time.time()
+        action = call_agent_api("GET", current_url, GET_ACTION_ENDPOINT, current_payload, logger, current_player)
+        action_duration = time.time() - action_start
+
+        raw_action = action["action"] # Expecting [Type, Amount, Idx1, Idx2]
+        act_type_int = raw_action[0]
+        act_amount = raw_action[1]
+        act_keep1 = raw_action[2]
+        act_keep2 = raw_action[3]
+        action_type = PokerEnv.ActionType(act_type_int)
+
+        # Update time tracking
+        if current_player == 0:
+            time_used_0 += action_duration
+            if time_used_0 > TIME_LIMIT_SECONDS:
+                raise TimeoutError("Player 0 exceeded time limit")
+            
+            bot_0_last_move = action_type
+        else:
+            time_used_1 += action_duration
+            if time_used_1 > TIME_LIMIT_SECONDS:
+                raise TimeoutError("Player 1 exceeded time limit")
+        
+            bot_1_last_move = action_type
+
+        # Notify other player
+        call_agent_api("POST", observer_url, SEND_OBS_ENDPOINT, observer_payload, logger, 1 - current_player)
+
+        def fmt_cards(cards_list):
+            return [env.int_card_to_str(c) for c in cards_list if c != -1]
+
+        num_board_cards = 0 if obs0["street"] == 0 else obs0["street"] + 2
+        # Log action
+        current_state = {
+            "hand_number": hand_number,
+            "street": get_street_name(obs0["street"]),
+            "active_team": obs0["acting_agent"],
+            "team_0_bankroll": bankrolls[0],
+            "team_1_bankroll": bankrolls[1],
+            "team_0_cards": fmt_cards(env.player_cards[0]),
+            "team_1_cards": fmt_cards(env.player_cards[1]),
+            "board_cards": fmt_cards(env.community_cards[: num_board_cards]),
+            "team_0_discarded": fmt_cards(env.discarded_cards[0]),
+            "team_1_discarded": fmt_cards(env.discarded_cards[1]),
+            "team_0_bet": obs0["my_bet"] if obs0["acting_agent"] == 0 else obs0["opp_bet"],
+            "team_1_bet": obs1["my_bet"] if obs1["acting_agent"] == 1 else obs1["opp_bet"],
+            "action_type": action_type.name,
+            "action_amount": act_amount,
+            "action_keep_1": act_keep1,
+            "action_keep_2": act_keep2
+        }
+        writer.writerow(current_state)
 
         # Step environment
-        (observations), (rewards), terminated, truncated, info = env.step(action=action["action"])
+        (obs0, obs1), (reward0, reward1), terminated, truncated, info = env.step(action=action["action"])
         info["hand_number"] = hand_number  # Maintain hand number after each step
         
-        for i, obs in enumerate(observations):
-            obs["time_used"] = time_used[i]
-            obs["time_left"] = TIME_LIMIT_SECONDS - time_used[i]
-
+        obs0["time_used"] = time_used_0
+        obs1["time_used"] = time_used_1
+        obs0["time_left"] = TIME_LIMIT_SECONDS - time_used_0
+        obs1["time_left"] = TIME_LIMIT_SECONDS - time_used_1
+        
+        obs1["opp_last_action"] = "None" if bot_0_last_move is None else bot_0_last_move.name
+        obs0["opp_last_action"] = "None" if bot_1_last_move is None else bot_1_last_move.name
     # game has terminated; prepare and send final observation
-    for player in range(NUM_PLAYERS):
-        obs, reward, url = observations[i], rewards[i], base_urls[i]
-        bot_payload = prepare_payload(obs, reward, terminated, truncated, info)
-        call_agent_api("POST", url, SEND_OBS_ENDPOINT, bot_payload, logger, player)
+    bot0_payload = prepare_payload(obs0, reward0, terminated, truncated, info)
+    bot1_payload = prepare_payload(obs1, reward1, terminated, truncated, info)
+    call_agent_api("POST", base_url_0, SEND_OBS_ENDPOINT, bot0_payload, logger, 0)
+    call_agent_api("POST", base_url_1, SEND_OBS_ENDPOINT, bot1_payload, logger, 1)
 
-    return rewards
+    return {"bot0_reward": reward0, "bot1_reward": reward1}
 
-    
-    
+
 def get_match_result(
     status: str,
     winner: Optional[int] = None,
