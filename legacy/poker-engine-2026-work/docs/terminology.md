@@ -13,44 +13,39 @@ A match consists of 1000 hands between two bots. The bot with the most chips at 
 
 A single poker hand is one complete round of play, from dealing cards to awarding the pot. Each hand:
 
-- Starts with dealing hole cards
-- Progresses through up to 5 betting streets
-- Ends when either:
-  - One player folds
-  - All betting is complete and remaining players show their cards (showdown)
+- Starts with each player being dealt **5 cards** (hole cards)
+- On the flop, there is a **discard round** where each player **discards 3 cards** and keeps 2
+- Progresses through 4 betting streets (pre-flop, flop, turn, river)
+- Ends when either one player folds or showdown
 
 ### Streets
 
-A street is one complete round of betting. Each hand has up to 5 streets, with the discard street being unique to this year's variant:
+A street is one complete round of betting. This variant uses 4 streets, with a mandatory discard round on the flop:
 
 - **Pre-flop** (Street 0):
-  - Players receive their hole cards
-  - Small blind (1 chip) and big blind (2 chips) are posted
+  - Each player is dealt **5 cards**
+  - Small blind (10 chips) and big blind (20 chips) are posted
   - First round of betting occurs
 
-- **Discard** (Street 1):
-  - Three community cards are dealt
-  - Each player discards down to two cards
-  - Discarded cards are revealed to all players 
- 
-- **Flop** (Street 2):
-  - Second round of betting occurs
+- **Flop** (Street 1):
+  - The first three community cards are dealt
+  - **Discard round**: each player **discards 3 cards** and keeps 2, in betting order. Both players must discard. Discarded cards are revealed to the opponent.
+  - Then flop betting occurs
 
-- **Turn** (Street 3):
+- **Turn** (Street 2):
   - Fourth community card is dealt
-  - Third round of betting occurs
+  - Betting occurs
 
-- **River** (Street 4):
-  - Final community card is dealt
-  - Final round of betting occurs
-  - If no one folds, showdown occurs
+- **River** (Street 3):
+  - Fifth community card is dealt
+  - Final betting; if no one folds, showdown occurs
 
 ## Basic Terms
 
 ### Positions
 
-- **Small Blind (SB)**: Player 0, posts 1 chip before cards are dealt
-- **Big Blind (BB)**: Player 1, posts 2 chips before cards are dealt
+- **Small Blind (SB)**: Player 0, posts 10 chips before cards are dealt
+- **Big Blind (BB)**: Player 1, posts 20 chips before cards are dealt
 
 ### Actions
 
@@ -58,7 +53,7 @@ A street is one complete round of betting. Each hand has up to 5 streets, with t
 - **Check**: Pass the action when no additional bet is required
 - **Call**: Match the current bet amount
 - **Raise**: Increase the current bet amount
-- **Discard**: Discard three cards from a five card hand (tournament-specific rule)
+- **Discard**: On the flop, choose 2 cards to keep from your 5 hole cards; the other 3 are discarded and revealed to the opponent (tournament-specific rule)
 
 > See the [Gym Environment Documentation](/docs/gym-env#action-space) for technical implementation details.
 
@@ -101,7 +96,7 @@ The following terms are commonly used in the API:
 
 ### Observation Dictionary Keys
 
-- `street`: Current betting round (0-4)
+- `street`: Current betting round (0-3: pre-flop, flop, turn, river)
 - `acting_agent`: Which player acts next (0 or 1)
 - `my_cards`: Your hole cards
 - `community_cards`: Visible shared cards
