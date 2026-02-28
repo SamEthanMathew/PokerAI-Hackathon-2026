@@ -81,13 +81,13 @@ From strongest to weakest:
 >
 > **Note**: Four-of-a-kind is impossible with this deck (only three suits).
 
-### Discard Rule
+### Deal and Discard
 
-- Each player will initially draw 5 cards
-- After the flop is dealt out, players will discard down to 2 cards in betting order
-- Once all players have made discards, flop betting will start
-- Discarded cards are revealed to the opponent
-- Discarded cards are removed from play for that hand
+- **Initial deal**: Each player is dealt **5 cards** (hole cards) at the start of the hand.
+- **Flop and discard round**: After the flop (first three community cards) is dealt, there is a **discard round**. Each player **discards 3 cards** and keeps 2, in betting order. Both players must complete their discard before flop betting begins.
+- Discarded cards are revealed to the opponent.
+- Discarded cards are removed from play for that hand.
+- After the discard round, flop betting starts; play then continues with turn and river as in standard Hold'em.
 
 ## Tournament Structure
 

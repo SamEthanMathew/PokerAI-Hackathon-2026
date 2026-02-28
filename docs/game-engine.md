@@ -39,15 +39,15 @@ class ActionType(Enum):
     INVALID = 5
 ```
 
-Each action is a tuple of three values:
+Each action is a tuple of four values:
 
 ```python
-(action_type: int, raise_amount: int, card_to_discard: int)
+(action_type: int, raise_amount: int, keep_card_1: int, keep_card_2: int)
 ```
 
 - `action_type`: One of the ActionType enum values
 - `raise_amount`: Amount to raise (1 to MAX_PLAYER_BET)
-- `card_to_discard`: Card index to discard (-1, 0, or 1)
+- `keep_card_1`, `keep_card_2`: During the discard round (flop), the two indices (0–4) of the cards to **keep** from your 5 hole cards; the other 3 are discarded. Not used for non-discard actions.
 
 ## Observation Space
 
@@ -57,14 +57,14 @@ Each player receives an observation dictionary containing:
 {
     "street": int,              # Current street (0-3)
     "acting_agent": int,        # Which player acts next (0 or 1)
-    "my_cards": List[int],      # Player's hole cards
-    "community_cards": List[int], # Visible community cards
-    "my_bet": int,             # Player's current bet
+    "my_cards": Tuple[int, ...], # Your hole cards (5 slots; -1 if not yet dealt or after discard only 2 are used)
+    "community_cards": Tuple[int, ...], # Visible community cards (5 slots; -1 for not yet dealt)
+    "my_bet": int,             # Your current bet
     "opp_bet": int,            # Opponent's current bet
-    "opp_discarded_card": int, # Card opponent discarded (-1 if none)
-    "opp_drawn_card": int,     # Card opponent drew (-1 if none)
+    "my_discarded_cards": Tuple[int, ...],  # Your 3 discarded cards (-1 until discarded)
+    "opp_discarded_cards": Tuple[int, ...], # Opponent's 3 discarded cards (-1 until revealed)
     "min_raise": int,          # Minimum raise amount
-    "max_raise": int,          # Maximum raise amount
+    "max_raise": int,           # Maximum raise amount
     "valid_actions": List[bool] # Which actions are currently valid
 }
 ```
@@ -96,19 +96,18 @@ env = PokerEnv(num_hands=1000)
 (obs0, obs1), info = env.reset()
 ```
 
-### 2. Betting Streets
+### 2. Deal, Discard, and Betting Streets
 
-The game progresses through 4 streets:
-
-- Street 0: Pre-flop
-- Street 1: Flop
-- Street 2: Turn
-- Street 3: River
+- **Initial deal**: Each player is dealt 5 cards.
+- **Street 0 — Pre-flop**: Blinds are posted; first round of betting.
+- **Street 1 — Flop**: The first three community cards are dealt. There is a **discard round**: each player chooses 2 cards to keep (and discards the other 3); both players act in order. Discarded cards are revealed. Then flop betting.
+- **Street 2 — Turn**: Fourth community card; betting.
+- **Street 3 — River**: Fifth community card; betting; showdown if no fold.
 
 ### 3. Taking Actions
 
 ```python
-obs, reward, terminated, truncated, info = env.step((action_type, raise_amount, card_to_discard))
+obs, reward, terminated, truncated, info = env.step((action_type, raise_amount, keep_card_1, keep_card_2))
 ```
 
 ### 4. Hand Evaluation
@@ -149,16 +148,13 @@ actions = [
 
 ### Example 3: Discard Action
 
-```python
-# Player discards first card (index 0)
-action = (ActionType.DISCARD.value, 0, 0)
+During the flop (street 1), each player must discard 3 cards and keep 2. You specify which two card indices (0–4) to **keep**:
 
-# Observation will show:
-{
-    "opp_discarded_card": 3,    # Card that was discarded
-    "opp_drawn_card": 0,        # New card that was drawn
-    # ... other observation fields
-}
+```python
+# Player keeps cards at indices 0 and 1, discards the other 3
+action = (ActionType.DISCARD.value, 0, 0, 1)
+
+# Observation includes my_discarded_cards and opp_discarded_cards (3 cards each)
 ```
 
 ## Important Rules and Constraints
@@ -169,10 +165,10 @@ action = (ActionType.DISCARD.value, 0, 0)
    - Small blind: 1
    - Big blind: 2
 
-2. **Discard Rules**
-   - Only allowed once per player per hand
-   - Not allowed during river
-   - Must discard before seeing turn and river cards
+2. **Deal and Discard**
+   - Each player is dealt 5 cards at the start of the hand.
+   - On the flop (street 1), there is one mandatory discard round: each player chooses 2 cards to keep and discards the other 3, in betting order. Both players must discard before flop betting.
+   - Discarded cards are revealed to the opponent and removed from the deck for that hand.
 
 3. **Valid Actions**
    - Can't check if opponent has bet
@@ -191,9 +187,8 @@ action = (ActionType.DISCARD.value, 0, 0)
    - Raises are cumulative (total bet, not increment)
 
 3. **Discarding**
-   - Can only discard once
-   - Must discard before street 2
-   - Card indices must be 0 or 1
+   - Mandatory on the flop (street 1); each player keeps 2 cards and discards 3.
+   - Action: use `DISCARD` with `keep_card_1` and `keep_card_2` as two distinct indices from 0 to 4 (your five hole cards).
 
 4. **Observation Processing**
    - Convert numpy values to native Python types
