@@ -7,6 +7,9 @@ class PlayerAgent(Agent):
         super().__init__(stream)
         self.action_types = PokerEnv.ActionType
 
+    def __name__(self):
+        return "PlayerAgent"
+
     def act(self, observation, reward, terminated, truncated, info):
         """
         Starter: Folds whenever possible. On the flop discard round (mandatory), keeps first two cards.
