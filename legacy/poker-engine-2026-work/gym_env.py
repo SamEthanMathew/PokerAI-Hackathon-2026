@@ -1,5 +1,5 @@
 """
-CMU Poker Bot Competition Game Engine 2025
+CMU Poker Bot Competition Game Engine 2026
 
 People working on this code, please refer to:
 https://gymnasium.farama.org
