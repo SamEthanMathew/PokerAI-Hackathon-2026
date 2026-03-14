@@ -12,7 +12,15 @@ action space for each agent.
 
 import logging
 import os
+import warnings
 from enum import Enum
+
+# Suppress gym deprecation/unmaintained warning (project uses gym 0.26)
+for _cat in (DeprecationWarning, UserWarning):
+    warnings.filterwarnings("ignore", category=_cat, module="gym")
+warnings.filterwarnings("ignore", message=".*[Gg]ym has been unmaintained.*")
+warnings.filterwarnings("ignore", message=".*[Gg]ymnasium.*")
+warnings.filterwarnings("ignore", message=".*upgrade to Gymnasium.*")
 
 import gym
 import numpy as np
@@ -286,7 +294,7 @@ class PokerEnv(gym.Env):
         """
         self.street += 1
         self.min_raise = self.big_blind_amount
-        assert self.bets[0] == self.bets[1], self.logger.log(f"Bet amounts are not equal: {self.bets}")
+        assert self.bets[0] == self.bets[1], f"Bet amounts are not equal: {self.bets}"
         self.last_street_bet = self.bets[0]
         self.acting_agent = self.big_blind_player
 
