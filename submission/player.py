@@ -1,40 +1,30 @@
-#CURRENT: ALPHANiT V5
+#CURRENT: LibratusV1
 
-import json
-import os
+"""
+Libratus-Lite: A loose-aggressive, table-driven, mixed-strategy poker bot.
+Runtime component -- lightweight policy lookup with MC discard evaluation.
+"""
 import random
+from collections import Counter
 from itertools import combinations
 
 from agents.agent import Agent
 from gym_env import PokerEnv
 
-# Load optional profile from logs/bot_profile.json (written by analyze_for_bot.py)
-_PROFILE = {}
-_profile_path = os.path.join(os.path.dirname(__file__), "..", "logs", "bot_profile.json")
-if os.path.isfile(_profile_path):
-    try:
-        with open(_profile_path, "r", encoding="utf-8") as f:
-            _PROFILE = json.load(f)
-    except (json.JSONDecodeError, OSError):
-        pass
+try:
+    from submission.libratus_tables import POLICY, KEEP_EQUITY, POSTERIOR, MATCHUPS
+except ImportError:
+    from libratus_tables import POLICY, KEEP_EQUITY, POSTERIOR, MATCHUPS
 
-RANDOM_FACTOR_LO = 0.96
-RANDOM_FACTOR_HI = 1.04
-SLOW_PLAY_CHANCE = 0.20
-STANDARD_OPEN = _PROFILE.get("standard_open", 8)
-
-MONSTER_THRESHOLD = 0.85
-STRONG_THRESHOLD = 0.70
-GOOD_THRESHOLD = 0.50
-PREFLOP_COMMIT_THRESHOLD = 15
-RIVER_CALL_POT_RATIO_MAX = _PROFILE.get("river_call_pot_ratio_max", 0.35)
-BOARD_PAIRED_EQUITY_PENALTY = _PROFILE.get("board_paired_equity_penalty", 0.10)
+# ── Constants ────────────────────────────────────────────────────────────────
 
 RANKS = "23456789A"
-NUM_RANKS = len(RANKS)
+SUITS = "dhs"
+NUM_RANKS = 9
 DECK_SIZE = 27
-
-int_to_card = PokerEnv.int_to_card
+RANK_A = 8
+RANK_9 = 7
+RANK_8 = 6
 
 FOLD = PokerEnv.ActionType.FOLD.value
 RAISE = PokerEnv.ActionType.RAISE.value
@@ -42,181 +32,453 @@ CHECK = PokerEnv.ActionType.CHECK.value
 CALL = PokerEnv.ActionType.CALL.value
 DISCARD = PokerEnv.ActionType.DISCARD.value
 
-PREMIUM_PAIRS = frozenset([
-    frozenset([8, 8]),  # AA
-    frozenset([7, 7]),  # 99
-    frozenset([6, 6]),  # 88
-])
+_int_to_card = PokerEnv.int_to_card
 
-PREMIUM_ANY_SUIT = frozenset([
-    frozenset([8, 7]),  # A9
-    frozenset([8, 6]),  # A8
-])
+# ── Card helpers ─────────────────────────────────────────────────────────────
 
-PREMIUM_SUITED_ONLY = frozenset([
-    frozenset([7, 6]),  # 98s
-    frozenset([6, 5]),  # 87s
-    frozenset([5, 4]),  # 76s
-    frozenset([5, 7]),  # 79s
-])
+def _rank(c):
+    return c % NUM_RANKS
 
+def _suit(c):
+    return c // NUM_RANKS
 
-def _rank(card):
-    return card % NUM_RANKS
+def _same_suit(c1, c2):
+    return _suit(c1) == _suit(c2)
 
+def _rank_gap(c1, c2):
+    return abs(_rank(c1) - _rank(c2))
 
-def _suit(card):
-    return card // NUM_RANKS
+def _effective_gap(c1, c2):
+    g = _rank_gap(c1, c2)
+    return g if g <= 4 else NUM_RANKS - g
 
+def _is_connected(c1, c2):
+    return _effective_gap(c1, c2) == 1
 
-def _is_premium(c1, c2):
-    r1, r2 = _rank(c1), _rank(c2)
-    s1, s2 = _suit(c1), _suit(c2)
-    ranks = frozenset([r1, r2])
+def _clamp(v, lo, hi):
+    return max(lo, min(hi, v))
 
-    if r1 == r2 and frozenset([r1, r1]) in PREMIUM_PAIRS:
-        return True
-    if ranks in PREMIUM_ANY_SUIT:
-        return True
-    if s1 == s2 and ranks in PREMIUM_SUITED_ONLY:
-        return True
-    return False
+# ── Bucketing functions (inlined for runtime speed) ──────────────────────────
 
+def _bucket_keep(keep2):
+    r1, r2 = _rank(keep2[0]), _rank(keep2[1])
+    s1, s2 = _suit(keep2[0]), _suit(keep2[1])
+    is_pair = r1 == r2
+    suited = s1 == s2
+    gap = abs(r1 - r2)
+    eg = gap if gap <= 4 else NUM_RANKS - gap
 
-def _has_any_premium(cards):
-    for i in range(len(cards)):
-        for j in range(i + 1, len(cards)):
-            if _is_premium(cards[i], cards[j]):
-                return True
-    return False
-
-
-def _is_premium_pair(c1, c2):
-    r1, r2 = _rank(c1), _rank(c2)
-    return r1 == r2 and frozenset([r1, r1]) in PREMIUM_PAIRS
-
-
-def _has_premium_pair(cards):
-    for i in range(len(cards)):
-        for j in range(i + 1, len(cards)):
-            if _is_premium_pair(cards[i], cards[j]):
-                return True
-    return False
+    if is_pair:
+        if r1 in (RANK_A, RANK_9):
+            return "premium_pair"
+        if r1 >= RANK_8:
+            return "medium_pair"
+        return "low_pair"
+    if suited:
+        if eg <= 1:
+            return "suited_connector"
+        if eg <= 3:
+            return "suited_semi"
+        return "suited_gapper"
+    if eg <= 1:
+        return "offsuit_connector"
+    return "offsuit_other"
 
 
-def _clamp(val, lo, hi):
-    return max(lo, min(hi, val))
+def _bucket_flop_simple(community):
+    if len(community) < 3:
+        return "dry"
+    suits = [_suit(c) for c in community[:3]]
+    ranks = [_rank(c) for c in community[:3]]
+    sc = Counter(suits)
+    rc = Counter(ranks)
+    max_sc = sc.most_common(1)[0][1]
+    is_paired = rc.most_common(1)[0][1] >= 2
+
+    sorted_r = sorted(set(ranks))
+    conn = 0
+    for i in range(len(sorted_r) - 1):
+        if sorted_r[i + 1] - sorted_r[i] == 1:
+            conn += 1
+    if RANK_A in sorted_r and 0 in sorted_r:
+        conn += 1
+
+    score = 0
+    if max_sc >= 3:
+        score += 3
+    elif max_sc >= 2:
+        score += 1
+    score += conn
+    if is_paired:
+        score += 1
+    if score >= 3:
+        return "wet"
+    if score >= 1:
+        return "medium"
+    return "dry"
 
 
-def _board_paired_and_we_weak(my_cards, community):
-    """
-    Nit: on a paired board, we are weak if we only have one pair (or our pair
-    is lower than the board pair). Returns True if we should reduce equity.
-    """
-    if len(my_cards) < 2 or len(community) < 2:
-        return False
-    board_ranks = [_rank(c) for c in community if c != -1]
-    if len(board_ranks) < 2:
-        return False
-    board_pair_rank = None
-    for r in set(board_ranks):
-        if board_ranks.count(r) >= 2 and (board_pair_rank is None or r > board_pair_rank):
-            board_pair_rank = r
-    if board_pair_rank is None:
-        return False
-    r1, r2 = _rank(my_cards[0]), _rank(my_cards[1])
-    if r1 == r2:
-        our_pair_rank = r1
-        if frozenset([r1, r1]) in PREMIUM_PAIRS:
-            return False
-        return our_pair_rank < board_pair_rank
-    return True
+def _bucket_strength(equity):
+    if equity > 0.80:
+        return "monster"
+    if equity > 0.65:
+        return "strong"
+    if equity > 0.50:
+        return "good"
+    if equity > 0.35:
+        return "marginal"
+    return "weak"
 
 
-def _infer_opp_threat(opp_discards, community):
-    """
-    Analyze opponent's 3 discarded cards to estimate how threatening
-    their kept hand likely is. Returns a float 0.0-0.30.
-    """
+def _bucket_to_call(to_call, pot_size):
+    if to_call <= 0:
+        return "none"
+    if pot_size <= 0:
+        return "large"
+    ratio = to_call / pot_size
+    if ratio <= 0.15:
+        return "small"
+    if ratio <= 0.40:
+        return "medium"
+    return "large"
+
+
+def _bucket_opp_discard(opp_discards):
     if len(opp_discards) < 3:
+        return "unknown"
+    ranks = [_rank(c) for c in opp_discards]
+    suits = [_suit(c) for c in opp_discards]
+    sc = Counter(suits)
+    rc = Counter(ranks)
+    has_pair = rc.most_common(1)[0][1] >= 2
+    max_sc = sc.most_common(1)[0][1]
+    has_ace = RANK_A in ranks
+
+    sorted_r = sorted(ranks)
+    conn = 0
+    for i in range(len(sorted_r) - 1):
+        if sorted_r[i + 1] - sorted_r[i] == 1:
+            conn += 1
+    if RANK_A in sorted_r and 0 in sorted_r:
+        conn += 1
+
+    if has_pair:
+        return "discarded_pair"
+    if max_sc >= 2:
+        return "suited_cluster"
+    if conn >= 2:
+        return "connected_cluster"
+    if has_ace:
+        return "high_junk"
+    if max(ranks) <= 5:
+        return "low_junk"
+    return "mixed_discard"
+
+
+# ── Keep scoring (runtime version, lightweight MC) ───────────────────────────
+
+def _structural_bonus(keep2):
+    r1, r2 = _rank(keep2[0]), _rank(keep2[1])
+    if r1 == r2:
+        if r1 in (RANK_A, RANK_9):
+            return 0.10
+        if r1 >= RANK_8:
+            return 0.05
+        return 0.03
+    eg = _effective_gap(keep2[0], keep2[1])
+    if _same_suit(keep2[0], keep2[1]):
+        if eg <= 1:
+            return 0.12
+        if eg <= 3:
+            return 0.08
+        return 0.06
+    if eg <= 1:
+        return 0.04
+    return 0.0
+
+
+def _board_interaction(keep2, community):
+    if not community:
         return 0.0
+    bonus = 0.0
+    k_suits = [_suit(c) for c in keep2]
+    k_ranks = [_rank(c) for c in keep2]
+    b_suits = [_suit(c) for c in community]
+    b_ranks = [_rank(c) for c in community]
 
-    threat = 0.0
-    discard_suits = [_suit(c) for c in opp_discards]
-    discard_ranks = sorted([_rank(c) for c in opp_discards])
-    unique_discard_suits = set(discard_suits)
-
-    if len(unique_discard_suits) == 3:
-        threat += 0.08
-
-    if all(r <= 5 for r in discard_ranks):
-        threat += 0.07
-
-    if len(set(discard_ranks)) == 3:
-        threat += 0.05
-
-    comm_suits = [_suit(c) for c in community]
-    for s in range(3):
-        if comm_suits.count(s) >= 2 and s not in unique_discard_suits:
-            threat += 0.10
+    for s in set(k_suits):
+        bm = sum(1 for bs in b_suits if bs == s)
+        km = sum(1 for ks in k_suits if ks == s)
+        if bm >= 2 and km >= 1:
+            bonus += 0.08
+            if km >= 2:
+                bonus += 0.04
             break
 
-    return min(0.30, threat)
+    all_r = sorted(set(k_ranks + b_ranks))
+    mc = 1
+    best = 1
+    for i in range(1, len(all_r)):
+        if all_r[i] - all_r[i - 1] == 1:
+            mc += 1
+            best = max(best, mc)
+        else:
+            mc = 1
+    if RANK_A in all_r and 0 in all_r:
+        best = max(best, 2)
+    if best >= 4:
+        bonus += 0.06
 
+    for kr in k_ranks:
+        if kr in b_ranks:
+            bonus += 0.04
+            break
+    return bonus
+
+
+def _inference_bonus(keep2, opp_discards, community):
+    if not opp_discards or len(opp_discards) < 3:
+        return 0.0
+    bonus = 0.0
+    opp_b = _bucket_opp_discard(opp_discards)
+    opp_d_suits = set(_suit(c) for c in opp_discards)
+    k_suits = [_suit(c) for c in keep2]
+    b_suits = [_suit(c) for c in community] if community else []
+
+    if opp_b == "low_junk":
+        if max(_rank(c) for c in keep2) <= 5:
+            bonus -= 0.04
+
+    if opp_b == "suited_cluster":
+        threat_suits = set(range(3)) - opp_d_suits
+        blocking = sum(1 for ks in k_suits if ks in threat_suits)
+        bonus += 0.02 * blocking
+        for ts in threat_suits:
+            if sum(1 for bs in b_suits if bs == ts) >= 2:
+                bonus += 0.03 * sum(1 for ks in k_suits if ks == ts)
+                break
+
+    if opp_b == "discarded_pair":
+        bonus += 0.02
+    return bonus
+
+
+# ── PlayerAgent ──────────────────────────────────────────────────────────────
 
 class PlayerAgent(Agent):
     def __init__(self, stream: bool = True):
         super().__init__(stream)
         self.action_types = PokerEnv.ActionType
-        self.evaluator = PokerEnv().evaluator
+        self._env = PokerEnv()
+        self.evaluator = self._env.evaluator
+
+        self.hand_number = 0
+        self.opp_stats = {
+            "fold_to_raise": [0, 0],  # [folds, total]
+            "aggression": [0, 0],     # [raises, opportunities]
+            "river_calldown": [0, 0],
+        }
 
     def __name__(self):
-        return "ALPHANIT_V2"
+        return "Libratus"
 
-    def _compute_equity(self, my_cards, community, opp_discards, my_discards, num_sims=300):
-        """
-        Monte Carlo win probability. All known/dead cards are excluded from
-        the sampling pool: our cards, visible community, both sets of discards.
-        """
-        dead = set(my_cards)
-        for c in community:
-            if c != -1:
-                dead.add(c)
-        for c in opp_discards:
-            if c != -1:
-                dead.add(c)
-        for c in my_discards:
-            if c != -1:
-                dead.add(c)
+    # ── Seeded RNG ──────────────────────────────────────────────────────
 
-        remaining = [i for i in range(DECK_SIZE) if i not in dead]
+    def _seed_rng(self, my_cards, street):
+        seed_val = hash((self.hand_number, street, tuple(sorted(my_cards))))
+        self._rng = random.Random(seed_val)
+
+    # ── MC equity ───────────────────────────────────────────────────────
+
+    def _mc_equity(self, my2, community, dead, num_sims=200):
+        known = set(my2) | set(community) | dead
+        remaining = [c for c in range(DECK_SIZE) if c not in known]
         board_needed = 5 - len(community)
-        opp_needed = 2
-        sample_size = opp_needed + board_needed
+        sample_needed = 2 + board_needed
 
-        if sample_size > len(remaining):
+        if sample_needed > len(remaining):
             return 0.5
 
-        wins = 0
+        wins = 0.0
         total = 0
         for _ in range(num_sims):
-            sample = random.sample(remaining, sample_size)
-            opp_cards = sample[:opp_needed]
-            full_board = list(community) + sample[opp_needed:]
-
-            my_hand = list(map(int_to_card, my_cards))
-            opp_hand = list(map(int_to_card, opp_cards))
-            board = list(map(int_to_card, full_board))
-
-            my_rank = self.evaluator.evaluate(my_hand, board)
-            opp_rank = self.evaluator.evaluate(opp_hand, board)
-            if my_rank < opp_rank:
-                wins += 1
-            elif my_rank == opp_rank:
+            sample = self._rng.sample(remaining, sample_needed)
+            opp = sample[:2]
+            full_board = list(community) + sample[2:]
+            my_hand = [_int_to_card(c) for c in my2]
+            opp_hand = [_int_to_card(c) for c in opp]
+            board = [_int_to_card(c) for c in full_board]
+            mr = self.evaluator.evaluate(my_hand, board)
+            orank = self.evaluator.evaluate(opp_hand, board)
+            if mr < orank:
+                wins += 1.0
+            elif mr == orank:
                 wins += 0.5
             total += 1
-
         return wins / total if total > 0 else 0.5
+
+    # ── Discard: choose best keep ───────────────────────────────────────
+
+    def _choose_keep(self, my_cards, community, opp_discards):
+        best_score = -999.0
+        best_ij = (0, 1)
+        candidates = []
+
+        for i, j in combinations(range(len(my_cards)), 2):
+            keep = [my_cards[i], my_cards[j]]
+            toss = [my_cards[k] for k in range(len(my_cards)) if k not in (i, j)]
+            dead = set(toss)
+            if opp_discards:
+                dead |= set(opp_discards)
+
+            eq = self._mc_equity(keep, community, dead, num_sims=150)
+            struct = _structural_bonus(keep)
+            board = _board_interaction(keep, community)
+            infer = _inference_bonus(keep, opp_discards, community)
+
+            score = 3.0 * eq + 1.5 * struct + 1.0 * board + 0.5 * infer
+            candidates.append((i, j, score, eq))
+            if score > best_score:
+                best_score = score
+                best_ij = (i, j)
+
+        # Near-tie randomization
+        ties = [(i, j) for i, j, sc, _ in candidates if best_score - sc < 0.06]
+        if len(ties) > 1:
+            best_ij = self._rng.choice(ties)
+
+        return best_ij
+
+    # ── Betting: policy table lookup + mixed strategy ───────────────────
+
+    def _choose_bet(self, street, my_cards, community, opp_discards, my_discards,
+                    valid, min_raise, max_raise, my_bet, opp_bet, pot_size, blind_pos):
+        to_call = max(0, opp_bet - my_bet)
+        position = "sb" if blind_pos == 0 else "bb"
+
+        dead = set()
+        if my_discards:
+            dead |= set(my_discards)
+        if opp_discards:
+            dead |= set(opp_discards)
+
+        # Compute equity
+        if len(my_cards) == 2 and len(community) >= 3:
+            equity = self._mc_equity(my_cards, community, dead, num_sims=200)
+        elif len(my_cards) == 5 and street == 0:
+            equity = self._mc_equity(my_cards[:2], [], dead, num_sims=100)
+        else:
+            equity = 0.45
+
+        # Adjust equity based on opponent discard inference
+        if opp_discards and len(opp_discards) >= 3:
+            opp_b = _bucket_opp_discard(opp_discards)
+            # Tighten slightly vs strong opponent discard signals
+            if opp_b == "low_junk":
+                equity -= 0.03  # they kept strong cards
+            elif opp_b == "discarded_pair":
+                equity += 0.02  # they're speculative
+
+        strength = _bucket_strength(equity)
+        board_b = _bucket_flop_simple(community) if street >= 1 else "any"
+        tc_b = _bucket_to_call(to_call, pot_size)
+
+        # Look up policy
+        key = str((street, position, strength, board_b, tc_b))
+        policy = POLICY.get(key)
+        if not policy:
+            # Fallback: try with "medium" board and "none" to_call
+            key2 = str((street, position, strength, "medium", "none"))
+            policy = POLICY.get(key2, {
+                "fold": 0.20, "check_call": 0.40, "small_bet": 0.25,
+                "medium_bet": 0.10, "large_bet": 0.05, "jam": 0.0
+            })
+
+        # Mild opponent-model adjustment
+        opp_fold_rate = self._opp_fold_rate()
+        if opp_fold_rate > 0.5:
+            # Opponent folds a lot: bluff more
+            policy = dict(policy)
+            policy["small_bet"] = policy.get("small_bet", 0) + 0.05
+            policy["fold"] = max(0, policy.get("fold", 0) - 0.05)
+
+        # Sample action from mixed policy
+        action = self._sample_action(policy)
+
+        # Convert to game action
+        return self._action_to_tuple(
+            action, valid, min_raise, max_raise, pot_size, to_call, equity
+        )
+
+    def _sample_action(self, policy):
+        r = self._rng.random()
+        cumul = 0.0
+        for act, prob in policy.items():
+            cumul += prob
+            if r < cumul:
+                return act
+        return "check_call"
+
+    def _action_to_tuple(self, action, valid, min_raise, max_raise, pot_size, to_call, equity):
+        if action == "fold":
+            if valid[FOLD]:
+                return (FOLD, 0, 0, 0)
+            if valid[CHECK]:
+                return (CHECK, 0, 0, 0)
+            return (FOLD, 0, 0, 0)
+
+        if action == "check_call":
+            if to_call > 0 and valid[CALL]:
+                return (CALL, 0, 0, 0)
+            if valid[CHECK]:
+                return (CHECK, 0, 0, 0)
+            if valid[CALL]:
+                return (CALL, 0, 0, 0)
+            return (CHECK, 0, 0, 0)
+
+        if action == "jam":
+            if valid[RAISE] and max_raise > 0:
+                return (RAISE, max_raise, 0, 0)
+            if valid[CALL]:
+                return (CALL, 0, 0, 0)
+            if valid[CHECK]:
+                return (CHECK, 0, 0, 0)
+            return (FOLD, 0, 0, 0)
+
+        # Bet sizing
+        pot_ref = max(pot_size, 1)
+        if action == "small_bet":
+            frac = self._rng.uniform(0.30, 0.45)
+        elif action == "medium_bet":
+            frac = self._rng.uniform(0.55, 0.75)
+        elif action == "large_bet":
+            frac = self._rng.uniform(0.85, 1.10)
+        else:
+            frac = 0.50
+
+        raw_amount = int(pot_ref * frac)
+        amount = _clamp(raw_amount, min_raise, max_raise)
+
+        if valid[RAISE] and max_raise >= min_raise:
+            return (RAISE, amount, 0, 0)
+        if valid[CALL]:
+            return (CALL, 0, 0, 0)
+        if valid[CHECK]:
+            return (CHECK, 0, 0, 0)
+        return (FOLD, 0, 0, 0)
+
+    # ── Opponent model ──────────────────────────────────────────────────
+
+    def _opp_fold_rate(self):
+        folds, total = self.opp_stats["fold_to_raise"]
+        if total < 10:
+            return 0.35  # default
+        return folds / total
+
+    def _update_opp_stats(self, observation):
+        pass  # tracked via external log analysis for now
+
+    # ── Main act function ───────────────────────────────────────────────
 
     def act(self, observation, reward, terminated, truncated, info):
         my_cards = [c for c in observation["my_cards"] if c != -1]
@@ -230,151 +492,21 @@ class PlayerAgent(Agent):
         my_bet = observation["my_bet"]
         opp_bet = observation["opp_bet"]
         pot_size = observation.get("pot_size", my_bet + opp_bet)
+        blind_pos = observation.get("blind_position", 0)
 
-        # ---- Discard phase: MC eval all 10 keep combos ----
+        # Track hand number for seeded RNG
+        if street == 0 and my_bet <= 2 and opp_bet <= 2:
+            self.hand_number += 1
+
+        self._seed_rng(my_cards, street)
+
+        # ── Discard phase ───────────────────────────────────────────
         if valid[DISCARD]:
-            threat_suits = set()
-            if opp_discards:
-                unique_opp_suits = set(_suit(c) for c in opp_discards)
-                for s in range(3):
-                    if s not in unique_opp_suits:
-                        threat_suits.add(s)
+            i, j = self._choose_keep(my_cards, community, opp_discards)
+            return (DISCARD, 0, i, j)
 
-            best_eq = -1.0
-            best_ij = (0, 1)
-            for i, j in combinations(range(len(my_cards)), 2):
-                keep = [my_cards[i], my_cards[j]]
-                toss = [my_cards[k] for k in range(len(my_cards)) if k != i and k != j]
-                eq = self._compute_equity(keep, community, opp_discards, toss, num_sims=150)
-                if opp_discards and threat_suits:
-                    blocking = sum(1 for c in keep if _suit(c) in threat_suits)
-                    eq += 0.02 * blocking
-                if eq > best_eq:
-                    best_eq = eq
-                    best_ij = (i, j)
-            return (DISCARD, 0, best_ij[0], best_ij[1])
-
-        # ---- Pre-flop (street 0): premium filter, standard open ----
-        if street == 0:
-            premium = _has_any_premium(my_cards)
-            premium_pair = _has_premium_pair(my_cards)
-
-            if premium:
-                if premium_pair and opp_bet >= PREFLOP_COMMIT_THRESHOLD and valid[RAISE]:
-                    return (RAISE, max_raise, 0, 0)
-
-                if premium_pair and random.random() < SLOW_PLAY_CHANCE:
-                    if valid[CALL]:
-                        return (CALL, 0, 0, 0)
-                    if valid[CHECK]:
-                        return (CHECK, 0, 0, 0)
-
-                noise = random.uniform(0.85, 1.15)
-                open_size = _clamp(int(max(10, STANDARD_OPEN) * noise), min_raise, max_raise)
-                if valid[RAISE]:
-                    return (RAISE, open_size, 0, 0)
-                if valid[CALL]:
-                    return (CALL, 0, 0, 0)
-                return (CHECK, 0, 0, 0)
-            else:
-                if valid[CHECK]:
-                    return (CHECK, 0, 0, 0)
-                return (FOLD, 0, 0, 0)
-
-        # ---- Post-flop (streets 1-3): equity-driven betting ----
-        if len(my_cards) > 2:
-            my_cards = my_cards[:2]
-
-        equity = self._compute_equity(my_cards, community, opp_discards, my_discards, num_sims=300)
-        noise = random.uniform(RANDOM_FACTOR_LO, RANDOM_FACTOR_HI)
-        equity_adj = min(0.98, equity * noise)
-
-        opp_threat = _infer_opp_threat(opp_discards, community)
-        equity_adj -= opp_threat
-        if _board_paired_and_we_weak(my_cards, community):
-            equity_adj -= BOARD_PAIRED_EQUITY_PENALTY
-
-        to_call = opp_bet - my_bet
-        pot_odds = to_call / (pot_size + to_call) if to_call > 0 and (pot_size + to_call) > 0 else 0.0
-
-        if equity_adj > MONSTER_THRESHOLD:
-            if street == 1:
-                lo = _PROFILE.get("monster_bet_frac_flop_lo", 0.55)
-                hi = _PROFILE.get("monster_bet_frac_flop_hi", 0.72)
-                bet_frac = random.uniform(lo, hi)
-            elif street == 2:
-                bet_frac = random.uniform(0.70, 0.90)
-            else:
-                bet_frac = 1.0
-            raise_amt = _clamp(int(pot_size * bet_frac), min_raise, max_raise)
-            if street == 3 and valid[RAISE]:
-                return (RAISE, max_raise, 0, 0)
-            if valid[RAISE]:
-                return (RAISE, raise_amt, 0, 0)
-            if valid[CALL]:
-                return (CALL, 0, 0, 0)
-            return (CHECK, 0, 0, 0)
-
-        elif equity_adj > STRONG_THRESHOLD:
-            if street == 1:
-                lo = _PROFILE.get("strong_bet_frac_flop_lo", 0.60)
-                hi = _PROFILE.get("strong_bet_frac_flop_hi", 0.75)
-                bet_frac = random.uniform(lo, hi)
-            elif street == 2:
-                bet_frac = random.uniform(0.65, 0.80)
-            else:
-                bet_frac = random.uniform(0.75, 0.90)
-            raise_amt = _clamp(int(pot_size * bet_frac), min_raise, max_raise)
-            if valid[RAISE]:
-                return (RAISE, raise_amt, 0, 0)
-            if valid[CALL]:
-                return (CALL, 0, 0, 0)
-            return (CHECK, 0, 0, 0)
-
-        elif equity_adj > GOOD_THRESHOLD:
-            bet_frac = random.uniform(0.30, 0.50)
-            raise_amt = _clamp(int(pot_size * bet_frac), min_raise, max_raise)
-            if valid[RAISE]:
-                return (RAISE, raise_amt, 0, 0)
-            if valid[CALL] and equity_adj >= pot_odds:
-                return (CALL, 0, 0, 0)
-            if valid[CHECK]:
-                return (CHECK, 0, 0, 0)
-            if len(my_cards) == 2 and _is_premium_pair(my_cards[0], my_cards[1]) and (to_call <= min_raise or (pot_size > 0 and to_call <= pot_size * 0.20)):
-                if valid[CALL]:
-                    return (CALL, 0, 0, 0)
-                if valid[CHECK]:
-                    return (CHECK, 0, 0, 0)
-            return (FOLD, 0, 0, 0)
-
-        elif equity_adj >= pot_odds and to_call <= pot_size * 0.3:
-            if street == 3 and to_call > 0 and pot_size > 0 and to_call > pot_size * RIVER_CALL_POT_RATIO_MAX:
-                if not (len(my_cards) == 2 and _is_premium_pair(my_cards[0], my_cards[1])):
-                    if valid[CHECK]:
-                        return (CHECK, 0, 0, 0)
-                    return (FOLD, 0, 0, 0)
-            if valid[CALL]:
-                return (CALL, 0, 0, 0)
-            if valid[CHECK]:
-                return (CHECK, 0, 0, 0)
-            if len(my_cards) == 2 and _is_premium_pair(my_cards[0], my_cards[1]) and (to_call <= min_raise or (pot_size > 0 and to_call <= pot_size * 0.20)):
-                if valid[CALL]:
-                    return (CALL, 0, 0, 0)
-                if valid[CHECK]:
-                    return (CHECK, 0, 0, 0)
-            return (FOLD, 0, 0, 0)
-
-        else:
-            if street == 3 and to_call > 0 and pot_size > 0 and to_call > pot_size * RIVER_CALL_POT_RATIO_MAX:
-                if not (len(my_cards) == 2 and _is_premium_pair(my_cards[0], my_cards[1])):
-                    if valid[CHECK]:
-                        return (CHECK, 0, 0, 0)
-                    return (FOLD, 0, 0, 0)
-            if valid[CHECK]:
-                return (CHECK, 0, 0, 0)
-            if len(my_cards) == 2 and _is_premium_pair(my_cards[0], my_cards[1]) and (to_call <= min_raise or (pot_size > 0 and to_call <= pot_size * 0.20)):
-                if valid[CALL]:
-                    return (CALL, 0, 0, 0)
-                if valid[CHECK]:
-                    return (CHECK, 0, 0, 0)
-            return (FOLD, 0, 0, 0)
+        # ── Betting phase ───────────────────────────────────────────
+        return self._choose_bet(
+            street, my_cards, community, opp_discards, my_discards,
+            valid, min_raise, max_raise, my_bet, opp_bet, pot_size, blind_pos
+        )

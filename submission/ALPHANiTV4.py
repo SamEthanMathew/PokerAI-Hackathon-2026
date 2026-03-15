@@ -1,5 +1,3 @@
-#CURRENT: ALPHANiT V2 (Nit: data-driven constants, river discipline, board caution)
-
 import json
 import os
 import random

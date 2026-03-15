@@ -144,12 +144,12 @@ def main():
 
     equity = generate_equity_table(num_sims, seed)
     distributions = generate_distribution_table(num_sims, seed)
-    matchups = generate_matchup_table(min(num_sims, 500), seed)
+    matchups = generate_matchup_table(max(num_sims, 1000), seed)
 
     policy = build_full_policy()
     print(f"\nBuilt {len(policy)} policy entries.")
 
-    posterior = build_posterior_table(min(num_sims, 2000), seed)
+    posterior = build_posterior_table(max(num_sims, 10000), seed)
     print(f"Built {len(posterior)} posterior entries.")
 
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

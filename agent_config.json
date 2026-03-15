@@ -1,6 +1,6 @@
 {
     "bot0": {
-        "file_path": "submission.ALPHANiT.PlayerAgent",
+        "file_path": "submission.Libratus.PlayerAgent",
         "port": 8000,
         "player_id": "bot0"
     },
