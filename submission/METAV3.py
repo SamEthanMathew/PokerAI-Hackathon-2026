@@ -158,130 +158,6 @@ def _normalize_action(raw):
 
 # ── Libratus bucket helpers ────────────────────────────────────────────────────
 
-# ── Hand rank and out-counting helpers ────────────────────────────────────────
-
-def _hand_rank_category(my_cards, community):
-    """
-    Determine hand category from our 2 cards + community.
-    Returns: 'trips_plus', 'two_pair', 'one_pair', 'draw_only', 'nothing'
-    'trips_plus' covers trips, straight, flush, full house, straight flush.
-    """
-    if len(my_cards) < 2 or len(community) < 3:
-        return "nothing"
-    all_ranks = [_rank(c) for c in my_cards[:2]] + [_rank(c) for c in community]
-    all_suits = [_suit(c) for c in my_cards[:2]] + [_suit(c) for c in community]
-    rc = Counter(all_ranks)
-    sc = Counter(all_suits)
-
-    # Check flush (5 of same suit)
-    if sc.most_common(1)[0][1] >= 5:
-        return "trips_plus"
-    # Check straight (5 consecutive)
-    unique_r = sorted(set(all_ranks))
-    # Add ace-low wrap
-    if RANK_A in unique_r:
-        unique_r_ext = [-1] + unique_r  # ace as -1 (below 0=rank2)
-    else:
-        unique_r_ext = unique_r
-    best_run = 1
-    cur_run = 1
-    for i in range(1, len(unique_r_ext)):
-        if unique_r_ext[i] - unique_r_ext[i-1] == 1:
-            cur_run += 1
-            best_run = max(best_run, cur_run)
-        else:
-            cur_run = 1
-    if best_run >= 5:
-        return "trips_plus"
-    # Check trips (3 of a kind)
-    if rc.most_common(1)[0][1] >= 3:
-        return "trips_plus"
-    # Check two pair
-    pairs = [r for r, cnt in rc.items() if cnt >= 2]
-    if len(pairs) >= 2:
-        return "two_pair"
-    if len(pairs) == 1:
-        return "one_pair"
-    return "nothing"
-
-
-def _count_flush_outs(my_cards, community, opp_discards, my_discards):
-    """
-    Count live flush outs. Returns (best_suit_count, live_outs, total_unknowns).
-    best_suit_count = how many of the best suit we have (hand + board).
-    """
-    if len(my_cards) < 2 or len(community) < 3:
-        return 0, 0, 27
-    known = set(my_cards[:2]) | set(community) | set(opp_discards) | set(my_discards)
-    total_unknowns = 27 - len(known)
-
-    best_suit = -1
-    best_count = 0
-    best_live = 0
-    for s in range(3):  # 3 suits
-        in_hand = sum(1 for c in my_cards[:2] if _suit(c) == s)
-        on_board = sum(1 for c in community if _suit(c) == s)
-        count = in_hand + on_board
-        if count >= best_count:
-            # Count dead cards of this suit
-            dead_of_suit = sum(1 for c in known if _suit(c) == s)
-            live = 9 - dead_of_suit  # 9 cards per suit in 27-card deck
-            if count > best_count or live > best_live:
-                best_suit = s
-                best_count = count
-                best_live = live
-    return best_count, best_live, total_unknowns
-
-
-def _count_straight_outs(my_cards, community, opp_discards, my_discards):
-    """
-    Count live straight outs. Returns (cards_in_run, live_outs, total_unknowns).
-    Checks how close we are to a 5-card straight and how many outs complete it.
-    """
-    if len(my_cards) < 2 or len(community) < 3:
-        return 0, 0, 27
-    known = set(my_cards[:2]) | set(community) | set(opp_discards) | set(my_discards)
-    total_unknowns = 27 - len(known)
-    have_ranks = set(_rank(c) for c in my_cards[:2]) | set(_rank(c) for c in community)
-
-    best_in_run = 0
-    best_outs = 0
-
-    # Check all possible 5-card straights: A-2-3-4-5 through 6-7-8-9-A
-    straight_windows = []
-    for low in range(0, NUM_RANKS):  # 0=rank2 through 8=rankA
-        window = [(low + i) % NUM_RANKS for i in range(5)]
-        # Validate: must be consecutive (handle ace-high: 5-6-7-8-A where A=8)
-        # Actually straights are: A2345, 23456, 34567, 45678, 56789, 6789A
-        straight_windows.append(window)
-    # Specific valid straights for this game:
-    valid_straights = [
-        [RANK_A, 0, 1, 2, 3],  # A-2-3-4-5
-        [0, 1, 2, 3, 4],       # 2-3-4-5-6
-        [1, 2, 3, 4, 5],       # 3-4-5-6-7
-        [2, 3, 4, 5, 6],       # 4-5-6-7-8
-        [3, 4, 5, 6, 7],       # 5-6-7-8-9
-        [4, 5, 6, 7, RANK_A],  # 6-7-8-9-A
-    ]
-
-    for window in valid_straights:
-        have = sum(1 for r in window if r in have_ranks)
-        need_ranks = [r for r in window if r not in have_ranks]
-        if have >= 3 and len(need_ranks) <= 2:
-            # Count live outs for needed ranks
-            live = 0
-            for nr in need_ranks:
-                # Each rank has 3 cards (3 suits); count how many are still unknown
-                for s in range(3):
-                    card_id = s * NUM_RANKS + nr
-                    if card_id not in known:
-                        live += 1
-            if have > best_in_run or (have == best_in_run and live > best_outs):
-                best_in_run = have
-                best_outs = live
-
-    return best_in_run, best_outs, total_unknowns
-
 def _bucket_keep(keep2):
     r1, r2 = _rank(keep2[0]), _rank(keep2[1])
     s1, s2 = _suit(keep2[0]), _suit(keep2[1])
@@ -709,56 +585,6 @@ class PlayerAgent(Agent):
         return 2.8*eq + 2.2*pp + 1.7*dd + 1.0*mhv + 0.8*bv + 0.6*sf, eq
 
     def _choose_keep(self, my_cards, community, opp_discards, d_sims, mode=MODE_AGRO):
-        # ── Priority-based override: flush draw > straight draw > fallback ──
-        # Check if any 2-card combo gives a strong draw before running MC
-        if community and len(community) >= 3:
-            best_flush_ij = None
-            best_flush_live = 0
-            best_flush_count = 0
-            best_straight_ij = None
-            best_straight_outs = 0
-            best_straight_in = 0
-            best_trips_ij = None
-
-            for i, j in combinations(range(len(my_cards)), 2):
-                keep = [my_cards[i], my_cards[j]]
-                toss = [my_cards[k] for k in range(len(my_cards)) if k not in (i, j)]
-                toss_set = set(toss)
-                opp_set = set(opp_discards) if opp_discards else set()
-
-                # Check flush potential
-                fc, fl, tu = _count_flush_outs(keep, community, opp_discards, list(toss_set))
-                if fc >= 4 and fl >= 3:  # 4+ to flush with 3+ live outs
-                    if fc > best_flush_count or (fc == best_flush_count and fl > best_flush_live):
-                        best_flush_count = fc
-                        best_flush_live = fl
-                        best_flush_ij = (i, j)
-
-                # Check straight potential
-                si, so, _ = _count_straight_outs(keep, community, opp_discards, list(toss_set))
-                if si >= 4 and so >= 3:  # 4+ to straight with 3+ live outs
-                    if si > best_straight_in or (si == best_straight_in and so > best_straight_outs):
-                        best_straight_in = si
-                        best_straight_outs = so
-                        best_straight_ij = (i, j)
-
-                # Check trips (pair matching board)
-                kr = [_rank(c) for c in keep]
-                br = [_rank(c) for c in community]
-                if kr[0] == kr[1] and kr[0] in br:
-                    best_trips_ij = (i, j)
-
-            # Priority 1: Flush draw (4+ to flush with live outs)
-            if best_flush_ij and best_flush_live >= 3:
-                return best_flush_ij
-            # Priority 2: Strong straight draw (4+ to straight with live outs)
-            if best_straight_ij and best_straight_outs >= 4:
-                return best_straight_ij
-            # Priority 3: Trips (pair matching the board)
-            if best_trips_ij:
-                return best_trips_ij
-
-        # ── Fallback: weighted keep_score with equity guard ──────────────
         best_score    = -999.0
         best_ij       = (0, 1)
         best_eq_ij    = (0, 1)
@@ -1484,35 +1310,6 @@ class PlayerAgent(Agent):
                                          my_discards, valid, min_raise, max_raise,
                                          my_bet, opp_bet, pot_size, opp_last, p_sims)
 
-        # ── One-pair cap: never RAISE postflop with only one pair ─────────
-        # Two pair, trips, straights, flushes can raise freely.
-        # One pair can only call or check — never initiate or escalate.
-        if len(my_cards) == 2 and len(community) >= 3:
-            hand_cat = _hand_rank_category(my_cards, community)
-            to_call_now = max(0, opp_bet - my_bet)
-            pot_ref_now = max(pot_size, 1)
-
-            if hand_cat == "one_pair":
-                # Never raise with one pair
-                if result[0] == RAISE:
-                    if to_call_now > 0 and valid[CALL]:
-                        result = (CALL, 0, 0, 0)
-                    elif valid[CHECK]:
-                        result = (CHECK, 0, 0, 0)
-
-                # Fold one pair facing big pressure (>40% pot bet)
-                if result[0] == CALL and to_call_now > pot_ref_now * 0.40:
-                    if valid[FOLD]:
-                        result = (FOLD, 0, 0, 0)
-
-            elif hand_cat == "nothing":
-                # No made hand and no draw — fold to any bet, check if free
-                if to_call_now > 0:
-                    if valid[FOLD]:
-                        result = (FOLD, 0, 0, 0)
-                elif valid[CHECK]:
-                    result = (CHECK, 0, 0, 0)
-
         if result[0] == RAISE:
             if street == 1:   self._betting_history["bet_flop"] = True
             elif street == 2: self._betting_history["bet_turn"] = True
@@ -1542,11 +1339,3 @@ class PlayerAgent(Agent):
 
         if terminated:
             self._running_pnl += int(reward)
-
-            # Terminal fold tracking: when opponent folds to our bet, act() is
-            # never called again, so we must update fold stats here.
-            if self._opp_folded and self._last_was_bet:
-                self._stats["fold_to_bet"][0] += 1
-                self._stats["fold_to_bet"][1] += 1
-                self._stats["fold_to_raise"][0] += 1
-                self._stats["fold_to_raise"][1] += 1
