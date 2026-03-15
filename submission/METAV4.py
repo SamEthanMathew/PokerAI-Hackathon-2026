@@ -1,4 +1,4 @@
-# MetaBot v2: Adaptive Decision-Tree Poker Agent
+# MetaBot v4: Adaptive Decision-Tree Poker Agent
 #
 # Routes between four strategy modes based on live opponent profiling:
 #   GTO_DEFAULT  — Libratus policy tables  (unknown villain, first ~5 hands)
