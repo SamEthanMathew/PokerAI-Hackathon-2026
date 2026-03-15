@@ -1,11 +1,11 @@
 {
     "bot0": {
-        "file_path": "submission.player.PlayerAgent",
+        "file_path": "submission.ALPHANiT.PlayerAgent",
         "port": 8000,
         "player_id": "bot0"
     },
     "bot1": {
-        "file_path": "agents.prob_agent.ProbabilityAgent",
+        "file_path": "submission.player.PlayerAgent",
         "port": 8001,
         "player_id": "bot1"
     },

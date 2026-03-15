@@ -1,4 +1,4 @@
-#CURRENT: ALPHANiT V5
+#CURRENT: ALPHANiT V2 (Nit: data-driven constants, river discipline, board caution)
 
 import json
 import os
@@ -28,7 +28,7 @@ STRONG_THRESHOLD = 0.70
 GOOD_THRESHOLD = 0.50
 PREFLOP_COMMIT_THRESHOLD = 15
 RIVER_CALL_POT_RATIO_MAX = _PROFILE.get("river_call_pot_ratio_max", 0.35)
-BOARD_PAIRED_EQUITY_PENALTY = _PROFILE.get("board_paired_equity_penalty", 0.10)
+BOARD_PAIRED_EQUITY_PENALTY = 0.08
 
 RANKS = "23456789A"
 NUM_RANKS = len(RANKS)
@@ -270,7 +270,7 @@ class PlayerAgent(Agent):
                         return (CHECK, 0, 0, 0)
 
                 noise = random.uniform(0.85, 1.15)
-                open_size = _clamp(int(max(10, STANDARD_OPEN) * noise), min_raise, max_raise)
+                open_size = _clamp(int(STANDARD_OPEN * noise), min_raise, max_raise)
                 if valid[RAISE]:
                     return (RAISE, open_size, 0, 0)
                 if valid[CALL]:
@@ -340,7 +340,7 @@ class PlayerAgent(Agent):
                 return (CALL, 0, 0, 0)
             if valid[CHECK]:
                 return (CHECK, 0, 0, 0)
-            if len(my_cards) == 2 and _is_premium_pair(my_cards[0], my_cards[1]) and (to_call <= min_raise or (pot_size > 0 and to_call <= pot_size * 0.20)):
+            if len(my_cards) == 2 and _is_premium_pair(my_cards[0], my_cards[1]) and (to_call <= min_raise or (pot_size > 0 and to_call <= pot_size * 0.15)):
                 if valid[CALL]:
                     return (CALL, 0, 0, 0)
                 if valid[CHECK]:
@@ -357,7 +357,7 @@ class PlayerAgent(Agent):
                 return (CALL, 0, 0, 0)
             if valid[CHECK]:
                 return (CHECK, 0, 0, 0)
-            if len(my_cards) == 2 and _is_premium_pair(my_cards[0], my_cards[1]) and (to_call <= min_raise or (pot_size > 0 and to_call <= pot_size * 0.20)):
+            if len(my_cards) == 2 and _is_premium_pair(my_cards[0], my_cards[1]) and (to_call <= min_raise or (pot_size > 0 and to_call <= pot_size * 0.15)):
                 if valid[CALL]:
                     return (CALL, 0, 0, 0)
                 if valid[CHECK]:
@@ -372,7 +372,7 @@ class PlayerAgent(Agent):
                     return (FOLD, 0, 0, 0)
             if valid[CHECK]:
                 return (CHECK, 0, 0, 0)
-            if len(my_cards) == 2 and _is_premium_pair(my_cards[0], my_cards[1]) and (to_call <= min_raise or (pot_size > 0 and to_call <= pot_size * 0.20)):
+            if len(my_cards) == 2 and _is_premium_pair(my_cards[0], my_cards[1]) and (to_call <= min_raise or (pot_size > 0 and to_call <= pot_size * 0.15)):
                 if valid[CALL]:
                     return (CALL, 0, 0, 0)
                 if valid[CHECK]:

@@ -1,4 +1,4 @@
-#CURRENT: ALPHANiT V5
+#CURRENT: ALPHANiT V4
 
 import json
 import os
