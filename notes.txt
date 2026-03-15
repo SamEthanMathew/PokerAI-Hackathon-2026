@@ -1,1 +1,14 @@
 Finish Agro bot and fix libratus.
+
+Write something to figure out who the comp is and accordingly change it to a specific type of bot just for them so you can beat them when it comes down to it.
+
+so made it not make it as aggressive
+auto fold when theres a fourliner to a flush and a straight
+- if theres four hearts then fold cause the straight 
+
+Tracking oponents stats:
+- Tracking agression factor: how much they bet or raise compared to call.
+if its above 5 then bet more. if its less than 1.5 then bluff more.
+
+Seperate how you play the river from how you play the flop and turn.
+
