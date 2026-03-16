@@ -1,4 +1,4 @@
-# PokerBotEngine2026
+#Team Bot
 
 ## How to run the engine
 
