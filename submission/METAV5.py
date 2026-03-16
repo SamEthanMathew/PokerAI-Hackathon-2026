@@ -30,11 +30,6 @@ try:
 except ImportError:
     from libratus_tables import POLICY, KEEP_EQUITY, POSTERIOR, MATCHUPS
 
-try:
-    from submission.discard_engine import choose_keep_postflop as _choose_keep_postflop
-except ImportError:
-    from discard_engine import choose_keep_postflop as _choose_keep_postflop
-
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 NUM_RANKS = 9
@@ -55,6 +50,49 @@ MODE_GTO   = "GTO"
 MODE_AGRO  = "AGRO"
 MODE_VALUE = "VALUE"
 MODE_TRAP  = "TRAP"
+
+# ── Discard scoring weights ──────────────────────────────────────────────────
+# The old discard_engine.py hard-tiered pairs above all draws (pair base=200,
+# max flush draw=116).  These rebalanced weights let strong draws beat weak
+# pairs, matching the empirical finding that MetaV5 kept flush draws only 498
+# times vs AlphaNiTV5's 1303 times.
+
+W_FLUSH_MADE       = 900
+W_FH_MADE          = 800
+W_STRAIGHT_MADE    = 700
+W_TRIPS_BASE       = 500
+W_TWO_PAIR_BASE    = 370
+W_PAIR_BASE        = 70       # heavily reduced — mid pairs were massive EV drain
+W_PAIR_RANK_MULT   = 14       # steeper rank curve so AA stays viable, low pairs drop
+PAIR_DRAW_PENALTY  = 60       # stronger penalty when flush/straight draws available
+
+W_FLUSH_DRAW       = 210      # up from ~80 — flush draws are the biggest leak
+W_FLUSH_OUT_MULT   = 12       # up from 4
+W_FLUSH_QUAL       = 5        # up from 2
+W_OESD_BASE        = 155      # up from ~50
+W_OESD_OUT_MULT    = 8        # up from 3
+W_GUTSHOT_BASE     = 60
+W_GUTSHOT_OUT_MULT = 5
+W_BOAT_OUT_MULT    = 12
+W_BOAT_QUALITY     = 3
+W_THREAT_SUIT      = 10       # up from 3 — was too small to ever matter
+W_OPP_HIGH_DUMP    = 6
+W_STRUCTURE_MAX    = 60
+TOP_K_MC           = 5        # wider net so rule-based ranker can't bury the best hand
+MC_TIEBREAK_SIMS   = 200      # SE ~3.5% — reliable enough to influence close decisions
+MC_TIEBREAK_W      = 80       # bridges gaps up to ~80 pts without overriding structural winners
+TOTAL_HANDS        = 1000    # match length for bleed-out lock
+
+# Six legal 5-card straight windows in the 27-card deck (rank indices)
+_VALID_STRAIGHTS = [
+    (8, 0, 1, 2, 3),   # A-2-3-4-5  (wheel)
+    (0, 1, 2, 3, 4),   # 2-3-4-5-6
+    (1, 2, 3, 4, 5),   # 3-4-5-6-7
+    (2, 3, 4, 5, 6),   # 4-5-6-7-8
+    (3, 4, 5, 6, 7),   # 5-6-7-8-9
+    (4, 5, 6, 7, 8),   # 6-7-8-9-A  (broadway)
+]
+_WHEEL_SET = frozenset({8, 0, 1, 2, 3})
 
 # ── Premium hand definitions (single source of truth) ─────────────────────────
 
@@ -286,6 +324,18 @@ def _count_straight_outs(my_cards, community, opp_discards, my_discards):
                 best_outs = live
 
     return best_in_run, best_outs, total_unknowns
+
+
+def _has_live_draw(my_cards, community, opp_discards, my_discards):
+    """Return True if the hand has a meaningful draw (4-to-flush or OESD)."""
+    suit_count, flush_outs, _ = _count_flush_outs(my_cards, community, opp_discards, my_discards)
+    if suit_count >= 4 and flush_outs >= 2:
+        return True
+    run_count, straight_outs, _ = _count_straight_outs(my_cards, community, opp_discards, my_discards)
+    if run_count >= 4 and straight_outs >= 3:
+        return True
+    return False
+
 
 def _bucket_keep(keep2):
     r1, r2 = _rank(keep2[0]), _rank(keep2[1])
@@ -600,7 +650,444 @@ class PlayerAgent(Agent):
         return MODE_AGRO, 1.0
 
     # =========================================================================
-    # DISCARD — Mode-aware KeepScore
+    # DISCARD — Improved keep-2 engine  (fixes flush-draw / boat / pair bias)
+    # =========================================================================
+    #
+    # The old discard_engine.py hard-tiered pairs (base 200) above all draws
+    # (max flush draw ~116), so MetaV5 almost never kept flush draws.  The new
+    # engine scores every candidate as a weighted sum of six components so that
+    # strong live draws can beat naked pairs.
+    # =========================================================================
+
+    # ── Step 1: classify the immediate 5-card made hand ──────────────────────
+
+    @staticmethod
+    def _classify_made(keep2, flop3):
+        """Classify keep2 + flop3 into (category, details).
+
+        Priority: flush > full_house > straight > trips > two_pair > pair > nothing.
+        In the 27-card variant flushes are the rarest and strongest hands.
+        """
+        all5 = list(keep2) + list(flop3)
+        ranks = [_rank(c) for c in all5]
+        suits = [_suit(c) for c in all5]
+        rc = Counter(ranks)
+        sc = Counter(suits)
+
+        is_flush = (sc.most_common(1)[0][1] == 5)
+
+        unique_ranks = sorted(set(ranks))
+        is_straight = False
+        straight_high = -1
+        if len(unique_ranks) == 5:
+            ur_set = set(unique_ranks)
+            for window in _VALID_STRAIGHTS:
+                if set(window) == ur_set:
+                    is_straight = True
+                    straight_high = 3 if ur_set == _WHEEL_SET else max(window)
+                    break
+
+        if is_flush:
+            flush_suit = sc.most_common(1)[0][0]
+            flush_ranks = sorted(
+                [_rank(c) for c in all5 if _suit(c) == flush_suit], reverse=True
+            )
+            return ('flush', {
+                'quality': flush_ranks[0],
+                'ranks': flush_ranks,
+                'is_straight_flush': is_straight,
+            })
+
+        trips_rank = None
+        pair_ranks = []
+        for r, cnt in rc.most_common():
+            if cnt >= 3 and trips_rank is None:
+                trips_rank = r
+            elif cnt == 2:
+                pair_ranks.append(r)
+
+        if trips_rank is not None and pair_ranks:
+            return ('full_house', {
+                'trips_rank': trips_rank,
+                'pair_rank': max(pair_ranks),
+            })
+
+        if is_straight:
+            return ('straight', {'high': straight_high})
+
+        if trips_rank is not None:
+            kickers = sorted([r for r in ranks if r != trips_rank], reverse=True)
+            return ('trips', {
+                'trips_rank': trips_rank,
+                'kicker_ranks': kickers,
+            })
+
+        if len(pair_ranks) >= 2:
+            pr_sorted = sorted(pair_ranks, reverse=True)
+            kicker = [r for r in ranks if r not in pair_ranks]
+            return ('two_pair', {
+                'pair_ranks': pr_sorted,
+                'kicker': max(kicker) if kicker else 0,
+            })
+
+        if pair_ranks:
+            pr = pair_ranks[0]
+            kickers = sorted([r for r in ranks if r != pr], reverse=True)
+            return ('pair', {'pair_rank': pr, 'kickers': kickers})
+
+        return ('nothing', {'high_cards': sorted(ranks, reverse=True)})
+
+    # ── Step 2: full-house / boat potential ───────────────────────────────────
+
+    @staticmethod
+    def _compute_boat_potential(keep2, flop3, known):
+        """Score boat potential for trips / two-pair / paired-board keeps.
+
+        In the 27-card game paired boards are common (only 9 ranks, 3 copies
+        each).  Boat potential is a first-class scoring term — not a tiny bonus
+        — because full houses are extremely strong when they hit.
+
+        Returns (boat_score, live_boat_outs).
+        """
+        all5 = list(keep2) + list(flop3)
+        ranks = [_rank(c) for c in all5]
+        rc = Counter(ranks)
+
+        trips_rank = None
+        pair_ranks = []
+        for r, cnt in rc.items():
+            if cnt >= 3:
+                trips_rank = r
+            elif cnt == 2:
+                pair_ranks.append(r)
+
+        live_outs = 0
+        best_quality = 0
+
+        if trips_rank is not None and not pair_ranks:
+            kicker_ranks = set(r for r in ranks if r != trips_rank)
+            for target in kicker_ranks:
+                for s in range(3):
+                    cid = s * NUM_RANKS + target
+                    if cid not in known:
+                        live_outs += 1
+                best_quality = max(best_quality, trips_rank * 10 + target)
+
+        elif len(pair_ranks) >= 2:
+            for pr in pair_ranks:
+                for s in range(3):
+                    cid = s * NUM_RANKS + pr
+                    if cid not in known:
+                        live_outs += 1
+                other = max(r for r in pair_ranks if r != pr)
+                best_quality = max(best_quality, pr * 10 + other)
+
+        boat_score = live_outs * W_BOAT_OUT_MULT + best_quality * W_BOAT_QUALITY
+        return boat_score, live_outs
+
+    # ── Step 3: flush-draw potential ─────────────────────────────────────────
+
+    @staticmethod
+    def _compute_flush_potential(keep2, flop3, known):
+        """Score flush-draw potential when both kept cards are suited and the
+        flop contains 2+ of that suit (4-to-a-flush on the flop).
+
+        This was the single biggest leak in the old engine: flush draws were
+        scored so low they could never beat a naked pair of 2s.  Now a strong
+        live flush draw scores 250-320, beating most naked pairs.
+
+        Opponent discards are already folded into *known* so dead outs are
+        automatically excluded from live_outs.
+
+        Returns (flush_score, is_draw, live_outs, quality_rank).
+        """
+        k_suits = [_suit(c) for c in keep2]
+        if k_suits[0] != k_suits[1]:
+            return 0.0, False, 0, 0
+
+        draw_suit = k_suits[0]
+        flop_of_suit = sum(1 for c in flop3 if _suit(c) == draw_suit)
+        total = 2 + flop_of_suit
+        if total < 4:
+            return 0.0, False, 0, 0
+
+        live_outs = 0
+        for r in range(NUM_RANKS):
+            cid = draw_suit * NUM_RANKS + r
+            if cid not in known:
+                live_outs += 1
+
+        quality_rank = max(_rank(c) for c in keep2)
+        flush_score = W_FLUSH_DRAW + live_outs * W_FLUSH_OUT_MULT + quality_rank * W_FLUSH_QUAL
+        return flush_score, True, live_outs, quality_rank
+
+    # ── Step 4: straight-draw potential ──────────────────────────────────────
+
+    @staticmethod
+    def _compute_straight_potential(keep2, flop3, known):
+        """Score straight-draw potential (OESD / gutshot / double-gutter).
+
+        Scans all 6 valid straight windows.  OESD = 2+ windows each needing
+        exactly 1 card.  Open-ended beats gutshot; more live outs beats fewer;
+        higher straight beats lower.
+
+        Returns (straight_score, draw_type, live_outs, straight_high).
+        """
+        all5 = list(keep2) + list(flop3)
+        have_ranks = set(_rank(c) for c in all5)
+
+        completing_cards = set()
+        best_high = -1
+        windows_needing_one = 0
+
+        for window in _VALID_STRAIGHTS:
+            w_set = set(window)
+            need = w_set - have_ranks
+
+            if len(need) == 1:
+                windows_needing_one += 1
+                needed_rank = next(iter(need))
+                for s in range(3):
+                    cid = s * NUM_RANKS + needed_rank
+                    if cid not in known:
+                        completing_cards.add(cid)
+                high = 3 if w_set == _WHEEL_SET else max(window)
+                best_high = max(best_high, high)
+
+            elif len(need) == 2:
+                for needed_rank in need:
+                    for s in range(3):
+                        cid = s * NUM_RANKS + needed_rank
+                        if cid not in known:
+                            completing_cards.add(cid)
+
+        live_outs = len(completing_cards)
+
+        if windows_needing_one >= 2:
+            draw_type = 'oesd'
+            straight_score = W_OESD_BASE + live_outs * W_OESD_OUT_MULT + max(best_high, 0)
+        elif windows_needing_one == 1:
+            draw_type = 'gutshot'
+            straight_score = W_GUTSHOT_BASE + live_outs * W_GUTSHOT_OUT_MULT + max(best_high, 0)
+        elif live_outs >= 4:
+            draw_type = 'double_gutter'
+            straight_score = W_GUTSHOT_BASE + live_outs * W_GUTSHOT_OUT_MULT + max(best_high, 0)
+        else:
+            draw_type = 'none'
+            straight_score = 0.0
+
+        return straight_score, draw_type, live_outs, best_high
+
+    # ── Step 5: opponent discard threat-suit inference ────────────────────────
+
+    @staticmethod
+    def _compute_threat_bonus(keep2, flop3, opp_discards, known):
+        """Lightweight inference from visible opponent discards.
+
+        Two signals:
+        1. Suit-abandon: if opponent threw 0 cards of suit S and the flop has
+           2+ of S, suit S is a "threat suit" they may have kept.  Holding
+           blockers of that suit is valuable.
+        2. High-card dump: if opponent tossed 2+ high cards (rank >= 8) their
+           kept hand likely skews weaker.
+
+        The old engine used +3 per match on a 0-999 scale — too small to ever
+        change a decision.  Now W_THREAT_SUIT = 10.
+        """
+        if not opp_discards:
+            return 0.0
+
+        bonus = 0.0
+        opp_suit_counts = Counter(_suit(c) for c in opp_discards)
+        keep_suits = [_suit(c) for c in keep2]
+        flop_suits = Counter(_suit(c) for c in flop3)
+
+        for s in range(3):
+            if opp_suit_counts.get(s, 0) == 0 and flop_suits.get(s, 0) >= 2:
+                if any(ks == s for ks in keep_suits):
+                    bonus += W_THREAT_SUIT
+
+        # Also credit when opponent abandons high cards of a suit we draw in
+        opp_suit_abandon = Counter(_suit(c) for c in opp_discards)
+        for s, cnt in opp_suit_abandon.items():
+            flop_of_s = flop_suits.get(s, 0)
+            if cnt >= 2 and flop_of_s >= 2:
+                if any(ks == s for ks in keep_suits):
+                    bonus += W_THREAT_SUIT * 0.5
+
+        opp_high = sum(1 for c in opp_discards if _rank(c) >= RANK_8)
+        if opp_high >= 2:
+            bonus += W_OPP_HIGH_DUMP
+
+        return bonus
+
+    # ── Step 6: structural fallback ──────────────────────────────────────────
+
+    @staticmethod
+    def _structural_fallback(keep2, flop3, known):
+        """Score 0-60 based on raw card quality for close tiebreaks.
+
+        Considers suitedness, connectivity, high-card value, and flop
+        interaction.  Only matters when higher-tier components are tied.
+        """
+        r0, r1 = _rank(keep2[0]), _rank(keep2[1])
+        s0, s1 = _suit(keep2[0]), _suit(keep2[1])
+        suited = (s0 == s1)
+        high_rank = max(r0, r1)
+
+        gap = abs(r0 - r1)
+        if gap > 4:
+            gap = NUM_RANKS - gap
+
+        score = 0.0
+
+        if suited:
+            flop_suit_count = sum(1 for c in flop3 if _suit(c) == s0)
+            if flop_suit_count >= 2:
+                score += 18
+            elif flop_suit_count == 1:
+                score += 3
+            # 0 matching flop cards = worthless backdoor in 27-card game
+
+        if gap == 0:
+            score += 12 + high_rank
+        elif gap == 1:
+            score += 12
+        elif gap == 2:
+            score += 7
+        elif gap == 3:
+            score += 3
+
+        score += high_rank * 1.5
+
+        flop_ranks = [_rank(c) for c in flop3]
+        if r0 in flop_ranks or r1 in flop_ranks:
+            score += 6
+
+        keep_set = set(keep2)
+        flop_set = set(flop3)
+        for r in (r0, r1):
+            for s in range(3):
+                cid = s * NUM_RANKS + r
+                if cid in known and cid not in keep_set and cid not in flop_set:
+                    score -= 1.5
+
+        return max(0.0, min(float(W_STRUCTURE_MAX), score))
+
+    # ── Orchestrator: score one candidate and pick the best ──────────────────
+
+    def _choose_keep(self, my_cards, community, opp_discards, d_sims, mode=MODE_AGRO):
+        """Evaluate all 10 keep-pairs and return the best (i, j).
+
+        Uses a weighted sum of made-hand / boat / flush / straight / blocker /
+        structure scores, then applies a small MC-equity tiebreak on the top-K
+        candidates only (runtime safety).
+        """
+        if not community or len(community) < 3:
+            # Safety fallback — discard only fires on the flop
+            return self._choose_keep_fallback(my_cards, community, opp_discards, d_sims, mode)
+
+        flop3 = list(community[:3])
+        opp_d = list(opp_discards) if opp_discards else []
+
+        candidates = []
+        any_flush_draw = False
+
+        for i, j in combinations(range(len(my_cards)), 2):
+            keep = [my_cards[i], my_cards[j]]
+            toss = [my_cards[k] for k in range(len(my_cards)) if k not in (i, j)]
+
+            known = set(keep) | set(flop3) | set(toss) | set(opp_d)
+
+            # ── Component scores ────────────────────────────────────────
+            cat, details = self._classify_made(keep, flop3)
+
+            # Made-hand base score
+            if cat == 'flush':
+                q = details['quality']
+                sf_bump = 10 if details.get('is_straight_flush') else 0
+                made_score = W_FLUSH_MADE + q * 8 + sf_bump
+            elif cat == 'full_house':
+                made_score = W_FH_MADE + details['trips_rank'] * 10 + details['pair_rank']
+            elif cat == 'straight':
+                made_score = W_STRAIGHT_MADE + details['high'] * 10
+            elif cat == 'trips':
+                made_score = W_TRIPS_BASE + details['trips_rank'] * 10
+            elif cat == 'two_pair':
+                pr = details['pair_ranks']
+                made_score = W_TWO_PAIR_BASE + pr[0] * 5 + pr[1] * 2
+            elif cat == 'pair':
+                made_score = W_PAIR_BASE + details['pair_rank'] * W_PAIR_RANK_MULT
+            else:
+                made_score = 0.0
+
+            boat_score, boat_outs = self._compute_boat_potential(keep, flop3, known)
+            flush_score, is_fd, fd_outs, fd_qual = self._compute_flush_potential(keep, flop3, known)
+            straight_score, sd_type, sd_outs, sd_high = self._compute_straight_potential(keep, flop3, known)
+            blocker_score = self._compute_threat_bonus(keep, flop3, opp_d, known)
+            structure_score = self._structural_fallback(keep, flop3, known)
+
+            if is_fd:
+                any_flush_draw = True
+
+            total = made_score + boat_score + flush_score + straight_score + blocker_score + structure_score
+
+            candidates.append((i, j, total, keep, toss, known, cat, is_fd, sd_type))
+
+        # ── Pair penalty: downgrade naked pairs when live draws exist ────
+        if any_flush_draw:
+            for idx, (i, j, total, keep, toss, known, cat, is_fd, sd_type) in enumerate(candidates):
+                if cat == 'pair' and not is_fd and sd_type == 'none':
+                    candidates[idx] = (i, j, total - PAIR_DRAW_PENALTY, keep, toss, known, cat, is_fd, sd_type)
+
+        # ── Top-K MC tiebreak ────────────────────────────────────────────
+        candidates.sort(key=lambda c: c[2], reverse=True)
+        top_k = candidates[:TOP_K_MC]
+
+        best_score = -1.0
+        best_ij = (candidates[0][0], candidates[0][1])
+
+        for i, j, total, keep, toss, known, cat, is_fd, sd_type in top_k:
+            dead = set(toss) | set(opp_d)
+            eq = self._mc_equity(keep, flop3, dead, num_sims=MC_TIEBREAK_SIMS)
+            final = total + MC_TIEBREAK_W * eq
+            if final > best_score:
+                best_score = final
+                best_ij = (i, j)
+
+        return best_ij
+
+    def _choose_keep_fallback(self, my_cards, community, opp_discards, d_sims, mode=MODE_AGRO):
+        """Original MC-based fallback for edge cases (pre-flop / missing community)."""
+        best_score    = -999.0
+        best_ij       = (0, 1)
+        best_eq_ij    = (0, 1)
+        best_raw_eq   = -1.0
+        chosen_raw_eq = 0.0
+        candidates    = []
+        for i, j in combinations(range(len(my_cards)), 2):
+            keep      = [my_cards[i], my_cards[j]]
+            toss      = [my_cards[k] for k in range(len(my_cards)) if k not in (i, j)]
+            toss_dead = set(toss) | (set(opp_discards) if opp_discards else set())
+            sc, eq    = self._keep_score(keep, community, opp_discards, toss_dead, d_sims, mode)
+            candidates.append((i, j, sc, eq))
+            if eq > best_raw_eq:
+                best_raw_eq = eq
+                best_eq_ij  = (i, j)
+            if sc > best_score:
+                best_score    = sc
+                best_ij       = (i, j)
+                chosen_raw_eq = eq
+        ties = [(i, j) for i, j, sc, _ in candidates if best_score - sc < 0.03]
+        if len(ties) > 1:
+            best_ij = self._rng.choice(ties)
+            chosen_raw_eq = next(eq for i, j, _, eq in candidates if (i, j) == best_ij)
+        if best_raw_eq - chosen_raw_eq > 0.10:
+            best_ij = best_eq_ij
+        return best_ij
+
+    # =========================================================================
+    # DISCARD — Legacy helpers (kept for reference / fallback path)
     # =========================================================================
 
     def _pressure_potential(self, keep2, community, opp_discards):
@@ -712,42 +1199,6 @@ class PlayerAgent(Agent):
         if mode in (MODE_VALUE, MODE_TRAP):
             return 3.5*eq + 0.6*pp + 1.7*dd + 2.0*mhv + 0.8*bv + 0.2*sf, eq
         return 2.8*eq + 2.2*pp + 1.7*dd + 1.0*mhv + 0.8*bv + 0.6*sf, eq
-
-    def _choose_keep(self, my_cards, community, opp_discards, d_sims, mode=MODE_AGRO):
-        # ── New 6-step discard engine (replaces old priority + MC fallback) ──
-        if community and len(community) >= 3:
-            blind_pos = 1 if not opp_discards else 0
-            return _choose_keep_postflop(my_cards, community, opp_discards,
-                                         blind_pos)
-
-        # ── Safety fallback for edge cases (should not be reached during
-        #    normal gameplay since discard only fires on street 1) ──────────
-        best_score    = -999.0
-        best_ij       = (0, 1)
-        best_eq_ij    = (0, 1)
-        best_raw_eq   = -1.0
-        chosen_raw_eq = 0.0
-        candidates    = []
-        for i, j in combinations(range(len(my_cards)), 2):
-            keep      = [my_cards[i], my_cards[j]]
-            toss      = [my_cards[k] for k in range(len(my_cards)) if k not in (i, j)]
-            toss_dead = set(toss) | (set(opp_discards) if opp_discards else set())
-            sc, eq    = self._keep_score(keep, community, opp_discards, toss_dead, d_sims, mode)
-            candidates.append((i, j, sc, eq))
-            if eq > best_raw_eq:
-                best_raw_eq = eq
-                best_eq_ij  = (i, j)
-            if sc > best_score:
-                best_score    = sc
-                best_ij       = (i, j)
-                chosen_raw_eq = eq
-        ties = [(i, j) for i, j, sc, _ in candidates if best_score - sc < 0.03]
-        if len(ties) > 1:
-            best_ij = self._rng.choice(ties)
-            chosen_raw_eq = next(eq for i, j, _, eq in candidates if (i, j) == best_ij)
-        if best_raw_eq - chosen_raw_eq > 0.10:
-            best_ij = best_eq_ij
-        return best_ij
 
     # =========================================================================
     # GTO_DEFAULT — Libratus policy table + range-vs-range equity
@@ -1084,13 +1535,13 @@ class PlayerAgent(Agent):
                     if valid[CHECK]: return (CHECK, 0, 0, 0)
                 if valid[RAISE] and max_raise >= min_raise:
                     return (RAISE, _clamp(int(pot_ref_pf * 2.5 * noise), min_raise, max_raise), 0, 0)
-            elif equity > 0.45:
+            elif equity > 0.50:
                 if self._rng.random() < 0.65 and valid[RAISE] and max_raise >= min_raise:
                     return (RAISE, _clamp(int(pot_ref_pf * 2.0 * noise), min_raise, max_raise), 0, 0)
                 if valid[CALL]:  return (CALL,  0, 0, 0)
                 if valid[CHECK]: return (CHECK, 0, 0, 0)
             else:
-                if self._rng.random() < 0.30 and valid[RAISE] and max_raise >= min_raise:
+                if self._rng.random() < 0.15 and valid[RAISE] and max_raise >= min_raise:
                     return (RAISE, _clamp(int(pot_ref_pf * 1.5 * noise), min_raise, max_raise), 0, 0)
                 if valid[CHECK]: return (CHECK, 0, 0, 0)
                 if valid[FOLD]:  return (FOLD,  0, 0, 0)
@@ -1101,7 +1552,7 @@ class PlayerAgent(Agent):
                         return (RAISE, _clamp(int(to_call * 3 * noise), min_raise, max_raise), 0, 0)
                     if valid[CALL]: return (CALL, 0, 0, 0)
                 if valid[CHECK]: return (CHECK, 0, 0, 0)
-            elif equity > 0.40:
+            elif equity > 0.45:
                 if to_call > 0:
                     if self._rng.random() < 0.15 and valid[RAISE] and max_raise >= min_raise:
                         return (RAISE, _clamp(int(to_call * 2.5 * noise), min_raise, max_raise), 0, 0)
@@ -1109,7 +1560,7 @@ class PlayerAgent(Agent):
                 if valid[CHECK]: return (CHECK, 0, 0, 0)
             else:
                 if to_call > 0:
-                    if equity > pot_odds and valid[CALL]: return (CALL, 0, 0, 0)
+                    if equity > pot_odds + 0.05 and valid[CALL]: return (CALL, 0, 0, 0)
                     if valid[FOLD]: return (FOLD, 0, 0, 0)
                 if valid[CHECK]: return (CHECK, 0, 0, 0)
         if valid[CHECK]: return (CHECK, 0, 0, 0)
@@ -1401,6 +1852,18 @@ class PlayerAgent(Agent):
         # ── Resolve effective mode ────────────────────────────────────────────
         mode = self._hand_override or self._hand_mode
 
+        # ── Bleed-out lock: if folding every remaining hand still wins, do it
+        if not valid[DISCARD]:
+            rounds_left = max(0, TOTAL_HANDS - self.hand_number)
+            sb_left = (rounds_left + 1) // 2
+            bb_left = rounds_left - sb_left
+            max_bleed = sb_left * 1 + bb_left * 2
+            if self._running_pnl > max_bleed:
+                if valid[FOLD]:
+                    return (FOLD, 0, 0, 0)
+                if valid[CHECK]:
+                    return (CHECK, 0, 0, 0)
+
         # ── Discard (mode-aware KeepScore) ────────────────────────────────────
         if valid[DISCARD]:
             i, j = self._choose_keep(my_cards, community, opp_discards, d_sims, mode)
@@ -1447,34 +1910,45 @@ class PlayerAgent(Agent):
                                          my_discards, valid, min_raise, max_raise,
                                          my_bet, opp_bet, pot_size, opp_last, p_sims)
 
-        # ── One-pair cap: never RAISE postflop with only one pair ─────────
-        # Two pair, trips, straights, flushes can raise freely.
-        # One pair can only call or check — never initiate or escalate.
+        # ── One-pair / nothing cap (draw-aware) ─────────────────────────
+        # Draws are now checked: hands with live flush or straight draws
+        # are allowed to semi-bluff raise and call larger bets.
         if len(my_cards) == 2 and len(community) >= 3:
             hand_cat = _hand_rank_category(my_cards, community)
             to_call_now = max(0, opp_bet - my_bet)
             pot_ref_now = max(pot_size, 1)
+            has_draw = _has_live_draw(my_cards, community, opp_discards, my_discards)
 
             if hand_cat == "one_pair":
-                # Never raise with one pair
-                if result[0] == RAISE:
-                    if to_call_now > 0 and valid[CALL]:
-                        result = (CALL, 0, 0, 0)
-                    elif valid[CHECK]:
-                        result = (CHECK, 0, 0, 0)
-
-                # Fold one pair facing big pressure (>40% pot bet)
-                if result[0] == CALL and to_call_now > pot_ref_now * 0.40:
-                    if valid[FOLD]:
-                        result = (FOLD, 0, 0, 0)
+                if has_draw:
+                    # Pair + draw: allow raising, fold only to >70% pot
+                    if result[0] == CALL and to_call_now > pot_ref_now * 0.70:
+                        if valid[FOLD]:
+                            result = (FOLD, 0, 0, 0)
+                else:
+                    # Naked pair: no raising, fold to >25% pot
+                    if result[0] == RAISE:
+                        if to_call_now > 0 and valid[CALL]:
+                            result = (CALL, 0, 0, 0)
+                        elif valid[CHECK]:
+                            result = (CHECK, 0, 0, 0)
+                    if result[0] == CALL and to_call_now > pot_ref_now * 0.25:
+                        if valid[FOLD]:
+                            result = (FOLD, 0, 0, 0)
 
             elif hand_cat == "nothing":
-                # No made hand and no draw — fold to any bet, check if free
-                if to_call_now > 0:
-                    if valid[FOLD]:
-                        result = (FOLD, 0, 0, 0)
-                elif valid[CHECK]:
-                    result = (CHECK, 0, 0, 0)
+                if has_draw:
+                    # Draw without a pair: allow calling, fold only to >50% pot
+                    if result[0] == CALL and to_call_now > pot_ref_now * 0.50:
+                        if valid[FOLD]:
+                            result = (FOLD, 0, 0, 0)
+                else:
+                    # True nothing: fold to any bet, check if free
+                    if to_call_now > 0:
+                        if valid[FOLD]:
+                            result = (FOLD, 0, 0, 0)
+                    elif valid[CHECK]:
+                        result = (CHECK, 0, 0, 0)
 
         if result[0] == RAISE:
             if street == 1:   self._betting_history["bet_flop"] = True
