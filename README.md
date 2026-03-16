@@ -50,3 +50,7 @@ python run.py
 ```
 
 You can modify which bots play by modifying the agent config file. Write the file path to the corresponding agent for that bot to play.
+
+## Human vs Bot (CLI)
+
+To play against a bot in the terminal, run from the project root: `python -m human_vs_bot.run`. Session logs are written to `human_vs_bot/logs/`.

@@ -1,6 +1,6 @@
 """
-Entry point for human vs bot: bot discovery, game loop, full logging.
-Run from project root: python -m human_vs_bot.run
+Entry point for human vs bot: bot discovery, game loop, full logging (decisions CSV, RL JSONL, session summary).
+Human is player 0, bot is player 1. Discard and betting prompts are separate; post-hand review optional.
 """
 import importlib
 import logging
@@ -25,11 +25,14 @@ from human_vs_bot.cli import (
 from human_vs_bot.derived_state import (
     compute_derived_state,
     cards_known_for_player,
+    suit_summary,
     analysis_for_discard_options,
 )
 from human_vs_bot.logger import SessionLogger
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
+logger = logging.getLogger(__name__)
+
 HUMAN_PLAYER = 0
 BOT_PLAYER = 1
 TIME_LIMIT_SECONDS = 600
