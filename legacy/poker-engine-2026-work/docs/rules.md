@@ -118,7 +118,7 @@ In addition to regular matchmaking, teams can request specific matches:
 
 ### Finals (March 21, 2026)
 
-- **Format**: Round-robin tournament between top 12 teams by ELO
+- **Format**: Round-robin tournament between top 10 teams by ELO
 - **Location**: Giant Eagle Auditorium (Baker Hall A51)
 - **Scoring**: Winners determined by most matches won in the round-robin
 - **Note**: We reserve the right to invite additional teams if the ELO cutoff is close or if resources permit extra matches
