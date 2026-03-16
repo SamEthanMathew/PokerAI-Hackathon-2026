@@ -12,3 +12,7 @@ if its above 5 then bet more. if its less than 1.5 then bluff more.
 
 Seperate how you play the river from how you play the flop and turn.
 
+
+!!!!!!!
+
+If our overall money at a certain point is going to be positive so that in the end if we keep folding we still win like we can bleed out if we hit a point of profit after 1000 then we just keep folding forget strategy.

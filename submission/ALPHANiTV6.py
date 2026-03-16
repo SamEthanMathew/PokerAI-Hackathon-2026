@@ -1,5 +1,3 @@
-# ALPHANiTV6
-
 import json
 import os
 import random
