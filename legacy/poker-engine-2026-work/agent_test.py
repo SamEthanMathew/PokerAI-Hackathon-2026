@@ -177,7 +177,7 @@ def main():
             test_results["timeout_errors"] += 1
             print(f"✗ Time limit exceeded: {time_per_hand:.2f}s per hand (limit: {TIME_PER_HAND}s)")
         else:
-            print(f"✓ Time check passed: {time_per_hand:.2f}s per hand")
+            print(f"✓ Time check passed: {time_per_hand:.2f}s per hand (limit: {TIME_PER_HAND}s)")
 
     print("\nTest Suite Summary")
     print("-" * 50)
