@@ -12,9 +12,9 @@ Street > 3: Pass-through (CHECK/CALL/FOLD as fallback).
 from agents.agent import Agent
 from gym_env import PokerEnv
 
-from submission.functions.street0_score import final_street0_score, classify_board_texture
-from submission.functions.street0_bet_sizing import get_street0_action_from_recon
-from submission.functions.opponent_recon import (
+from submission.street0_score import final_street0_score, classify_board_texture
+from submission.street0_bet_sizing import get_street0_action_from_recon
+from submission.opponent_recon import (
     OpponentRecon,
     start_new_hand,
     start_new_street,
@@ -51,21 +51,21 @@ from submission.functions.opponent_recon import (
     update_opponent_river_response,
     update_opponent_river_aggression,
 )
-from submission.functions.street1a_discard import (
+from submission.street1a_discard import (
     Street1AContext,
     choose_keep_with_controlled_mixing,
     classify_flop_texture,
 )
-from submission.functions.street1b_betting import (
+from submission.street1b_betting import (
     Street1BContext,
     get_street1b_action,
 )
-from submission.functions.street2_turn import (
+from submission.street2_turn import (
     Street2Context,
     get_street2_action,
     classify_turn_texture,
 )
-from submission.functions.street3_river import (
+from submission.street3_river import (
     Street3Context,
     get_street3_action,
 )

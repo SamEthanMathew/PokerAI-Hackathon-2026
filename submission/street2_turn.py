@@ -16,7 +16,7 @@ import random
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
-from submission.functions.street0_score import (
+from submission.street0_score import (
     DECK_SIZE,
     NUM_RANKS,
     NUM_SUITS,
@@ -298,7 +298,7 @@ def score_turn_pressure(
     if recon is None:
         return 0.5
     try:
-        from submission.functions.opponent_recon import (
+        from submission.opponent_recon import (
             get_turn_fold_vs_size_bucket,
             get_turn_fold_by_turn_texture,
             get_turn_fold_vs_our_discard_class,
@@ -354,7 +354,7 @@ def score_turn_exploit(ctx: Street2Context, recon: Any) -> float:
     if recon is None:
         return 0.0
     try:
-        from submission.functions.opponent_recon import (
+        from submission.opponent_recon import (
             get_turn_fold_vs_size_bucket,
             get_turn_raise_vs_size_bucket,
             get_turn_fold_by_turn_texture,
@@ -462,7 +462,7 @@ def compute_turn_motives(
     fold_turn_idx = 0.5
     if ctx.recon is not None:
         try:
-            from submission.functions.opponent_recon import get_turn_fold_vs_size_bucket
+            from submission.opponent_recon import get_turn_fold_vs_size_bucket
             fold_turn_idx = get_turn_fold_vs_size_bucket(ctx.recon, "medium")
             stickiness = 1.0 - fold_turn_idx
         except ImportError:

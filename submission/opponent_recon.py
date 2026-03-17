@@ -516,7 +516,7 @@ def classify_opponent_flop_discard(
 
     recon._opp_discard_classified_this_hand = True
 
-    from submission.functions.street0_score import (
+    from submission.street0_score import (
         rank, suit, hand_suit_counts, hand_rank_counts, NUM_SUITS,
     )
 
@@ -1180,7 +1180,7 @@ def to_opponent_profile(recon: OpponentRecon):  # -> OpponentProfile
     Build street0_score.OpponentProfile from OpponentRecon so you can pass it to final_street0_score.
     Import OpponentProfile from street0_score inside this function to avoid circular imports.
     """
-    from submission.functions.street0_score import OpponentProfile
+    from submission.street0_score import OpponentProfile
     return OpponentProfile(
         vpip_opportunities=recon.total_hands,
         vpip_successes=recon.opp_vpip_count,

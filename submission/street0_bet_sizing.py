@@ -3,7 +3,7 @@ Street 0 Bet Sizing
 ===================
 Returns preflop action and bet sizing from the Street 0 score and game context.
 
-Use with: score from submission.functions.street0_score.final_street0_score(),
+Use with: score from submission.street0_score.final_street0_score(),
           plus observation and opponent stats from your agent.
 
 Returns: (action_type, raise_amount) for use in act() on street 0.
@@ -286,9 +286,9 @@ def get_street0_action_from_recon(
 ) -> Tuple[int, int]:
     """
     Convenience: use OpponentRecon to fill opponent stats for Street0Context.
-    Import and pass submission.functions.opponent_recon.OpponentRecon.
+    Import and pass submission.opponent_recon.OpponentRecon.
     """
-    from submission.functions.opponent_recon import stats_for_street0_context
+    from submission.opponent_recon import stats_for_street0_context
     stats = stats_for_street0_context(recon)
     return get_street0_action_from_obs(
         score,

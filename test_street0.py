@@ -1,6 +1,6 @@
 """Quick functional test for street0_score."""
 import time
-from submission.functions.street0_score import (
+from submission.street0_score import (
     final_street0_score, hand_structure_features, classify_discard,
     classify_board_texture, OpponentProfile, all_keeps, rank, suit, card_str
 )

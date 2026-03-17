@@ -15,7 +15,7 @@ import random
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from submission.functions.street0_score import (
+from submission.street0_score import (
     classify_board_texture,
     evaluate_hand,
     hand_class_from_score,
@@ -91,7 +91,7 @@ def is_board_paired(board5: List[int]) -> bool:
     """True if any rank appears >= 2 on board."""
     if not board5 or len(board5) < 5:
         return False
-    from submission.functions.street0_score import rank
+    from submission.street0_score import rank
     rc = hand_rank_counts(board5)
     return any(cnt >= 2 for cnt in rc.values())
 
@@ -235,7 +235,7 @@ def score_river_exploit(ctx: Street3Context, recon: Any) -> float:
     if recon is None:
         return 0.0
     try:
-        from submission.functions.opponent_recon import (
+        from submission.opponent_recon import (
             get_river_fold_vs_size_bucket,
             get_river_raise_vs_size_bucket,
             get_river_fold_by_river_texture,
@@ -339,7 +339,7 @@ def _river_opening(
     fold_river = 0.5
     if ctx.recon is not None:
         try:
-            from submission.functions.opponent_recon import get_fold_to_river_bet
+            from submission.opponent_recon import get_fold_to_river_bet
             fold_river = get_fold_to_river_bet(ctx.recon)
         except ImportError:
             pass

@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from itertools import combinations
 from typing import Dict, List, Optional, Tuple
 
-from submission.functions.street0_score import (
+from submission.street0_score import (
     DECK_SIZE,
     NUM_RANKS,
     NUM_SUITS,

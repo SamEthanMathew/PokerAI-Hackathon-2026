@@ -25,7 +25,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-from submission.functions.street0_score import (
+from submission.street0_score import (
     DECK_SIZE,
     NUM_RANKS,
     NUM_SUITS,
@@ -244,11 +244,11 @@ def score_pressure_suitability(
     our_discard_class: str,
 ) -> float:
     """Can we push folds? Based on fold tendencies and our apparent strength."""
-    from submission.functions.opponent_recon import (
+    from submission.opponent_recon import (
         get_flop_fold_vs_our_discard_class,
         get_flop_fold_by_texture,
     )
-    from submission.functions.street1a_discard import classify_flop_texture
+    from submission.street1a_discard import classify_flop_texture
 
     h_score = score_post_discard_current_hand(keep2, flop3)
     pressure = 0.0
@@ -298,7 +298,7 @@ def score_exploit_adjustment(
     texture: str,
 ) -> float:
     """Overfold/overcall/overbluff adjustments."""
-    from submission.functions.opponent_recon import (
+    from submission.opponent_recon import (
         get_flop_fold_vs_our_discard_class,
         get_flop_fold_by_texture,
         get_opponent_flop_aggression_after_discard,
