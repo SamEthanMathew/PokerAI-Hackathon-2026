@@ -298,6 +298,7 @@ class GenesisAgent(Agent):
             return at.FOLD.value, 0, 0, 1
 
         opponent_profile = to_opponent_profile(self.recon)
+        # Street 0 scoring can use multiple workers; set POKER_N_WORKERS=2 (default) or 4 for next phase.
         score, breakdown = final_street0_score(
             hand5,
             opponent_profile=opponent_profile,

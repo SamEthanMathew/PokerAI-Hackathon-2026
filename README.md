@@ -50,3 +50,7 @@ python run.py
 ```
 
 You can modify which bots play by modifying the agent config file. Write the file path to the corresponding agent for that bot to play.
+
+## Performance (match time limit)
+
+Preflop (Street 0) scoring uses parallel workers to stay within the match time limit. Set **`POKER_N_WORKERS`** in the environment: use **2** for the current 2 vCPU setup (default), and **4** in the next phase when 4 vCPU are available.
