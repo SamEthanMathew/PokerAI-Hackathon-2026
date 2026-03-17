@@ -1,9 +1,12 @@
 """
 Genesis Agent – main player implementation.
-Street 0: full preflop strategy via street0_score and street0_bet_sizing + opponent_recon.
-Street 1A: discard engine via street1a_discard.
-Street 1B: flop betting engine via street1b_betting (multi-round).
-Street >= 2: minimal pass-through so the engine runs.
+
+Street 0: Preflop via street0_score and street0_bet_sizing + opponent_recon.
+Street 1A: Discard via street1a_discard.
+Street 1B: Flop betting (multi-round) via street1b_betting.
+Street 2: Turn via street2_turn.
+Street 3: River via street3_river.
+Street > 3: Pass-through (CHECK/CALL/FOLD as fallback).
 """
 
 from agents.agent import Agent
@@ -27,6 +30,8 @@ from submission.functions.opponent_recon import (
     get_fold_to_non_river_bet,
     get_fold_to_river_bet,
     get_non_river_bet_percentage,
+    get_opponent_type,
+    get_river_bet_when_checked_to,
     # Street 1 recon APIs
     record_our_flop_discard_class,
     record_our_flop_bet,
@@ -65,6 +70,8 @@ from submission.functions.street3_river import (
     get_street3_action,
 )
 
+# ── Constants ─────────────────────────────────────────────────────────────────
+
 DEFAULT_N_FLOP_SAMPLES = 150
 DEFAULT_N_TR_SAMPLES = 50
 
@@ -72,6 +79,11 @@ STREET0_LOG_PREFIX = "STREET0"
 STREET1_LOG_PREFIX = "STREET1"
 STREET2_LOG_PREFIX = "STREET2"
 STREET3_LOG_PREFIX = "STREET3"
+OPP_RECON_LOG_PREFIX = "OPP_RECON"
+HAND_RESULT_LOG_PREFIX = "HAND_RESULT"
+
+
+# ── GenesisAgent ──────────────────────────────────────────────────────────────
 
 
 class GenesisAgent(Agent):
@@ -101,15 +113,25 @@ class GenesisAgent(Agent):
         self._river_we_checked = False
         self._river_size_bucket = ""
 
+        # Running chip total across the match (updated on each hand end in observe)
+        self._running_chips = 0.0
+
     def __name__(self):
         return "GenesisAgent"
 
-    # =================================================================
-    # observe() – called for the non-acting player after each env.step()
-    # =================================================================
+    # ── observe() ─────────────────────────────────────────────────────────────
+
     def observe(self, observation, reward, terminated, truncated, info):
+        """Called when we receive an observation (non-acting player)."""
         street = observation.get("street", -1)
-        opp_last_action = observation.get("opp_last_action")
+        opp_last_action = observation.get("opp_last_action", "") or ""
+
+        # Street 3 recon: when we see opponent's river action (we had bet or we had checked)
+        if street == 3 and _is_betting_action(opp_last_action):
+            if self.recon.our_river_size_bucket:
+                update_opponent_river_response(self.recon, opp_last_action, self._street1_discard_class)
+            elif self._river_we_checked:
+                update_opponent_river_aggression(self.recon, True, opp_last_action)
 
         if terminated:
             update_fold_on_terminate(self.recon, street, opp_last_action, terminated)
@@ -146,6 +168,16 @@ class GenesisAgent(Agent):
                     f" | river_texture={river_tex} | flop_line={self._flop_line_summary or ''}"
                     f" | turn_we_bet={getattr(self, '_street2_size_bucket', '') != ''}"
                 )
+            # Opponent recon snapshot after each hand (how opponent data evolves over the match)
+            self._log_opponent_recon_snapshot(hand_number, entry)
+            # End type: they_fold / we_fold / showdown / showdown_tie
+            street_ended = street
+            if street_ended <= 3:
+                end_type = "they_fold" if (opp_last_action or "").strip().upper() == "FOLD" else "we_fold"
+            else:
+                end_type = "showdown_tie" if reward == 0 else "showdown"
+            self._running_chips += reward
+            self._log_hand_result(hand_number, entry, reward, observation, info, end_type, street_ended, truncated)
             return
 
         # Non-terminal observe on street 1: update flop response/aggression recon
@@ -156,10 +188,10 @@ class GenesisAgent(Agent):
         if street == 2 and _is_betting_action(opp_last_action):
             update_opponent_turn_response(self.recon, opp_last_action, self._street1_discard_class)
 
-    # =================================================================
-    # act() – main decision logic
-    # =================================================================
+    # ── act() and street dispatch ─────────────────────────────────────────────
+
     def act(self, observation, reward, terminated, truncated, info):
+        """Main decision entry; returns (action_type, raise_amount, keep_card_1, keep_card_2)."""
         street = observation.get("street", 0)
         valid_actions = observation.get("valid_actions", [1, 1, 1, 1, 0])
         at = self.action_types
@@ -251,9 +283,8 @@ class GenesisAgent(Agent):
         # --- Street 0: Full preflop strategy ---
         return self._act_street0(observation, info, valid_actions, terminated)
 
-    # =================================================================
-    # Street 0
-    # =================================================================
+    # ── Street 0: Preflop ─────────────────────────────────────────────────────
+
     def _act_street0(self, observation, info, valid_actions, terminated):
         at = self.action_types
         street = observation.get("street", 0)
@@ -294,9 +325,8 @@ class GenesisAgent(Agent):
         amount = raise_amount if action_type == at.RAISE.value else 0
         return action_type, amount, 0, 1
 
-    # =================================================================
-    # Street 1A – Discard
-    # =================================================================
+    # ── Street 1A: Discard ────────────────────────────────────────────────────
+
     def _act_street1a(self, observation, info, valid_actions):
         at = self.action_types
         hand_number = info.get("hand_number", 0)
@@ -353,9 +383,8 @@ class GenesisAgent(Agent):
 
         return at.DISCARD.value, 0, ki0, ki1
 
-    # =================================================================
-    # Street 1B – Flop Betting (multi-round)
-    # =================================================================
+    # ── Street 1B: Flop ───────────────────────────────────────────────────────
+
     def _act_street1b(self, observation, info, valid_actions):
         at = self.action_types
         hand_number = info.get("hand_number", 0)
@@ -436,9 +465,8 @@ class GenesisAgent(Agent):
         opp = (getattr(self.recon, "_flop_opp_action", "") or "unknown").replace(" ", "_")
         return f"{we}_opp_{opp}"
 
-    # =================================================================
-    # Street 2 – Turn
-    # =================================================================
+    # ── Street 2: Turn ─────────────────────────────────────────────────────────
+
     def _act_street2(self, observation, info, valid_actions):
         at = self.action_types
         hand_number = info.get("hand_number", 0)
@@ -520,9 +548,8 @@ class GenesisAgent(Agent):
         amount = raise_amount if action_type == at.RAISE.value else 0
         return action_type, amount, 0, 1
 
-    # =================================================================
-    # Street 3 – River
-    # =================================================================
+    # ── Street 3: River ────────────────────────────────────────────────────────
+
     def _act_street3(self, observation, info, valid_actions):
         at = self.action_types
         hand_number = info.get("hand_number", 0)
@@ -586,9 +613,119 @@ class GenesisAgent(Agent):
         amount = raise_amount if action_type == at.RAISE.value else 0
         return action_type, amount, 0, 1
 
-    # =================================================================
-    # Logging helpers
-    # =================================================================
+    # ── Logging ───────────────────────────────────────────────────────────────
+
+    def _log_opponent_recon_snapshot(self, hand_number, entry):
+        """Log opponent recon data after each hand so we can see how it evolves over the match."""
+        r = self.recon
+        parts = [
+            OPP_RECON_LOG_PREFIX,
+            f"entry={entry}",
+            f"hand={hand_number}",
+            f"total_hands={r.total_hands}",
+            f"vpip={get_vpip(r):.3f}",
+            f"vpip_n={r.opp_vpip_count}",
+            f"pfr={get_pfr(r):.3f}",
+            f"pfr_n={r.opp_pfr_count}",
+            f"af={get_aggression_factor(r):.3f}",
+            f"raise_n={r.opp_raise_count}",
+            f"call_n={r.opp_call_count}",
+            f"fold_non_river={get_fold_to_non_river_bet(r):.3f}",
+            f"non_river_faced={r.opp_non_river_bets_faced}",
+            f"non_river_folds={r.opp_non_river_folds}",
+            f"fold_river={get_fold_to_river_bet(r):.3f}",
+            f"river_faced={r.opp_river_bets_faced}",
+            f"river_folds={r.opp_river_folds}",
+            f"non_river_bet_pct={get_non_river_bet_percentage(r):.3f}",
+            f"streets_seen={r.opp_non_river_streets_seen}",
+            f"non_river_bet_n={r.opp_non_river_bet_count}",
+            f"opp_type={get_opponent_type(r)}",
+            f"river_bet_when_checked={get_river_bet_when_checked_to(r):.3f}",
+            f"river_we_checked_opp_bet={r.river_we_checked_opp_bet_count}",
+            f"river_we_checked_opp_check={r.river_we_checked_opp_check_count}",
+        ]
+        self.logger.info(" | ".join(parts))
+
+    def _log_hand_result(self, hand_number, entry, reward, observation, info, end_type, street_ended, truncated):
+        """Log one pipe-separated HAND_RESULT line per hand for loss diagnostics and tuning."""
+        my_bet = int(observation.get("my_bet", 0) or 0)
+        opp_bet = int(observation.get("opp_bet", 0) or 0)
+        pot = my_bet + opp_bet
+        blind_pos = observation.get("blind_position", -1)
+        position = "SB" if blind_pos == 0 else "BB" if blind_pos == 1 else str(blind_pos)
+        opp_last_action = (observation.get("opp_last_action") or "").strip()
+        invalid_action = bool(info.get("invalid_action", False))
+        is_showdown = street_ended > 3
+        won = reward > 0
+        lost = reward < 0
+        tie = reward == 0
+
+        def card_str(c):
+            if c is None or c == -1:
+                return None
+            return PokerEnv.int_card_to_str(int(c))
+
+        my_cards_raw = observation.get("my_cards", []) or []
+        my_cards_str = " ".join(card_str(c) for c in my_cards_raw if card_str(c))
+        community = observation.get("community_cards", []) or []
+        board_str = " ".join(card_str(c) for c in community if card_str(c))
+
+        flop_tex = getattr(self, "_street1_flop_texture", "") or ""
+        turn_tex = getattr(self.recon, "turn_texture_this_hand", None) or ""
+        river_tex = getattr(self.recon, "river_texture_this_hand", None) or ""
+        flop_line = getattr(self, "_flop_line_summary", "") or ""
+        flop_bucket = getattr(self, "_flop_we_bet_bucket", "") or ""
+        flop_rounds = getattr(self, "_street1b_round_count", 0)
+        turn_we_bet = bool(getattr(self, "_street2_size_bucket", "") or "")
+        turn_bucket = getattr(self, "_street2_size_bucket", "") or ""
+        turn_rounds = getattr(self, "_street2_round_count", 0)
+        river_we_bet = bool(getattr(self, "_river_size_bucket", "") or "")
+        river_bucket = getattr(self, "_river_size_bucket", "") or ""
+        our_discard = getattr(self, "_street1_discard_class", "") or ""
+        opp_discard = getattr(self.recon, "opp_flop_discard_class", "") or ""
+        time_used = observation.get("time_used", 0)
+        time_left = observation.get("time_left", 0)
+
+        parts = [
+            HAND_RESULT_LOG_PREFIX,
+            f"entry={entry}",
+            f"hand={hand_number}",
+            f"reward={reward}",
+            f"won={won}",
+            f"lost={lost}",
+            f"tie={tie}",
+            f"running_chips={self._running_chips:.1f}",
+            f"street_ended={street_ended}",
+            f"is_showdown={is_showdown}",
+            f"end_type={end_type}",
+            f"invalid_action={invalid_action}",
+            f"position={position}",
+            f"pot={pot}",
+            f"my_bet={my_bet}",
+            f"opp_bet={opp_bet}",
+            f"our_discard_class={our_discard}",
+            f"flop_line={flop_line}",
+            f"flop_bet_bucket={flop_bucket}",
+            f"flop_rounds={flop_rounds}",
+            f"turn_we_bet={turn_we_bet}",
+            f"turn_bet_bucket={turn_bucket}",
+            f"turn_rounds={turn_rounds}",
+            f"river_we_bet={river_we_bet}",
+            f"river_bet_bucket={river_bucket}",
+            f"flop_texture={flop_tex}",
+            f"turn_texture={turn_tex}",
+            f"river_texture={river_tex}",
+            f"opp_last_action={opp_last_action!r}",
+            f"opp_type={get_opponent_type(self.recon)}",
+            f"opp_discard_class={opp_discard}",
+            f"my_cards={my_cards_str}",
+            f"board={board_str}",
+            f"time_used={time_used}",
+            f"time_left={time_left}",
+            f"truncated={truncated}",
+        ]
+        self.logger.info(" | ".join(parts))
+
     def _log_street0(self, hand_number, hand5, score, breakdown,
                      action_type, raise_amount, observation):
         at = self.action_types
