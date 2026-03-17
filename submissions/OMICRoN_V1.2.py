@@ -1,4 +1,3 @@
-# Omicron_V1.3: Meta chassis x Alpha killer instinct - ALL FLAWS FIXED
 from agents.agent import Agent
 from gym_env import PokerEnv
 
@@ -98,12 +97,12 @@ class PlayerAgent(Agent):
     def update_opponent_stats(self, opp_last_action: str):
         """Track opponent's actions to calculate aggression factor"""
         if opp_last_action:
-            if "raise" in opp_last_action.lower():
-                self.opp_raise_count += 1
-            elif "call" in opp_last_action.lower():
-                self.opp_call_count += 1
+            if "raise" in opp_last_action.lower():... (30 KB left)
 
-# OMICRoN V1: Fork of ALPHANiTV8 - exact subgame solver for discard + adaptive
+brian lam player.py
+80 KB
+R — 1:27 AM
+# OMICRoN V1: Fork of ALPHANiTV8 — exact subgame solver for discard + adaptive
 #             opponent modeling + full postflop engine (range-weighted equity,
 #             board texture, semi-bluff, dynamic sizing, opponent profiling).
 #
@@ -165,7 +164,7 @@ for _tc in _INT_TO_TREYS:
 
 _base_eval = Evaluator()
 
-# OPT4: module-level rank/suit lookup arrays - replaces function calls with
+# OPT4: module-level rank/suit lookup arrays — replaces function calls with
 # array indexing throughout
 _RANK = [i % NUM_RANKS for i in range(DECK_SIZE)]
 _SUIT = [i // NUM_RANKS for i in range(DECK_SIZE)]
@@ -202,10 +201,15 @@ PREMIUM_SUITED_ONLY = frozenset([
     frozenset([RANK_9, RANK_8]),
     frozenset([RANK_8, 5]),
     frozenset([5, 4]),
-    frozenset([5, RANK_9]),
-])
+    frozenset([5, RANK_9]),... (3 KB left)
 
-# OMICRoN V1: Fork of ALPHANiTV8 - exact subgame solver for discard + adaptive
+OMICRoN_V1.py
+53 KB
+This is 1.2, i have v1 stored locally
+﻿
+R
+rudy0612
+# OMICRoN V1: Fork of ALPHANiTV8 — exact subgame solver for discard + adaptive
 #             opponent modeling + full postflop engine (range-weighted equity,
 #             board texture, semi-bluff, dynamic sizing, opponent profiling).
 #
@@ -267,7 +271,7 @@ for _tc in _INT_TO_TREYS:
 
 _base_eval = Evaluator()
 
-# OPT4: module-level rank/suit lookup arrays - replaces function calls with
+# OPT4: module-level rank/suit lookup arrays — replaces function calls with
 # array indexing throughout
 _RANK = [i % NUM_RANKS for i in range(DECK_SIZE)]
 _SUIT = [i // NUM_RANKS for i in range(DECK_SIZE)]
@@ -702,133 +706,6 @@ class PlayerAgent(Agent):
         self._last_was_bet = False
         self._last_street = 0
 
-        # Blambot-style opponent learning (hand/street resets, fold tracking, VPIP/PFR)
-        self._last_hand_number = -1
-        self.we_bet_this_street = False
-        self.preflop_aggressor = False
-        self.flop_aggressor = False
-        self.turn_aggressor = False
-        self.opp_non_river_bets_faced = 0
-        self.opp_non_river_folds = 0
-        self.opp_river_bets_faced = 0
-        self.opp_river_folds = 0
-        self.total_hands = 0
-        self.opp_vpip_count = 0
-        self.opp_pfr_count = 0
-        self.opp_non_river_streets_seen = 0
-        self.opp_non_river_bet_count = 0
-        self.opp_raise_count = 0
-        self.opp_call_count = 0
-
-    # ── Blambot-style opponent learning helpers ───────────────────────────────
-
-    def _reset_per_hand_flags(self):
-        for flag in (
-            "_counted_river_bet_this_hand",
-            "_counted_flop_bet_faced_this_hand",
-            "_counted_turn_bet_faced_this_hand",
-            "_counted_vpip_this_hand",
-            "_counted_pfr_this_hand",
-            "_counted_flop_seen_this_hand",
-            "_counted_turn_seen_this_hand",
-            "_counted_flop_bet_this_hand",
-            "_counted_turn_bet_this_hand",
-        ):
-            if hasattr(self, flag):
-                delattr(self, flag)
-
-    def record_our_bet(self, street):
-        """Record that we bet/raised on this street (increment bets_faced once per street per hand)."""
-        self.we_bet_this_street = True
-        if street == 3:
-            if not getattr(self, "_counted_river_bet_this_hand", False):
-                self._counted_river_bet_this_hand = True
-                self.opp_river_bets_faced += 1
-        elif street in (1, 2):
-            flag_name = "_counted_flop_bet_faced_this_hand" if street == 1 else "_counted_turn_bet_faced_this_hand"
-            if not getattr(self, flag_name, False):
-                setattr(self, flag_name, True)
-                self.opp_non_river_bets_faced += 1
-
-    def update_aggression_tracking(self, observation, street):
-        """Set per-street aggressor flags from opponent's last action (raise/bet)."""
-        opp_last_action = observation.get("opp_last_action", "") or ""
-        if "raise" in opp_last_action.lower() or "bet" in opp_last_action.lower():
-            if street == 0:
-                self.preflop_aggressor = True
-            elif street == 1:
-                self.flop_aggressor = True
-            elif street == 2:
-                self.turn_aggressor = True
-
-    def _update_opponent_raise_call(self, opp_last_action):
-        if not opp_last_action:
-            return
-        if "raise" in opp_last_action.lower():
-            self.opp_raise_count += 1
-        elif "call" in opp_last_action.lower():
-            self.opp_call_count += 1
-
-    def get_aggression_factor(self):
-        if self.opp_call_count == 0:
-            return 2.0 if self.opp_raise_count > 0 else 0.0
-        return min(4.0, self.opp_raise_count / self.opp_call_count)
-
-    def get_aggression_street_count(self):
-        return sum([self.preflop_aggressor, self.flop_aggressor, self.turn_aggressor])
-
-    def get_fold_to_non_river_bet(self):
-        if self.opp_non_river_bets_faced == 0:
-            return 0.5
-        return self.opp_non_river_folds / self.opp_non_river_bets_faced
-
-    def get_fold_to_river_bet(self):
-        if self.opp_river_bets_faced == 0:
-            return 0.5
-        return self.opp_river_folds / self.opp_river_bets_faced
-
-    def get_vpip(self):
-        if self.total_hands == 0:
-            return 0.5
-        return self.opp_vpip_count / self.total_hands
-
-    def get_pfr(self):
-        if self.total_hands == 0:
-            return 0.5
-        return self.opp_pfr_count / self.total_hands
-
-    def get_non_river_bet_percentage(self):
-        if self.opp_non_river_streets_seen == 0:
-            return 0.5
-        return self.opp_non_river_bet_count / self.opp_non_river_streets_seen
-
-    def update_vpip_pfr_stats(self, observation, street):
-        """Update VPIP, PFR, and non-river bet tracking (once per hand per street)."""
-        opp_last_action = observation.get("opp_last_action", "") or ""
-        if street == 0 and opp_last_action:
-            if "raise" in opp_last_action.lower():
-                if not getattr(self, "_counted_pfr_this_hand", False):
-                    self._counted_pfr_this_hand = True
-                    self.opp_vpip_count += 1
-                    self.opp_pfr_count += 1
-            elif "call" in opp_last_action.lower():
-                my_blind_position = observation.get("blind_position", -1)
-                opp_is_big_blind = my_blind_position == 0
-                if not getattr(self, "_counted_vpip_this_hand", False):
-                    if not opp_is_big_blind or observation.get("my_bet", 0) > observation.get("opp_bet", 0):
-                        self._counted_vpip_this_hand = True
-                        self.opp_vpip_count += 1
-        if street in (1, 2):
-            flag_seen = "_counted_flop_seen_this_hand" if street == 1 else "_counted_turn_seen_this_hand"
-            if not getattr(self, flag_seen, False):
-                setattr(self, flag_seen, True)
-                self.opp_non_river_streets_seen += 1
-            if opp_last_action and ("bet" in opp_last_action.lower() or "raise" in opp_last_action.lower()):
-                flag_bet = "_counted_flop_bet_this_hand" if street == 1 else "_counted_turn_bet_this_hand"
-                if not getattr(self, flag_bet, False):
-                    setattr(self, flag_bet, True)
-                    self.opp_non_river_bet_count += 1
-
     # ── Opponent profiling helpers ───────────────────────────────────────────
 
     def _safe_rate(self, key):
@@ -939,14 +816,6 @@ class PlayerAgent(Agent):
                 self._stats["fold_to_raise"][0] += 1
                 self._stats["fold_to_raise"][1] += 1
 
-            # Blambot-style: update river vs non-river fold counts when opp folded to our bet
-            if self._opp_folded and self.we_bet_this_street:
-                street = observation.get("street", -1)
-                if street == 3:
-                    self.opp_river_folds += 1
-                elif street in (1, 2):
-                    self.opp_non_river_folds += 1
-
             self._learn_from_showdown(observation, info)
 
             self._opp_folded = False
@@ -979,7 +848,7 @@ class PlayerAgent(Agent):
     def __name__(self):
         return "OMICRON_V1"
 
-    # -- MC Equity (random range - for discard screening + preflop) -----------
+    # ── MC Equity (random range — for discard screening + preflop) ───────────
 
     def _compute_equity(self, my_cards, community, opp_discards, my_discards, num_sims=300):
         dead = set(my_cards)
@@ -1337,40 +1206,28 @@ class PlayerAgent(Agent):
             return True, (RAISE, amt, 0, 0)
         return False, None
 
-    def _get_fold_tendency(self):
-        """Continuous [0, 1]: 0 = station, 1 = overfolder. Blend of river and non-river fold rates."""
-        fnr = self.get_fold_to_non_river_bet()
-        fr = self.get_fold_to_river_bet()
-        return (fnr + fr) / 2.0
-
-    def _get_aggro(self):
-        """Continuous [0, 1]: 0 = passive, 1 = maniac. Uses aggression factor capped and opp_aggression rate."""
-        af = self.get_aggression_factor()
-        af_norm = min(1.0, af / 4.0) if af != float("inf") else 1.0
-        rate = self._safe_rate("opp_aggression")
-        return (af_norm + rate) / 2.0
-
     def _dynamic_sizing(self, base_amount, strength, street, is_semi_bluff):
-        # Gradient blend: continuous fold_tendency and aggro instead of discrete archetype
-        fold_tendency = self._get_fold_tendency()
-        aggro = self._get_aggro()
-        w_over = fold_tendency
-        w_station = (1.0 - fold_tendency) * (1.0 - aggro)
-        w_maniac = (1.0 - fold_tendency) * aggro
-        total = w_over + w_station + w_maniac
-        if total <= 0:
-            total = 1.0
-        w_over, w_station, w_maniac = w_over / total, w_station / total, w_maniac / total
-
-        mult_over = mult_station = mult_maniac = 1.0
-        if is_semi_bluff or strength in ("draw", "weak"):
-            mult_over, mult_station, mult_maniac = 1.25, 0.80, 1.0
-        elif strength == "monster":
-            mult_over, mult_station, mult_maniac = 0.85, (1.30 if street == 3 else 1.20), 0.70
-        elif strength in ("strong", "medium"):
-            mult_over, mult_station, mult_maniac = 0.75, 1.15, 0.80
-
-        mult = w_over * mult_over + w_station * mult_station + w_maniac * mult_maniac
+        arch = self._opp_archetype
+        mult = 1.0
+        if arch == "overfolder":
+            if is_semi_bluff or strength in ("draw", "weak"):
+                mult = 1.25
+            elif strength == "monster":
+                mult = 0.85
+            elif strength in ("strong", "medium"):
+                mult = 0.75
+        elif arch == "station":
+            if strength == "monster":
+                mult = 1.30 if street == 3 else 1.20
+            elif strength in ("strong", "medium"):
+                mult = 1.15
+            elif is_semi_bluff or strength == "draw":
+                mult = 0.80
+        elif arch == "maniac":
+            if strength == "monster":
+                mult = 0.70
+            elif strength in ("strong", "medium"):
+                mult = 0.80
         return max(1, int(base_amount * mult))
 
     # ── Main act() ───────────────────────────────────────────────────────────
@@ -1396,21 +1253,7 @@ class PlayerAgent(Agent):
 
         in_early_phase = self._hands_completed < EARLY_PHASE_HANDS
 
-        # Blambot-style: hand and street resets, opponent learning updates
-        current_hand = info.get("hand_number", -1)
-        if current_hand != self._last_hand_number:
-            self.preflop_aggressor = False
-            self.flop_aggressor = False
-            self.turn_aggressor = False
-            self._last_hand_number = current_hand
-            self._reset_per_hand_flags()
-            self.total_hands = max(self.total_hands, current_hand)
-        if street != self._last_street:
-            self.we_bet_this_street = False
-        self.update_aggression_tracking(observation, street)
-        self.update_vpip_pfr_stats(observation, street)
         raw = observation.get("opp_last_action", "")
-        self._update_opponent_raise_call(raw or "")
         opp_action = _normalize_action(raw)
         if opp_action:
             self._process_opponent_action(observation, opp_action,
@@ -1585,8 +1428,7 @@ class PlayerAgent(Agent):
 
             dead = set(my_cards) | set(community) | set(opp_discards) | set(my_discards)
 
-            aggro = self._get_aggro()
-            opp_signal = (1.0 - aggro) * self._opp_hand_aggr
+            opp_signal = 0.0 if self._opp_archetype == "maniac" else self._opp_hand_aggr
             equity = self._compute_equity_ranged(
                 my_cards, community, dead, opp_discards, opp_signal, num_sims=300)
 
@@ -1604,20 +1446,7 @@ class PlayerAgent(Agent):
             pot_ref = max(pot_size, 1)
             pot_odds = to_call / (pot_ref + to_call) if to_call > 0 else 0.0
 
-            # Tight-overbet exploit: fold to overbet vs tight opponent unless we have monster
-            if to_call > 0 and result is None:
-                initial_pot = pot_ref - to_call
-                is_overbet = initial_pot > 0 and to_call > initial_pot
-                fold_nr = self.get_fold_to_non_river_bet()
-                fold_r = self.get_fold_to_river_bet()
-                is_tight = fold_nr >= 0.70 and fold_r >= 0.70
-                if is_tight and is_overbet and hand_cat != "trips_plus":
-                    if valid[FOLD]:
-                        result = (FOLD, 0, 0, 0)
-                    elif valid[CHECK]:
-                        result = (CHECK, 0, 0, 0)
-
-            if result is None and to_call <= 0:
+            if to_call <= 0:
                 fire, sb_action = self._semi_bluff_check(
                     my_cards, community, opp_discards, my_discards,
                     pot_size, to_call, street, valid, min_raise, max_raise,
@@ -1666,22 +1495,4 @@ class PlayerAgent(Agent):
                     bet_frac = random.uniform(0.30, 0.50)
                     base_amt = _clamp(int(pot_ref * bet_frac), min_raise, max_raise)
                     raise_amt = self._dynamic_sizing(base_amt, strength, street, False)
-                    raise_amt = _clamp(raise_amt, min_raise, max_raise)
-                    if valid[RAISE]:
-                        result = (RAISE, raise_amt, 0, 0)
-                    elif valid[CALL]:
-                        result = (CALL, 0, 0, 0)
-                    else:
-                        result = (CHECK, 0, 0, 0)
-
-                if result is None:
-                    if valid[CHECK]:
-                        result = (CHECK, 0, 0, 0)
-                    else:
-                        result = (FOLD, 0, 0, 0)
-
-        if result is not None and result[0] == RAISE:
-            self.record_our_bet(street)
-            self._last_was_bet = True
-        self._last_street = street
-        return result
+                    raise_amt = _clamp(raise_am... (3 KB left)

@@ -1,4 +1,3 @@
-# Omicron_V1.3: Meta chassis x Alpha killer instinct - ALL FLAWS FIXED
 from agents.agent import Agent
 from gym_env import PokerEnv
 
