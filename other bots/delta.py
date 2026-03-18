@@ -1,15 +1,17 @@
-# OMICRoN V1: Fork of ALPHANiTV8 — exact subgame solver for discard + adaptive
-#             opponent modeling + full postflop engine (range-weighted equity,
-#             board texture, semi-bluff, dynamic sizing, opponent profiling).
-#
-# Speed-optimized: lookup arrays, no Counter in hot paths, precomputed treys
-# pairs, precomputed opponent weight maps, shared dead-sets.
+# DELTA V1: Frankenstein bot — merges OMICRoN V1 (LUT + parallel exact solver),
+#           Genesis V2 (equity-aware strength, river logic, tiered draws, preflop
+#           fixes), Meta V5 (safety caps, mid-hand override, smooth ramp-in), plus
+#           a new adaptive opponent learning system with EMA stats, Bayesian
+#           archetype posteriors, per-street profiling, regime detection, and
+#           bet-sizing tell tracking.
 
 import json
 import os
 import random
+from concurrent.futures import ProcessPoolExecutor
 from itertools import combinations
 
+import numpy as np
 from treys import Card, Evaluator
 
 from agents.agent import Agent
@@ -38,13 +40,15 @@ STANDARD_OPEN = _PROFILE.get("standard_open", 8)
 MONSTER_THRESHOLD = 0.82
 STRONG_THRESHOLD = 0.65
 GOOD_THRESHOLD = 0.48
-PREFLOP_COMMIT_THRESHOLD = 15
+PREFLOP_COMMIT_THRESHOLD = 20
 TOTAL_HANDS = _PROFILE.get("total_hands", 1000)
 
 EARLY_PHASE_HANDS = _PROFILE.get("early_phase_hands", 50)
 EARLY_PREFLOP_MIN_EQUITY = _PROFILE.get("early_preflop_min_equity", 0.48)
 NORMAL_PREFLOP_MIN_EQUITY = 0.45
 EARLY_OPEN_MULTIPLIER = 1.20
+
+RIVER_CALL_PREMIUM = 0.08
 
 RANKS = "23456789A"
 
@@ -60,10 +64,25 @@ for _tc in _INT_TO_TREYS:
 
 _base_eval = Evaluator()
 
-# OPT4: module-level rank/suit lookup arrays — replaces function calls with
-# array indexing throughout
 _RANK = [i % NUM_RANKS for i in range(DECK_SIZE)]
 _SUIT = [i // NUM_RANKS for i in range(DECK_SIZE)]
+
+# ── Evaluation Lookup Table ──────────────────────────────────────────────────
+
+_C = [[0] * 28 for _ in range(28)]
+for _n in range(28):
+    _C[_n][0] = 1
+    for _k in range(1, _n + 1):
+        _C[_n][_k] = _C[_n - 1][_k - 1] + _C[_n - 1][_k]
+
+_EVAL_LUT = np.load(os.path.join(os.path.dirname(__file__), "eval_table.npy"))
+
+
+def _lut_eval_7(cards_7):
+    s = sorted(cards_7)
+    return int(_EVAL_LUT[
+        _C[s[0]][1] + _C[s[1]][2] + _C[s[2]][3] + _C[s[3]][4] +
+        _C[s[4]][5] + _C[s[5]][6] + _C[s[6]][7]])
 
 
 def _fast_evaluate(hand, board, alt_hand, alt_board):
@@ -155,6 +174,10 @@ def _has_premium_pair(cards):
             if _is_premium_pair(cards[i], cards[j]):
                 return True
     return False
+
+
+def _has_pair_of_rank(cards, rank):
+    return sum(1 for c in cards if _RANK[c] == rank) >= 2
 
 
 # ── Board texture functions ──────────────────────────────────────────────────
@@ -354,6 +377,16 @@ def _count_straight_outs(my_cards, community, opp_discards, my_discards):
     return best_in_run, best_outs, DECK_SIZE - len(known)
 
 
+def _has_live_draw(my_cards, community, opp_discards, my_discards):
+    suit_count, flush_outs, _ = _count_flush_outs(my_cards, community, opp_discards, my_discards)
+    if suit_count >= 4 and flush_outs >= 2:
+        return True
+    run_count, straight_outs, _ = _count_straight_outs(my_cards, community, opp_discards, my_discards)
+    if run_count >= 4 and straight_outs >= 3:
+        return True
+    return False
+
+
 # ── String/int conversion ────────────────────────────────────────────────────
 
 _RANKS_STR = "23456789A"
@@ -370,7 +403,6 @@ def _str_to_int(card_str):
 
 
 class _OppDiscardModel:
-    """Adaptive linear model that learns opponent's discard feature weights."""
 
     _FEATURE_NAMES = [
         "pair_with_board", "pocket_pair", "flush_draw",
@@ -378,11 +410,14 @@ class _OppDiscardModel:
     ]
     _NUM_FEATURES = len(_FEATURE_NAMES)
     _DEFAULTS = [10.0, 8.0, 6.0, 3.0, 2.0, 4.0, 3.0]
-    _ALPHA = 0.15
+    _ALPHA_BASE = 0.15
     _WEIGHT_FLOOR = 0.5
 
     def __init__(self):
         self.weights = list(self._DEFAULTS)
+        self._alpha = self._ALPHA_BASE
+        self._correct = 0
+        self._total = 0
 
     @staticmethod
     def _extract_features(keep, flop, _fr=None, _fs=None, _bsc=None):
@@ -444,22 +479,34 @@ class _OppDiscardModel:
         predicted_best = keeps_and_scores[0][0]
         chosen_set = set(opp_kept)
         predicted_set = set(predicted_best)
+        self._total += 1
         if chosen_set == predicted_set:
+            self._correct += 1
+            self._adapt_learning_rate()
             return
+        self._adapt_learning_rate()
         chosen_feats = self._extract_features(list(opp_kept), flop)
         predicted_feats = self._extract_features(predicted_best, flop)
         for i in range(self._NUM_FEATURES):
             diff = chosen_feats[i] - predicted_feats[i]
-            self.weights[i] += self._ALPHA * diff
+            self.weights[i] += self._alpha * diff
             self.weights[i] = max(self._WEIGHT_FLOOR, self.weights[i])
 
+    def _adapt_learning_rate(self):
+        if self._total < 5:
+            return
+        accuracy = self._correct / self._total
+        if accuracy < 0.30:
+            self._alpha = min(0.30, self._alpha * 1.1)
+        elif accuracy > 0.60:
+            self._alpha = max(0.08, self._alpha * 0.95)
 
-# ── PlayerAgent ──────────────────────────────────────────────────────────────
+
+# ── Adaptive Opponent Statistics (EMA-based) ─────────────────────────────────
 
 
-class PlayerAgent(Agent):
-
-    _STAT_PRIORS = {
+class _AdaptiveStats:
+    PRIORS = {
         "fold_to_bet":       0.35,
         "fold_to_raise":     0.35,
         "check_raise":       0.05,
@@ -468,6 +515,278 @@ class PlayerAgent(Agent):
         "opp_avg_bet_frac":  0.50,
         "opp_preflop_raise": 0.30,
     }
+    BASE_FAST_ALPHA = 0.12
+    BASE_SLOW_ALPHA = 0.03
+    MIN_OBS_FOR_RATE = 3
+
+    def __init__(self):
+        self._fast = {k: v for k, v in self.PRIORS.items()}
+        self._slow = {k: v for k, v in self.PRIORS.items()}
+        self._counts = {k: 0 for k in self.PRIORS}
+        self.fast_alpha = self.BASE_FAST_ALPHA
+        self.slow_alpha = self.BASE_SLOW_ALPHA
+
+    def update(self, stat_name, value):
+        if stat_name not in self._fast:
+            self._fast[stat_name] = self.PRIORS.get(stat_name, 0.35)
+            self._slow[stat_name] = self.PRIORS.get(stat_name, 0.35)
+            self._counts[stat_name] = 0
+        self._fast[stat_name] = (1 - self.fast_alpha) * self._fast[stat_name] + self.fast_alpha * value
+        self._slow[stat_name] = (1 - self.slow_alpha) * self._slow[stat_name] + self.slow_alpha * value
+        self._counts[stat_name] += 1
+
+    def rate(self, stat_name):
+        if self._counts.get(stat_name, 0) < self.MIN_OBS_FOR_RATE:
+            return self.PRIORS.get(stat_name, 0.35)
+        return self._fast[stat_name]
+
+    def slow_rate(self, stat_name):
+        if self._counts.get(stat_name, 0) < self.MIN_OBS_FOR_RATE:
+            return self.PRIORS.get(stat_name, 0.35)
+        return self._slow[stat_name]
+
+    def count(self, stat_name):
+        return self._counts.get(stat_name, 0)
+
+    def total_obs(self):
+        return sum(self._counts.values())
+
+    def detect_regime_change(self):
+        key_stats = ["fold_to_bet", "opp_aggression", "check_raise", "call_down"]
+        divergences = []
+        for stat in key_stats:
+            if self._counts.get(stat, 0) >= 10:
+                div = abs(self._fast[stat] - self._slow[stat])
+                divergences.append(div)
+        if not divergences:
+            return False
+        avg_div = sum(divergences) / len(divergences)
+        if avg_div > 0.12:
+            self.fast_alpha = min(0.25, self.fast_alpha * 1.5)
+            return True
+        else:
+            self.fast_alpha = max(self.BASE_FAST_ALPHA, self.fast_alpha * 0.95)
+            return False
+
+    def update_bet_frac(self, stat_name, frac_value):
+        if stat_name not in self._fast:
+            self._fast[stat_name] = self.PRIORS.get(stat_name, 0.50)
+            self._slow[stat_name] = self.PRIORS.get(stat_name, 0.50)
+            self._counts[stat_name] = 0
+        self._fast[stat_name] = (1 - self.fast_alpha) * self._fast[stat_name] + self.fast_alpha * frac_value
+        self._slow[stat_name] = (1 - self.slow_alpha) * self._slow[stat_name] + self.slow_alpha * frac_value
+        self._counts[stat_name] += 1
+
+
+# ── Bayesian Archetype Posterior ─────────────────────────────────────────────
+
+
+class _BayesianArchetype:
+    ARCHETYPES = ("overfolder", "station", "maniac", "balanced")
+    LIKELIHOODS = {
+        "overfolder": {"fold": 0.55, "call": 0.25, "raise": 0.20},
+        "station":    {"fold": 0.15, "call": 0.60, "raise": 0.25},
+        "maniac":     {"fold": 0.10, "call": 0.30, "raise": 0.60},
+        "balanced":   {"fold": 0.33, "call": 0.34, "raise": 0.33},
+    }
+
+    def __init__(self):
+        self.probs = {a: 0.25 for a in self.ARCHETYPES}
+
+    def update(self, observed_action):
+        if observed_action not in ("fold", "call", "raise"):
+            return
+        total = 0.0
+        for arch in self.ARCHETYPES:
+            likelihood = self.LIKELIHOODS[arch].get(observed_action, 0.33)
+            self.probs[arch] *= likelihood
+            total += self.probs[arch]
+        if total > 0:
+            for arch in self.ARCHETYPES:
+                self.probs[arch] /= total
+
+    def dominant(self):
+        return max(self.probs, key=self.probs.get)
+
+    def prob(self, archetype):
+        return self.probs.get(archetype, 0.0)
+
+    def reset_uniform(self):
+        self.probs = {a: 0.25 for a in self.ARCHETYPES}
+
+
+# ── Bet-Sizing Tell Tracker ─────────────────────────────────────────────────
+
+
+class _SizingTellTracker:
+    MAX_HISTORY = 50
+
+    def __init__(self):
+        self._small = []
+        self._medium = []
+        self._large = []
+
+    def record(self, bet_frac, hand_strength):
+        if bet_frac < 0.40:
+            bucket = self._small
+        elif bet_frac < 0.75:
+            bucket = self._medium
+        else:
+            bucket = self._large
+        bucket.append(hand_strength)
+        if len(bucket) > self.MAX_HISTORY:
+            bucket.pop(0)
+
+    def tell_adjustment(self, current_bet_frac):
+        if current_bet_frac < 0.40:
+            bucket = self._small
+        elif current_bet_frac < 0.75:
+            bucket = self._medium
+        else:
+            bucket = self._large
+        if len(bucket) < 8:
+            return 0.0
+        avg_strength = sum(bucket) / len(bucket)
+        if avg_strength > 0.70:
+            return -0.06
+        if avg_strength < 0.35:
+            return 0.06
+        return 0.0
+
+
+# ── Module-level solver functions (for ProcessPoolExecutor pickling) ──────────
+
+
+def _opp_keep_weight_lut(opp_hand, community, opp_discards, model_weights,
+                         _flop_cache=None):
+    original5 = list(opp_hand) + list(opp_discards)
+    if len(original5) < 5:
+        return 1.0
+    if _flop_cache is not None:
+        fr, fs, bsc = _flop_cache
+    else:
+        flop = community[:3]
+        fr = [_RANK[c] for c in flop]
+        fs = [_SUIT[c] for c in flop]
+        bsc = [0, 0, 0]
+        for s in fs:
+            bsc[s] += 1
+    keeps_and_scores = []
+    for i, j in combinations(range(len(original5)), 2):
+        cand = [original5[i], original5[j]]
+        feats = _OppDiscardModel._extract_features(cand, None, fr, fs, bsc)
+        sc = sum(w * f for w, f in zip(model_weights, feats))
+        keeps_and_scores.append((frozenset([original5[i], original5[j]]), sc))
+    keeps_and_scores.sort(key=lambda x: x[1], reverse=True)
+    opp_set = frozenset(opp_hand)
+    for rank_idx, (kset, _) in enumerate(keeps_and_scores):
+        if kset == opp_set:
+            if rank_idx == 0:
+                return 1.0
+            elif rank_idx == 1:
+                return 0.3
+            elif rank_idx == 2:
+                return 0.1
+            else:
+                return 0.02
+    return 0.02
+
+
+def _exact_discard_equity_lut(my_keep, community, dead_cards):
+    remaining = [c for c in range(DECK_SIZE) if c not in dead_cards]
+    board_needed = 5 - len(community)
+    community_l = list(community)
+    wins = 0.0
+    total = 0
+    for runout in combinations(remaining, board_needed):
+        board_5 = community_l + list(runout)
+        mr = _lut_eval_7(list(my_keep) + board_5)
+        runout_set = set(runout)
+        opp_pool = [c for c in remaining if c not in runout_set]
+        for opp in combinations(opp_pool, 2):
+            orr = _lut_eval_7(list(opp) + board_5)
+            if mr < orr:
+                wins += 1.0
+            elif mr == orr:
+                wins += 0.5
+            total += 1
+    return wins / total if total > 0 else 0.5
+
+
+def _exact_discard_equity_weighted_lut(my_keep, community, dead_cards,
+                                       opp_discards, model_weights):
+    remaining = [c for c in range(DECK_SIZE) if c not in dead_cards]
+    board_needed = 5 - len(community)
+    community_l = list(community)
+    flop = community_l[:3]
+    fr = [_RANK[c] for c in flop]
+    fs = [_SUIT[c] for c in flop]
+    bsc = [0, 0, 0]
+    for s in fs:
+        bsc[s] += 1
+    flop_cache = (fr, fs, bsc)
+
+    opp_weights = {}
+    for opp in combinations(remaining, 2):
+        w = _opp_keep_weight_lut(list(opp), community, opp_discards,
+                                 model_weights, flop_cache)
+        if w >= 0.01:
+            opp_weights[opp] = w
+
+    wins = 0.0
+    total_weight = 0.0
+    for runout in combinations(remaining, board_needed):
+        board_5 = community_l + list(runout)
+        mr = _lut_eval_7(list(my_keep) + board_5)
+        runout_set = set(runout)
+        opp_pool = [c for c in remaining if c not in runout_set]
+        for opp in combinations(opp_pool, 2):
+            entry = opp_weights.get(opp)
+            if entry is None:
+                continue
+            orr = _lut_eval_7(list(opp) + board_5)
+            if mr < orr:
+                wins += entry
+            elif mr == orr:
+                wins += 0.5 * entry
+            total_weight += entry
+    return wins / total_weight if total_weight > 0 else 0.5
+
+
+_NUM_CPUS = min(4, os.cpu_count() or 1)
+try:
+    import multiprocessing as _mp
+    _mp_ctx = _mp.get_context("fork")
+except (ValueError, AttributeError):
+    _mp_ctx = None
+
+_POOL = None
+
+def _get_pool():
+    global _POOL
+    if _POOL is None:
+        _POOL = ProcessPoolExecutor(max_workers=_NUM_CPUS, mp_context=_mp_ctx)
+    return _POOL
+
+import atexit, signal as _signal
+
+def _shutdown_pool(*_args):
+    global _POOL
+    if _POOL is not None:
+        _POOL.shutdown(wait=False)
+        _POOL = None
+
+atexit.register(_shutdown_pool)
+try:
+    _signal.signal(_signal.SIGTERM, lambda s, f: (_shutdown_pool(), os._exit(0)))
+except (OSError, ValueError):
+    pass
+
+
+# ── PlayerAgent ──────────────────────────────────────────────────────────────
+
+
+class PlayerAgent(Agent):
 
     def __init__(self, stream: bool = True):
         super().__init__(stream)
@@ -480,41 +799,54 @@ class PlayerAgent(Agent):
         self._last_opp_discards = []
         self._last_my_cards = []
 
-        self._stats = {
-            "fold_to_bet":       [0, 0],
-            "fold_to_raise":     [0, 0],
-            "check_raise":       [0, 0],
-            "call_down":         [0, 0],
-            "opp_aggression":    [0, 0],
-            "opp_avg_bet_frac":  [0.0, 0],
-            "opp_preflop_raise": [0, 0],
-        }
+        self._global_stats = _AdaptiveStats()
+        self._street_stats = {s: _AdaptiveStats() for s in range(4)}
+        self._bayesian = _BayesianArchetype()
+        self._sizing_tells = _SizingTellTracker()
+
         self._opp_hand_aggr = 0.0
         self._opp_archetype = "default"
         self._opp_folded = False
         self._last_was_bet = False
+        self._last_was_check = False
         self._last_street = 0
+        self._hand_override = None
+        self._position = "BB"
+        self._cached_preflop_eq = None
+
+        self._opp_last_bet_fracs = []
 
     # ── Opponent profiling helpers ───────────────────────────────────────────
 
-    def _safe_rate(self, key):
-        folds, total = self._stats.get(key, [0, 0])
-        if total < 3:
-            return self._STAT_PRIORS.get(key, 0.35)
-        return folds / total
+    def _safe_rate(self, key, street=None):
+        if street is not None and street in self._street_stats:
+            ss = self._street_stats[street]
+            if ss.count(key) >= 5:
+                return ss.rate(key)
+        return self._global_stats.rate(key)
 
     def _total_obs(self):
-        return sum(v[1] for v in self._stats.values() if isinstance(v[1], int))
+        return self._global_stats.total_obs()
 
     def _select_mode(self):
-        if self._total_obs() < 5:
+        total = self._total_obs()
+        if total < 5:
             self._opp_archetype = "default"
             return
-        fold_to_bet = self._safe_rate("fold_to_bet")
-        cr_rate = self._safe_rate("check_raise")
-        call_down = self._safe_rate("call_down")
-        opp_aggro = self._safe_rate("opp_aggression")
-        pf_raise = self._safe_rate("opp_preflop_raise")
+
+        ramp = min(1.0, (self._hands_completed - 5) / 7.0)
+        if ramp < 0:
+            ramp = 0.0
+
+        self._global_stats.detect_regime_change()
+
+        fold_to_bet = self._global_stats.rate("fold_to_bet")
+        cr_rate = self._global_stats.rate("check_raise")
+        call_down = self._global_stats.rate("call_down")
+        opp_aggro = self._global_stats.rate("opp_aggression")
+        pf_raise = self._global_stats.rate("opp_preflop_raise")
+
+        bay_dom = self._bayesian.dominant()
 
         if opp_aggro > 0.45:
             self._opp_archetype = "maniac"
@@ -524,14 +856,17 @@ class PlayerAgent(Agent):
             self._opp_archetype = "station"
         elif cr_rate > 0.10:
             self._opp_archetype = "maniac"
-        elif opp_aggro < 0.15 and self._stats["opp_aggression"][1] >= 8:
+        elif opp_aggro < 0.15 and self._global_stats.count("opp_aggression") >= 8:
             self._opp_archetype = "overfolder"
         elif pf_raise > 0.50:
             self._opp_archetype = "default"
         elif pf_raise < 0.12:
             self._opp_archetype = "station"
         else:
-            self._opp_archetype = "default"
+            if self._bayesian.prob(bay_dom) > 0.40 and bay_dom != "balanced":
+                self._opp_archetype = bay_dom
+            else:
+                self._opp_archetype = "default"
 
     def _process_opponent_action(self, observation, opp_action, last_was_bet, last_street):
         if not opp_action:
@@ -539,46 +874,58 @@ class PlayerAgent(Agent):
         if opp_action == "fold":
             self._opp_folded = True
 
-        if last_was_bet:
-            if opp_action == "fold":
-                self._stats["fold_to_bet"][0] += 1
-                self._stats["fold_to_bet"][1] += 1
-                self._stats["fold_to_raise"][0] += 1
-                self._stats["fold_to_raise"][1] += 1
-            elif opp_action in ("call", "check", "raise"):
-                self._stats["fold_to_bet"][1] += 1
-                self._stats["fold_to_raise"][1] += 1
-                if opp_action == "call" and last_street >= 1:
-                    self._stats["call_down"][0] += 1
-                    self._stats["call_down"][1] += 1
-                elif last_street >= 1:
-                    self._stats["call_down"][1] += 1
+        current_street = observation.get("street", 0)
+        canon = opp_action if opp_action in ("fold", "call", "raise") else "call"
+        self._bayesian.update(canon)
 
-        if not last_was_bet and opp_action == "raise":
-            self._stats["check_raise"][0] += 1
-            self._stats["check_raise"][1] += 1
-        elif not last_was_bet and opp_action in ("check", "call", "fold"):
-            self._stats["check_raise"][1] += 1
+        if last_was_bet:
+            is_fold = 1.0 if opp_action == "fold" else 0.0
+            self._global_stats.update("fold_to_bet", is_fold)
+            self._global_stats.update("fold_to_raise", is_fold)
+            self._street_stats[last_street].update("fold_to_bet", is_fold)
+            self._street_stats[last_street].update("fold_to_raise", is_fold)
+            if opp_action in ("call", "check", "raise"):
+                if opp_action == "call" and last_street >= 1:
+                    self._global_stats.update("call_down", 1.0)
+                    self._street_stats[last_street].update("call_down", 1.0)
+                elif last_street >= 1:
+                    self._global_stats.update("call_down", 0.0)
+                    self._street_stats[last_street].update("call_down", 0.0)
+
+        last_was_check = self._last_was_check
+        if last_was_check and opp_action == "raise":
+            self._global_stats.update("check_raise", 1.0)
+            self._street_stats[last_street].update("check_raise", 1.0)
+            if self._hand_override is None:
+                self._hand_override = "value_mode"
+        elif last_was_check and opp_action in ("check", "call", "fold"):
+            self._global_stats.update("check_raise", 0.0)
+            self._street_stats[last_street].update("check_raise", 0.0)
+
+        if last_was_bet and opp_action == "raise":
+            if self._hand_override is None:
+                self._hand_override = "value_mode"
 
         if opp_action in ("raise", "call", "check"):
-            self._stats["opp_aggression"][1] += 1
+            is_raise = 1.0 if opp_action == "raise" else 0.0
+            self._global_stats.update("opp_aggression", is_raise)
+            self._street_stats[current_street].update("opp_aggression", is_raise)
             if opp_action == "raise":
-                self._stats["opp_aggression"][0] += 1
                 opp_bet_obs = observation.get("opp_bet", 0)
                 my_bet_obs = observation.get("my_bet", 0)
                 pot_obs = observation.get("pot_size", opp_bet_obs + my_bet_obs)
                 raise_size = max(0, opp_bet_obs - my_bet_obs)
                 if pot_obs > 0 and raise_size > 0:
                     frac = raise_size / pot_obs
-                    self._stats["opp_avg_bet_frac"][0] += frac
-                    self._stats["opp_avg_bet_frac"][1] += 1
+                    self._global_stats.update_bet_frac("opp_avg_bet_frac", frac)
+                    self._opp_last_bet_fracs.append(frac)
+                    if len(self._opp_last_bet_fracs) > 30:
+                        self._opp_last_bet_fracs.pop(0)
 
         if last_street == 0 and opp_action in ("raise", "call", "check", "fold"):
-            self._stats["opp_preflop_raise"][1] += 1
-            if opp_action == "raise":
-                self._stats["opp_preflop_raise"][0] += 1
+            is_pf_raise = 1.0 if opp_action == "raise" else 0.0
+            self._global_stats.update("opp_preflop_raise", is_pf_raise)
 
-        current_street = observation.get("street", 0)
         if current_street > last_street:
             self._opp_hand_aggr *= 0.7
 
@@ -600,17 +947,18 @@ class PlayerAgent(Agent):
             self._hands_completed += 1
 
             if self._opp_folded and self._last_was_bet:
-                self._stats["fold_to_bet"][0] += 1
-                self._stats["fold_to_bet"][1] += 1
-                self._stats["fold_to_raise"][0] += 1
-                self._stats["fold_to_raise"][1] += 1
+                self._global_stats.update("fold_to_bet", 1.0)
+                self._global_stats.update("fold_to_raise", 1.0)
 
             self._learn_from_showdown(observation, info)
 
             self._opp_folded = False
             self._last_was_bet = False
+            self._last_was_check = False
             self._opp_hand_aggr = 0.0
             self._last_street = 0
+            self._hand_override = None
+            self._cached_preflop_eq = None
 
     def _learn_from_showdown(self, observation, info):
         p0_cards = info.get("player_0_cards")
@@ -634,8 +982,17 @@ class PlayerAgent(Agent):
         flop = self._last_community[:3]
         self._opp_model.update(opp_kept, flop, self._last_opp_discards)
 
+        if len(self._last_community) >= 5 and len(opp_kept) == 2:
+            opp_rank = _lut_eval_7(list(opp_kept) + self._last_community[:5])
+            opp_strength = 1.0 - (opp_rank / 7462.0)
+            if self._opp_last_bet_fracs:
+                avg_frac = sum(self._opp_last_bet_fracs) / len(self._opp_last_bet_fracs)
+                self._sizing_tells.record(avg_frac, opp_strength)
+
+        self._opp_last_bet_fracs = []
+
     def __name__(self):
-        return "OMICRON_V1"
+        return "DELTA_V1"
 
     # ── MC Equity (random range — for discard screening + preflop) ───────────
 
@@ -658,25 +1015,18 @@ class PlayerAgent(Agent):
         if sample_size > len(remaining):
             return 0.5
 
-        my_h = [_INT_TO_TREYS[c] for c in my_cards]
-        my_ha = [_INT_TO_TREYS_ALT[c] for c in my_cards]
-        comm = [_INT_TO_TREYS[c] for c in community]
-        comm_a = [_INT_TO_TREYS_ALT[c] for c in community]
+        community_l = list(community)
+        my_keep = list(my_cards)
 
         wins = 0
         total = 0
         for _ in range(num_sims):
             sample = random.sample(remaining, sample_size)
             opp_cards = sample[:2]
-            runout = sample[2:]
+            board_5 = community_l + sample[2:]
 
-            oh = [_INT_TO_TREYS[c] for c in opp_cards]
-            oha = [_INT_TO_TREYS_ALT[c] for c in opp_cards]
-            board = comm + [_INT_TO_TREYS[c] for c in runout]
-            board_a = comm_a + [_INT_TO_TREYS_ALT[c] for c in runout]
-
-            my_rank = _fast_evaluate(my_h, board, my_ha, board_a)
-            opp_rank = _fast_evaluate(oh, board, oha, board_a)
+            my_rank = _lut_eval_7(my_keep + board_5)
+            opp_rank = _lut_eval_7(opp_cards + board_5)
             if my_rank < opp_rank:
                 wins += 1
             elif my_rank == opp_rank:
@@ -711,12 +1061,9 @@ class PlayerAgent(Agent):
         reject_one_pair = opp_signal >= 3.5
         max_retries = 3 if reject_nothing else 0
 
-        my_h = [_INT_TO_TREYS[c] for c in my2]
-        my_ha = [_INT_TO_TREYS_ALT[c] for c in my2]
-        comm = [_INT_TO_TREYS[c] for c in community]
-        comm_a = [_INT_TO_TREYS_ALT[c] for c in community]
+        community_l = list(community)
+        my_keep = list(my2)
 
-        # OPT1: precompute opponent weight map before MC loop
         opp_weight_map = {}
         if have_discards and flop_cache:
             for pair in combinations(remaining, 2):
@@ -749,13 +1096,9 @@ class PlayerAgent(Agent):
                 if w < 0.01:
                     continue
 
-            oh = [_INT_TO_TREYS[c] for c in opp]
-            oha = [_INT_TO_TREYS_ALT[c] for c in opp]
-            board = comm + [_INT_TO_TREYS[c] for c in runout]
-            board_a = comm_a + [_INT_TO_TREYS_ALT[c] for c in runout]
-
-            my_rank = _fast_evaluate(my_h, board, my_ha, board_a)
-            opp_rank = _fast_evaluate(oh, board, oha, board_a)
+            board_5 = community_l + runout
+            my_rank = _lut_eval_7(my_keep + board_5)
+            opp_rank = _lut_eval_7(opp + board_5)
             if my_rank < opp_rank:
                 wins += w
             elif my_rank == opp_rank:
@@ -764,144 +1107,34 @@ class PlayerAgent(Agent):
 
         return wins / total_weight if total_weight > 0 else 0.5
 
-    # ── Preflop equity ───────────────────────────────────────────────────────
+    # ── Preflop equity (best-keep + cache) ───────────────────────────────────
 
-    def _preflop_equity(self, my5, dead):
-        scores = []
+    def _preflop_equity(self, my5):
+        if self._cached_preflop_eq is not None:
+            return self._cached_preflop_eq
+        best_eq = 0.0
+        dead = set(my5)
         for i, j in combinations(range(len(my5)), 2):
             keep = [my5[i], my5[j]]
             toss = [my5[k] for k in range(len(my5)) if k not in (i, j)]
             eq = self._compute_equity(keep, [], [], toss, num_sims=80)
-            scores.append(eq)
-        scores.sort(reverse=True)
-        top = scores[:3]
-        return sum(top) / len(top) if top else 0.45
+            best_eq = max(best_eq, eq)
+        self._cached_preflop_eq = best_eq
+        return best_eq
 
     # ── Exact discard methods (subgame solver) ───────────────────────────────
 
     def _exact_discard_equity(self, my_keep, community, dead_cards):
-        remaining = [c for c in range(DECK_SIZE) if c not in dead_cards]
-        board_needed = 5 - len(community)
-
-        my_h = [_INT_TO_TREYS[c] for c in my_keep]
-        my_ha = [_INT_TO_TREYS_ALT[c] for c in my_keep]
-        comm = [_INT_TO_TREYS[c] for c in community]
-        comm_a = [_INT_TO_TREYS_ALT[c] for c in community]
-
-        # OPT2: pre-build opponent treys pairs
-        opp_treys = {}
-        for pair in combinations(remaining, 2):
-            opp_treys[pair] = (
-                [_INT_TO_TREYS[pair[0]], _INT_TO_TREYS[pair[1]]],
-                [_INT_TO_TREYS_ALT[pair[0]], _INT_TO_TREYS_ALT[pair[1]]],
-            )
-
-        wins = 0.0
-        total = 0
-
-        for runout in combinations(remaining, board_needed):
-            board = comm + [_INT_TO_TREYS[c] for c in runout]
-            board_a = comm_a + [_INT_TO_TREYS_ALT[c] for c in runout]
-            mr = _fast_evaluate(my_h, board, my_ha, board_a)
-            runout_set = set(runout)
-            opp_pool = [c for c in remaining if c not in runout_set]
-            for opp in combinations(opp_pool, 2):
-                oh, oha = opp_treys[opp]
-                orr = _fast_evaluate(oh, board, oha, board_a)
-                if mr < orr:
-                    wins += 1.0
-                elif mr == orr:
-                    wins += 0.5
-                total += 1
-
-        return wins / total if total > 0 else 0.5
+        return _exact_discard_equity_lut(my_keep, community, dead_cards)
 
     def _opp_keep_weight(self, opp_hand, community, opp_discards, _flop_cache=None):
-        original5 = list(opp_hand) + list(opp_discards)
-        if len(original5) < 5:
-            return 1.0
-
-        if _flop_cache is not None:
-            fr, fs, bsc = _flop_cache
-        else:
-            flop = community[:3]
-            fr = [_RANK[c] for c in flop]
-            fs = [_SUIT[c] for c in flop]
-            bsc = [0, 0, 0]
-            for s in fs:
-                bsc[s] += 1
-
-        keeps_and_scores = []
-        for i, j in combinations(range(len(original5)), 2):
-            cand = [original5[i], original5[j]]
-            sc = self._opp_model.score_precomputed(cand, fr, fs, bsc)
-            keeps_and_scores.append((frozenset([original5[i], original5[j]]), sc))
-
-        keeps_and_scores.sort(key=lambda x: x[1], reverse=True)
-        opp_set = frozenset(opp_hand)
-
-        for rank_idx, (kset, _) in enumerate(keeps_and_scores):
-            if kset == opp_set:
-                if rank_idx == 0:
-                    return 1.0
-                elif rank_idx == 1:
-                    return 0.3
-                elif rank_idx == 2:
-                    return 0.1
-                else:
-                    return 0.02
-        return 0.02
+        return _opp_keep_weight_lut(opp_hand, community, opp_discards,
+                                    self._opp_model.weights, _flop_cache)
 
     def _exact_discard_equity_weighted(self, my_keep, community, dead_cards, opp_discards):
-        remaining = [c for c in range(DECK_SIZE) if c not in dead_cards]
-        board_needed = 5 - len(community)
-
-        my_h = [_INT_TO_TREYS[c] for c in my_keep]
-        my_ha = [_INT_TO_TREYS_ALT[c] for c in my_keep]
-        comm = [_INT_TO_TREYS[c] for c in community]
-        comm_a = [_INT_TO_TREYS_ALT[c] for c in community]
-
-        flop = community[:3]
-        fr = [_RANK[c] for c in flop]
-        fs = [_SUIT[c] for c in flop]
-        bsc = [0, 0, 0]
-        for s in fs:
-            bsc[s] += 1
-        flop_cache = (fr, fs, bsc)
-
-        # OPT2: pre-build opponent treys pairs + weights together
-        opp_data = {}
-        for opp in combinations(remaining, 2):
-            w = self._opp_keep_weight(list(opp), community, opp_discards, flop_cache)
-            if w >= 0.01:
-                opp_data[opp] = (
-                    w,
-                    [_INT_TO_TREYS[opp[0]], _INT_TO_TREYS[opp[1]]],
-                    [_INT_TO_TREYS_ALT[opp[0]], _INT_TO_TREYS_ALT[opp[1]]],
-                )
-
-        wins = 0.0
-        total_weight = 0.0
-
-        for runout in combinations(remaining, board_needed):
-            board = comm + [_INT_TO_TREYS[c] for c in runout]
-            board_a = comm_a + [_INT_TO_TREYS_ALT[c] for c in runout]
-            mr = _fast_evaluate(my_h, board, my_ha, board_a)
-            runout_set = set(runout)
-            opp_pool = [c for c in remaining if c not in runout_set]
-            for opp in combinations(opp_pool, 2):
-                entry = opp_data.get(opp)
-                if entry is None:
-                    continue
-                w, oh, oha = entry
-                orr = _fast_evaluate(oh, board, oha, board_a)
-                if mr < orr:
-                    wins += w
-                elif mr == orr:
-                    wins += 0.5 * w
-                total_weight += w
-
-        return wins / total_weight if total_weight > 0 else 0.5
+        return _exact_discard_equity_weighted_lut(
+            my_keep, community, dead_cards, opp_discards,
+            self._opp_model.weights)
 
     # ── Postflop helper systems ──────────────────────────────────────────────
 
@@ -910,6 +1143,8 @@ class PlayerAgent(Agent):
                        opp_discards=None):
         outs = max(flush_outs, straight_outs)
         if street == 1 and has_draw and outs > 0:
+            equity += min(0.14, outs * 0.035)
+        elif street == 2 and has_draw and outs > 0:
             equity += min(0.10, outs * 0.025)
         elif street == 3 and has_draw and hand_cat in ("nothing", "one_pair"):
             equity -= 0.10
@@ -923,10 +1158,18 @@ class PlayerAgent(Agent):
         return _clamp(equity, 0.0, 0.98)
 
     @staticmethod
-    def _cat_to_strength(hand_cat, has_draw, my_cards=None, community=None):
-        if hand_cat == "trips_plus":
-            return "monster"
-        if hand_cat == "two_pair":
+    def _cat_to_strength(hand_cat, has_draw, equity=None):
+        if equity is not None:
+            if equity > MONSTER_THRESHOLD:
+                return "monster"
+            if equity > STRONG_THRESHOLD:
+                return "strong"
+            if equity > GOOD_THRESHOLD:
+                return "strong" if hand_cat == "trips_plus" else "good"
+            if has_draw:
+                return "draw"
+            return "weak"
+        if hand_cat in ("trips_plus", "two_pair"):
             return "monster"
         if hand_cat == "one_pair" and has_draw:
             return "strong"
@@ -939,6 +1182,8 @@ class PlayerAgent(Agent):
     def _semi_bluff_check(self, my_cards, community, opp_discards, my_discards,
                           pot_size, to_call, street, valid, min_raise, max_raise,
                           has_draw=None, flush_outs_v=None, straight_outs_v=None):
+        if self._hand_override is not None:
+            return False, None
         if street not in (1, 2):
             return False, None
         if not (valid[RAISE] and max_raise >= min_raise):
@@ -976,7 +1221,7 @@ class PlayerAgent(Agent):
             miss_two = max(0, remaining - outs - 1) / max(1, remaining - 1)
             draw_eq = 1.0 - miss_one * miss_two
 
-        fold_prob = self._safe_rate("fold_to_bet")
+        fold_prob = self._safe_rate("fold_to_bet", street=street)
         pot = max(pot_size, 1)
 
         if fold_prob > 0.48:
@@ -1017,7 +1262,108 @@ class PlayerAgent(Agent):
                 mult = 0.70
             elif strength in ("strong", "medium"):
                 mult = 0.80
-        return max(1, int(base_amount * mult))
+        noise = random.uniform(0.90, 1.10)
+        return max(1, int(base_amount * mult * noise))
+
+    # ── River-specific decision logic (from Genesis V2) ──────────────────────
+
+    def _act_river(self, my_cards, community, opp_discards, my_discards,
+                   valid, pot_size, my_bet, opp_bet, min_raise, max_raise,
+                   equity, hand_cat, strength, has_draw):
+        to_call = max(0, opp_bet - my_bet)
+        pot_ref = max(pot_size, 1)
+        pot_odds = to_call / (pot_ref + to_call) if to_call > 0 else 0.0
+        arch = self._opp_archetype
+        fold_rate = self._safe_rate("fold_to_bet", street=3)
+
+        opp_bet_frac = to_call / pot_ref if to_call > 0 else 0.0
+        tell_adj = self._sizing_tells.tell_adjustment(opp_bet_frac) if to_call > 0 else 0.0
+        adj_equity = _clamp(equity + tell_adj, 0.0, 0.98)
+
+        result = None
+
+        if to_call <= 0:
+            if adj_equity > MONSTER_THRESHOLD:
+                if arch == "station":
+                    frac = random.uniform(0.85, 1.00)
+                elif arch == "overfolder":
+                    frac = random.uniform(0.60, 0.75)
+                else:
+                    frac = random.uniform(0.70, 0.88)
+                amt = _clamp(int(pot_ref * frac), min_raise, max_raise)
+                if valid[RAISE]:
+                    result = (RAISE, _clamp(self._dynamic_sizing(amt, strength, 3, False), min_raise, max_raise), 0, 0)
+                elif valid[CALL]:
+                    result = (CALL, 0, 0, 0)
+                else:
+                    result = (CHECK, 0, 0, 0)
+
+            elif adj_equity > STRONG_THRESHOLD:
+                if arch == "station":
+                    frac = random.uniform(0.65, 0.80)
+                elif arch == "overfolder":
+                    frac = random.uniform(0.45, 0.60)
+                else:
+                    frac = random.uniform(0.55, 0.70)
+                amt = _clamp(int(pot_ref * frac), min_raise, max_raise)
+                if valid[RAISE]:
+                    result = (RAISE, _clamp(self._dynamic_sizing(amt, strength, 3, False), min_raise, max_raise), 0, 0)
+                else:
+                    result = (CHECK if valid[CHECK] else FOLD, 0, 0, 0)
+
+            elif adj_equity > GOOD_THRESHOLD:
+                if arch == "overfolder" and valid[RAISE]:
+                    frac = random.uniform(0.35, 0.50)
+                    amt = _clamp(int(pot_ref * frac), min_raise, max_raise)
+                    result = (RAISE, _clamp(self._dynamic_sizing(amt, strength, 3, False), min_raise, max_raise), 0, 0)
+                else:
+                    result = (CHECK if valid[CHECK] else FOLD, 0, 0, 0)
+
+            else:
+                if arch == "overfolder" and fold_rate > 0.55 and valid[RAISE]:
+                    if random.random() < 0.25:
+                        amt = _clamp(int(pot_ref * random.uniform(0.55, 0.70)), min_raise, max_raise)
+                        result = (RAISE, amt, 0, 0)
+                if result is None:
+                    result = (CHECK if valid[CHECK] else FOLD, 0, 0, 0)
+
+        else:
+            if adj_equity > MONSTER_THRESHOLD:
+                if valid[RAISE]:
+                    amt = _clamp(int(pot_ref * 1.0), min_raise, max_raise)
+                    result = (RAISE, amt, 0, 0)
+                elif valid[CALL]:
+                    result = (CALL, 0, 0, 0)
+                else:
+                    result = (CHECK, 0, 0, 0)
+
+            elif adj_equity > STRONG_THRESHOLD:
+                if valid[CALL]:
+                    result = (CALL, 0, 0, 0)
+                else:
+                    result = (CHECK if valid[CHECK] else FOLD, 0, 0, 0)
+
+            elif adj_equity > GOOD_THRESHOLD:
+                if adj_equity >= pot_odds + RIVER_CALL_PREMIUM and to_call <= pot_ref * 0.45:
+                    if valid[CALL]:
+                        result = (CALL, 0, 0, 0)
+                if result is None:
+                    result = (CHECK if valid[CHECK] else FOLD, 0, 0, 0)
+
+            else:
+                if adj_equity >= pot_odds + RIVER_CALL_PREMIUM + 0.05 and to_call <= pot_ref * 0.20:
+                    if valid[CALL]:
+                        result = (CALL, 0, 0, 0)
+                if result is None:
+                    result = (CHECK if valid[CHECK] else FOLD, 0, 0, 0)
+
+        if result[0] == FOLD and to_call <= 0 and valid[CHECK]:
+            result = (CHECK, 0, 0, 0)
+        if result[0] == FOLD and my_bet > 0 and to_call > 0 and to_call <= pot_ref * 0.15:
+            if valid[CALL]:
+                result = (CALL, 0, 0, 0)
+
+        return result
 
     # ── Main act() ───────────────────────────────────────────────────────────
 
@@ -1042,6 +1388,19 @@ class PlayerAgent(Agent):
 
         in_early_phase = self._hands_completed < EARLY_PHASE_HANDS
 
+        blind_pos = observation.get("blind_position", 1)
+        self._position = "SB" if blind_pos == 0 else "BB"
+
+        time_left = observation.get("time_left", 1000.0)
+        hands_left = max(1, TOTAL_HANDS - self._hands_completed)
+        budget_per_hand = time_left / hands_left
+        if budget_per_hand < 0.15:
+            sim_mode = "emergency"
+        elif budget_per_hand < 0.50:
+            sim_mode = "conservative"
+        else:
+            sim_mode = "full"
+
         raw = observation.get("opp_last_action", "")
         opp_action = _normalize_action(raw)
         if opp_action:
@@ -1050,19 +1409,6 @@ class PlayerAgent(Agent):
 
         if street == 0 and not valid[DISCARD]:
             self._select_mode()
-
-        # ── Bleed-out lock ───────────────────────────────────────────────────
-        if not valid[DISCARD]:
-            hands_remaining = max(0, TOTAL_HANDS - self._hands_completed)
-            sb_left = (hands_remaining + 1) // 2
-            bb_left = hands_remaining // 2
-            max_bleed = sb_left * 1 + bb_left * 2
-
-            if self._running_pnl > max_bleed:
-                if valid[FOLD]:
-                    return (FOLD, 0, 0, 0)
-                if valid[CHECK]:
-                    return (CHECK, 0, 0, 0)
 
         # ── Discard phase ────────────────────────────────────────────────────
         if valid[DISCARD]:
@@ -1079,21 +1425,63 @@ class PlayerAgent(Agent):
                 all_keeps.append((i, j, keep, toss))
 
             if have_opp_discards:
-                best_eq = -1.0
-                best_ij = (0, 1)
-                for i, j, keep, toss in all_keeps:
-                    dead = dead_base | set(toss) | set(opp_discards)
-                    eq = self._exact_discard_equity_weighted(keep, community, dead, opp_discards)
-                    if eq > best_eq:
-                        best_eq = eq
-                        best_ij = (i, j)
+                if sim_mode == "emergency":
+                    opp_disc_set = set(opp_discards)
+                    community_l = list(community)
+                    board_needed = 5 - len(community)
+                    ss = 2 + board_needed
+                    best_eq = -1.0
+                    best_ij = (0, 1)
+                    for i, j, keep, toss in all_keeps:
+                        per_dead = dead_base | set(toss) | opp_disc_set
+                        per_remaining = [c for c in range(DECK_SIZE) if c not in per_dead]
+                        if ss > len(per_remaining):
+                            eq = 0.5
+                        else:
+                            w = 0
+                            t = 0
+                            for _ in range(100):
+                                samp = random.sample(per_remaining, ss)
+                                board_5 = community_l + samp[2:]
+                                mr = _lut_eval_7(list(keep) + board_5)
+                                orr = _lut_eval_7(samp[:2] + board_5)
+                                if mr < orr:
+                                    w += 1
+                                elif mr == orr:
+                                    w += 0.5
+                                t += 1
+                            eq = w / t if t else 0.5
+                        if eq > best_eq:
+                            best_eq = eq
+                            best_ij = (i, j)
+                else:
+                    weights = list(self._opp_model.weights)
+                    futures = []
+                    for i, j, keep, toss in all_keeps:
+                        dead = dead_base | set(toss) | set(opp_discards)
+                        fut = _get_pool().submit(_exact_discard_equity_weighted_lut,
+                                           keep, community, dead, opp_discards,
+                                           weights)
+                        futures.append((i, j, fut))
+                    best_eq = -1.0
+                    best_ij = (0, 1)
+                    for i, j, fut in futures:
+                        eq = fut.result()
+                        if eq > best_eq:
+                            best_eq = eq
+                            best_ij = (i, j)
             else:
-                # OPT3: shared dead-set and treys for MC screen
                 opp_disc_set = set(opp_discards)
-                comm_treys = [_INT_TO_TREYS[c] for c in community]
-                comm_alt = [_INT_TO_TREYS_ALT[c] for c in community]
+                community_l = list(community)
                 board_needed = 5 - len(community)
                 screen_sample_size = 2 + board_needed
+
+                if sim_mode == "emergency":
+                    mc_sims = 100
+                elif sim_mode == "conservative":
+                    mc_sims = 300
+                else:
+                    mc_sims = 500
 
                 candidates = []
                 for i, j, keep, toss in all_keeps:
@@ -1103,20 +1491,13 @@ class PlayerAgent(Agent):
                         candidates.append((i, j, 0.5, keep, toss))
                         continue
 
-                    kh = [_INT_TO_TREYS[c] for c in keep]
-                    kha = [_INT_TO_TREYS_ALT[c] for c in keep]
                     w = 0
                     t = 0
-                    for _ in range(500):
+                    for _ in range(mc_sims):
                         samp = random.sample(per_remaining, screen_sample_size)
-                        oc = samp[:2]
-                        ro = samp[2:]
-                        oh = [_INT_TO_TREYS[c] for c in oc]
-                        oha = [_INT_TO_TREYS_ALT[c] for c in oc]
-                        bd = comm_treys + [_INT_TO_TREYS[c] for c in ro]
-                        bda = comm_alt + [_INT_TO_TREYS_ALT[c] for c in ro]
-                        mr = _fast_evaluate(kh, bd, kha, bda)
-                        orr = _fast_evaluate(oh, bd, oha, bda)
+                        board_5 = community_l + samp[2:]
+                        mr = _lut_eval_7(list(keep) + board_5)
+                        orr = _lut_eval_7(samp[:2] + board_5)
                         if mr < orr:
                             w += 1
                         elif mr == orr:
@@ -1126,14 +1507,23 @@ class PlayerAgent(Agent):
 
                 candidates.sort(key=lambda c: c[2], reverse=True)
 
-                best_eq = -1.0
-                best_ij = (0, 1)
-                for i, j, _, keep, toss in candidates[:5]:
-                    dead = dead_base | set(toss) | opp_disc_set
-                    eq = self._exact_discard_equity(keep, community, dead)
-                    if eq > best_eq:
-                        best_eq = eq
-                        best_ij = (i, j)
+                if sim_mode == "emergency":
+                    best_ij = (candidates[0][0], candidates[0][1])
+                else:
+                    top_n = 3 if sim_mode == "conservative" else 5
+                    futures = []
+                    for i, j, _, keep, toss in candidates[:top_n]:
+                        dead = dead_base | set(toss) | opp_disc_set
+                        fut = _get_pool().submit(_exact_discard_equity_lut,
+                                           keep, community, dead)
+                        futures.append((i, j, fut))
+                    best_eq = -1.0
+                    best_ij = (0, 1)
+                    for i, j, fut in futures:
+                        eq = fut.result()
+                        if eq > best_eq:
+                            best_eq = eq
+                            best_ij = (i, j)
 
             return (DISCARD, 0, best_ij[0], best_ij[1])
 
@@ -1146,10 +1536,15 @@ class PlayerAgent(Agent):
             to_call = max(0, opp_bet - my_bet)
 
             if in_early_phase:
-                preflop_eq = self._preflop_equity(my_cards, set()) if len(my_cards) == 5 else 0.45
+                preflop_eq = self._preflop_equity(my_cards) if len(my_cards) == 5 else 0.45
                 if premium:
                     if premium_pair and opp_bet >= PREFLOP_COMMIT_THRESHOLD and valid[RAISE]:
-                        result = (RAISE, max_raise, 0, 0)
+                        if self._opp_archetype == "maniac" and not _has_pair_of_rank(my_cards, RANK_A):
+                            amt = _clamp(int(to_call * 2.5 * random.uniform(0.9, 1.1)),
+                                         min_raise, max(min_raise, max_raise // 3))
+                            result = (RAISE, amt, 0, 0)
+                        else:
+                            result = (RAISE, max_raise, 0, 0)
                     elif to_call > 0 and valid[RAISE] and random.random() < 0.70:
                         amt = _clamp(int(to_call * 2.5 * random.uniform(0.9, 1.1)), min_raise, max_raise)
                         result = (RAISE, amt, 0, 0)
@@ -1179,7 +1574,12 @@ class PlayerAgent(Agent):
             else:
                 if premium:
                     if premium_pair and opp_bet >= PREFLOP_COMMIT_THRESHOLD and valid[RAISE]:
-                        result = (RAISE, max_raise, 0, 0)
+                        if self._opp_archetype == "maniac" and not _has_pair_of_rank(my_cards, RANK_A):
+                            amt = _clamp(int(to_call * 2.5 * random.uniform(0.9, 1.1)),
+                                         min_raise, max(min_raise, max_raise // 3))
+                            result = (RAISE, amt, 0, 0)
+                        else:
+                            result = (RAISE, max_raise, 0, 0)
                     elif premium_pair and random.random() < SLOW_PLAY_CHANCE:
                         if valid[CALL]:
                             result = (CALL, 0, 0, 0)
@@ -1195,9 +1595,12 @@ class PlayerAgent(Agent):
                         else:
                             result = (CHECK, 0, 0, 0)
                 else:
-                    preflop_eq = self._preflop_equity(my_cards, set()) if len(my_cards) == 5 else 0.45
-                    if preflop_eq >= NORMAL_PREFLOP_MIN_EQUITY:
-                        if to_call <= 0 and valid[RAISE] and random.random() < 0.40:
+                    preflop_eq = self._preflop_equity(my_cards) if len(my_cards) == 5 else 0.45
+
+                    if self._position == "BB" and to_call <= 4 and preflop_eq >= 0.40 and valid[CALL]:
+                        result = (CALL, 0, 0, 0)
+                    elif preflop_eq >= NORMAL_PREFLOP_MIN_EQUITY:
+                        if to_call <= 0 and valid[RAISE] and random.random() < 0.25:
                             amt = _clamp(int(8 * random.uniform(0.9, 1.1)), min_raise, max_raise)
                             result = (RAISE, amt, 0, 0)
                         elif valid[CALL] and to_call <= 4:
@@ -1218,97 +1621,145 @@ class PlayerAgent(Agent):
             dead = set(my_cards) | set(community) | set(opp_discards) | set(my_discards)
 
             opp_signal = 0.0 if self._opp_archetype == "maniac" else self._opp_hand_aggr
+            eq_sims = 100 if sim_mode == "emergency" else (200 if sim_mode == "conservative" else 300)
             equity = self._compute_equity_ranged(
-                my_cards, community, dead, opp_discards, opp_signal, num_sims=300)
+                my_cards, community, dead, opp_discards, opp_signal, num_sims=eq_sims)
 
             hand_cat = _hand_rank_category(my_cards, community)
-            # OPT7: compute outs once, derive has_draw without re-calling
             suit_count, flush_outs, _ = _count_flush_outs(my_cards, community, opp_discards, my_discards)
             run_count, straight_outs, _ = _count_straight_outs(my_cards, community, opp_discards, my_discards)
             has_draw = (suit_count >= 4 and flush_outs >= 2) or (run_count >= 4 and straight_outs >= 3)
-            strength = self._cat_to_strength(hand_cat, has_draw, my_cards, community)
 
             equity = self._street_adjust(equity, street, has_draw, flush_outs, straight_outs,
                                          hand_cat, my_cards, community, opp_discards)
+
+            strength = self._cat_to_strength(hand_cat, has_draw, equity=equity)
 
             to_call = max(0, opp_bet - my_bet)
             pot_ref = max(pot_size, 1)
             pot_odds = to_call / (pot_ref + to_call) if to_call > 0 else 0.0
 
-            if to_call <= 0:
-                fire, sb_action = self._semi_bluff_check(
+            if street == 3:
+                result = self._act_river(
                     my_cards, community, opp_discards, my_discards,
-                    pot_size, to_call, street, valid, min_raise, max_raise,
-                    has_draw=has_draw, flush_outs_v=flush_outs, straight_outs_v=straight_outs)
-                if fire:
-                    result = sb_action
+                    valid, pot_size, my_bet, opp_bet, min_raise, max_raise,
+                    equity, hand_cat, strength, has_draw,
+                )
+            else:
+                if to_call <= 0:
+                    fire, sb_action = self._semi_bluff_check(
+                        my_cards, community, opp_discards, my_discards,
+                        pot_size, to_call, street, valid, min_raise, max_raise,
+                        has_draw=has_draw, flush_outs_v=flush_outs, straight_outs_v=straight_outs)
+                    if fire:
+                        result = sb_action
 
-            if result is None:
-                if equity > MONSTER_THRESHOLD:
-                    if street == 1:
-                        bet_frac = random.uniform(0.55, 0.72)
-                    elif street == 2:
-                        bet_frac = random.uniform(0.70, 0.90)
-                    else:
-                        bet_frac = 1.0
-                    base_amt = _clamp(int(pot_ref * bet_frac), min_raise, max_raise)
-                    raise_amt = self._dynamic_sizing(base_amt, strength, street, False)
-                    raise_amt = _clamp(raise_amt, min_raise, max_raise)
-                    if street == 3 and valid[RAISE]:
-                        result = (RAISE, max_raise, 0, 0)
-                    elif valid[RAISE]:
-                        result = (RAISE, raise_amt, 0, 0)
-                    elif valid[CALL]:
-                        result = (CALL, 0, 0, 0)
-                    else:
-                        result = (CHECK, 0, 0, 0)
+                if result is None:
+                    if self._hand_override is not None:
+                        if equity > MONSTER_THRESHOLD and valid[RAISE]:
+                            bet_frac = random.uniform(0.55, 0.72) if street == 1 else random.uniform(0.70, 0.90)
+                            base_amt = _clamp(int(pot_ref * bet_frac), min_raise, max_raise)
+                            raise_amt = self._dynamic_sizing(base_amt, strength, street, False)
+                            result = (RAISE, _clamp(raise_amt, min_raise, max_raise), 0, 0)
+                        elif equity > STRONG_THRESHOLD and valid[CALL]:
+                            result = (CALL, 0, 0, 0)
+                        elif equity >= pot_odds and to_call > 0 and valid[CALL]:
+                            result = (CALL, 0, 0, 0)
+                        elif valid[CHECK]:
+                            result = (CHECK, 0, 0, 0)
+                        else:
+                            result = (FOLD, 0, 0, 0)
 
-                elif equity > STRONG_THRESHOLD:
-                    if street == 1:
-                        bet_frac = random.uniform(0.55, 0.72)
-                    elif street == 2:
-                        bet_frac = random.uniform(0.65, 0.80)
-                    else:
-                        bet_frac = random.uniform(0.75, 0.90)
-                    base_amt = _clamp(int(pot_ref * bet_frac), min_raise, max_raise)
-                    raise_amt = self._dynamic_sizing(base_amt, strength, street, False)
-                    raise_amt = _clamp(raise_amt, min_raise, max_raise)
-                    if valid[RAISE]:
-                        result = (RAISE, raise_amt, 0, 0)
-                    elif valid[CALL]:
-                        result = (CALL, 0, 0, 0)
-                    else:
-                        result = (CHECK, 0, 0, 0)
+                if result is None:
+                    if equity > MONSTER_THRESHOLD:
+                        if street == 1:
+                            bet_frac = random.uniform(0.55, 0.72)
+                        else:
+                            bet_frac = random.uniform(0.70, 0.90)
+                        base_amt = _clamp(int(pot_ref * bet_frac), min_raise, max_raise)
+                        raise_amt = self._dynamic_sizing(base_amt, strength, street, False)
+                        raise_amt = _clamp(raise_amt, min_raise, max_raise)
+                        if valid[RAISE]:
+                            result = (RAISE, raise_amt, 0, 0)
+                        elif valid[CALL]:
+                            result = (CALL, 0, 0, 0)
+                        else:
+                            result = (CHECK, 0, 0, 0)
 
-                elif equity > GOOD_THRESHOLD:
-                    bet_frac = random.uniform(0.30, 0.50)
-                    base_amt = _clamp(int(pot_ref * bet_frac), min_raise, max_raise)
-                    raise_amt = self._dynamic_sizing(base_amt, strength, street, False)
-                    raise_amt = _clamp(raise_amt, min_raise, max_raise)
-                    if to_call <= 0 and valid[RAISE]:
-                        result = (RAISE, raise_amt, 0, 0)
-                    elif to_call > 0 and equity >= pot_odds and valid[CALL]:
-                        result = (CALL, 0, 0, 0)
-                    elif valid[CHECK]:
-                        result = (CHECK, 0, 0, 0)
-                    else:
-                        result = (FOLD, 0, 0, 0)
+                    elif equity > STRONG_THRESHOLD:
+                        if street == 1:
+                            bet_frac = random.uniform(0.55, 0.72)
+                        else:
+                            bet_frac = random.uniform(0.65, 0.80)
+                        base_amt = _clamp(int(pot_ref * bet_frac), min_raise, max_raise)
+                        raise_amt = self._dynamic_sizing(base_amt, strength, street, False)
+                        raise_amt = _clamp(raise_amt, min_raise, max_raise)
+                        if valid[RAISE]:
+                            result = (RAISE, raise_amt, 0, 0)
+                        elif valid[CALL]:
+                            result = (CALL, 0, 0, 0)
+                        else:
+                            result = (CHECK, 0, 0, 0)
 
-                elif equity >= pot_odds and to_call > 0 and to_call <= pot_ref * 0.35:
-                    if valid[CALL]:
-                        result = (CALL, 0, 0, 0)
-                    elif valid[CHECK]:
-                        result = (CHECK, 0, 0, 0)
-                    else:
-                        result = (FOLD, 0, 0, 0)
+                    elif equity > GOOD_THRESHOLD:
+                        bet_frac = random.uniform(0.30, 0.50)
+                        base_amt = _clamp(int(pot_ref * bet_frac), min_raise, max_raise)
+                        raise_amt = self._dynamic_sizing(base_amt, strength, street, False)
+                        raise_amt = _clamp(raise_amt, min_raise, max_raise)
+                        if to_call <= 0 and valid[RAISE]:
+                            result = (RAISE, raise_amt, 0, 0)
+                        elif to_call > 0 and equity >= pot_odds and valid[CALL]:
+                            result = (CALL, 0, 0, 0)
+                        elif valid[CHECK]:
+                            result = (CHECK, 0, 0, 0)
+                        else:
+                            result = (FOLD, 0, 0, 0)
 
-                else:
-                    if valid[CHECK]:
-                        result = (CHECK, 0, 0, 0)
-                    else:
-                        result = (FOLD, 0, 0, 0)
+                    elif equity >= pot_odds and to_call > 0 and to_call <= pot_ref * 0.35:
+                        if valid[CALL]:
+                            result = (CALL, 0, 0, 0)
+                        elif valid[CHECK]:
+                            result = (CHECK, 0, 0, 0)
+                        else:
+                            result = (FOLD, 0, 0, 0)
 
-            # Decision guards (postflop only)
+                    else:
+                        if valid[CHECK]:
+                            result = (CHECK, 0, 0, 0)
+                        else:
+                            result = (FOLD, 0, 0, 0)
+
+            # ── Hand-category safety caps (from Meta V5) ─────────────────────
+            if len(my_cards) == 2 and len(community) >= 3:
+                cap_draw = _has_live_draw(my_cards, community, opp_discards, my_discards)
+
+                if hand_cat == "one_pair":
+                    if cap_draw:
+                        if result[0] == CALL and to_call > pot_ref * 0.70:
+                            if valid[FOLD]:
+                                result = (FOLD, 0, 0, 0)
+                    else:
+                        if result[0] == RAISE:
+                            if to_call > 0 and valid[CALL]:
+                                result = (CALL, 0, 0, 0)
+                            elif valid[CHECK]:
+                                result = (CHECK, 0, 0, 0)
+                        if result[0] == CALL and to_call > pot_ref * 0.25:
+                            if valid[FOLD]:
+                                result = (FOLD, 0, 0, 0)
+                elif hand_cat == "nothing":
+                    if cap_draw:
+                        if result[0] == CALL and to_call > pot_ref * 0.50:
+                            if valid[FOLD]:
+                                result = (FOLD, 0, 0, 0)
+                    else:
+                        if to_call > 0:
+                            if valid[FOLD]:
+                                result = (FOLD, 0, 0, 0)
+                        elif valid[CHECK]:
+                            result = (CHECK, 0, 0, 0)
+
+            # ── Decision guards (postflop only) ──────────────────────────────
             if result[0] == FOLD and to_call <= 0 and valid[CHECK]:
                 result = (CHECK, 0, 0, 0)
 
@@ -1324,17 +1775,16 @@ class PlayerAgent(Agent):
 
         # ── Track our action ─────────────────────────────────────────────────
         self._last_was_bet = result[0] == RAISE
+        self._last_was_check = result[0] == CHECK
         self._last_street = street
 
-        # ── Safety-net bleed-out ─────────────────────────────────────────────
-        hands_remaining = max(0, TOTAL_HANDS - self._hands_completed)
-        sb_left = (hands_remaining + 1) // 2
-        bb_left = hands_remaining // 2
-        max_bleed = sb_left * 1 + bb_left * 2
-        if self._running_pnl > max_bleed and result[0] in (RAISE, CALL):
-            if valid[FOLD]:
-                result = (FOLD, 0, 0, 0)
-            elif valid[CHECK]:
-                result = (CHECK, 0, 0, 0)
-
         return result
+
+
+# Ensure module is in sys.modules for ProcessPoolExecutor pickle compatibility
+import sys as _sys
+if __name__ not in _sys.modules:
+    from types import ModuleType as _MT
+    _self_mod = _MT(__name__)
+    _self_mod.__dict__.update(globals())
+    _sys.modules[__name__] = _self_mod

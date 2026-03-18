@@ -1,0 +1,56 @@
+{
+  "version": "v1.0",
+  "description": "Distilled strategy parameters from GenesisV2 hardcoded thresholds (MONSTER=0.82, STRONG=0.65, GOOD=0.48)",
+  "top_genomes": [
+    {
+      "id": "genesis_v2_tight",
+      "action_probs": [0.18, 0.38, 0.24, 0.20],
+      "raise_size_fraction": 0.65,
+      "bluff_freq": 0.10,
+      "fold_to_raise": 0.68,
+      "cbet_freq": 0.68,
+      "pot_odds_threshold": 0.30,
+      "discard_pair_weight": 0.85,
+      "discard_suited_weight": 0.55,
+      "monster_threshold": 0.82,
+      "strong_threshold": 0.65,
+      "good_threshold": 0.48
+    },
+    {
+      "id": "genesis_v2_balanced",
+      "action_probs": [0.15, 0.42, 0.22, 0.21],
+      "raise_size_fraction": 0.72,
+      "bluff_freq": 0.14,
+      "fold_to_raise": 0.63,
+      "cbet_freq": 0.72,
+      "pot_odds_threshold": 0.35,
+      "discard_pair_weight": 0.80,
+      "discard_suited_weight": 0.60,
+      "monster_threshold": 0.82,
+      "strong_threshold": 0.65,
+      "good_threshold": 0.48
+    },
+    {
+      "id": "genesis_v2_aggressive",
+      "action_probs": [0.12, 0.50, 0.18, 0.20],
+      "raise_size_fraction": 0.80,
+      "bluff_freq": 0.20,
+      "fold_to_raise": 0.55,
+      "cbet_freq": 0.80,
+      "pot_odds_threshold": 0.40,
+      "discard_pair_weight": 0.75,
+      "discard_suited_weight": 0.65,
+      "monster_threshold": 0.80,
+      "strong_threshold": 0.62,
+      "good_threshold": 0.45
+    }
+  ],
+  "ensemble_params": {
+    "bluff_freq": 0.14,
+    "fold_to_raise": 0.65,
+    "cbet_freq": 0.70,
+    "pot_odds_threshold": 0.35,
+    "discard_pair_weight": 0.80,
+    "discard_suited_weight": 0.60
+  }
+}
