@@ -556,7 +556,7 @@ def train_on_accumulated(config: dict, out_path: str) -> float:
         return float("inf")
 
     print(f"Training on {len(accumulated)} decision points...")
-    b_feats, b_labels, r_buckets, d_feats, d_labels = process_session_data(accumulated)
+    b_feats, b_labels, r_buckets, d_feats, d_labels, *_ = process_session_data(accumulated)
     print(f"  Betting: {len(b_labels)}, Discard: {len(d_labels)}")
 
     if len(b_labels) < 10:

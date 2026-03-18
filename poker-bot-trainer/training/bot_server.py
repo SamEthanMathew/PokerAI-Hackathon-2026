@@ -123,9 +123,29 @@ def _eval_best(hole, comm):
 
 ACTION_TYPE_MAP = {"fold": 0, "raise": 1, "check": 2, "call": 3, "discard": 4}
 
+def _get_nn_opp_features() -> list[float]:
+    """Return the 10 opponent-tendency context features from the current exploit profile."""
+    try:
+        nn = _load_exploit_profile().get("nn_opponent_features", {})
+        return [
+            nn.get("vpip", 0.5),
+            nn.get("fold_to_flop_bet", 0.1),
+            nn.get("fold_to_turn_bet", 0.1),
+            nn.get("fold_to_river_bet", 0.1),
+            nn.get("river_trap_winrate", 0.5),
+            nn.get("river_raise_ratio", 0.5),
+            nn.get("showdown_pct", 0.3),
+            nn.get("three_bet_pct", 0.0),
+            nn.get("check_raise_pct", 0.0),
+            nn.get("hands_seen_norm", 0.0),
+        ]
+    except Exception:
+        return [0.5, 0.1, 0.1, 0.1, 0.5, 0.5, 0.3, 0.0, 0.0, 0.0]
+
+
 def extract_features_from_gym_obs(obs: dict, action_history: list = None) -> np.ndarray:
-    """Extract 98-dim features from a gym_env-style observation dict."""
-    feat = np.zeros(98, dtype=np.float32)
+    """Extract 108-dim features from a gym_env-style observation dict."""
+    feat = np.zeros(108, dtype=np.float32)
     my_cards = [c for c in obs.get("my_cards", []) if c >= 0]
     comm = [c for c in obs.get("community_cards", []) if c >= 0]
     opp_disc = [c for c in obs.get("opp_discarded_cards", []) if c >= 0]
@@ -173,6 +193,11 @@ def extract_features_from_gym_obs(obs: dict, action_history: list = None) -> np.
         feat[83+i] = c/26 if c>=0 else 0
 
     feat[93]=0; feat[94]=0; feat[95]=0; feat[96]=0.5; feat[97]=0
+
+    # [98-107] opponent tendency context — injected from exploit_profile.json
+    for i, v in enumerate(_get_nn_opp_features()):
+        feat[98 + i] = v
+
     return feat
 
 
@@ -310,6 +335,14 @@ class ExploitLayer:
             if pot > 0 and raise_amt / pot < 0.6:
                 return (2, 0, 0, 1)  # CHECK instead
 
+        # ── 5. C-bet suppression: don't continuation-bet if human never folds ─
+        if (street == 1 and action_type == 1   # RAISE on flop (c-bet)
+                and self.ep.get("suppress_cbet", False)
+                and valid[2]):
+            # Only suppress if we don't have a strong made hand (rely on hand strength feature)
+            # For GenesisV2 inner agent: trust it knows when to c-bet for value
+            pass  # ExploitLayer doesn't have hand strength here; leave to future enhancement
+
         return (action_type, raise_amt, k1, k2)
 
 
@@ -435,6 +468,30 @@ def revert_genesis():
         _current_model_label = "genesisV2"
         _current_generation = 0
     return {"ok": True}
+
+
+@app.post("/reload_exploit")
+def reload_exploit():
+    """
+    Reload exploit_profile.json and update ExploitLayer rules.
+    Called automatically by watch_and_train.py after each retrain.
+    The new profile also updates the [98-107] opponent-tendency features
+    used by any CloneBotAdapter for the next inference call.
+    """
+    global _agent
+    with _lock:
+        if isinstance(_agent, ExploitLayer):
+            _agent.reload_profile()
+            ep = _agent.ep
+            return {
+                "ok": True,
+                "river_bet_always": ep.get("river_bet_always"),
+                "preflop_always_raise": ep.get("preflop_always_raise"),
+                "detect_river_trap": ep.get("detect_river_trap"),
+                "suppress_flop_bluff": ep.get("suppress_flop_bluff"),
+                "suppress_cbet": ep.get("suppress_cbet"),
+            }
+        return {"ok": False, "reason": "agent is not an ExploitLayer (CloneBot without exploit wrapper)"}
 
 
 if __name__ == "__main__":

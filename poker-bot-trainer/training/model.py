@@ -14,7 +14,7 @@ Training loss:
 import torch
 import torch.nn as nn
 
-FEATURE_DIM = 98
+FEATURE_DIM = 108  # 98 game features + 10 opponent-tendency context features
 NUM_ACTIONS = 4      # fold, raise, check, call
 NUM_RAISE_BUCKETS = 10
 NUM_DISCARD_COMBOS = 10  # C(5,2)
