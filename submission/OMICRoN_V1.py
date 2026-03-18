@@ -8,8 +8,10 @@
 import json
 import os
 import random
+from concurrent.futures import ProcessPoolExecutor
 from itertools import combinations
 
+import numpy as np
 from treys import Card, Evaluator
 
 from agents.agent import Agent
@@ -64,6 +66,23 @@ _base_eval = Evaluator()
 # array indexing throughout
 _RANK = [i % NUM_RANKS for i in range(DECK_SIZE)]
 _SUIT = [i // NUM_RANKS for i in range(DECK_SIZE)]
+
+# ── Evaluation Lookup Table ──────────────────────────────────────────────────
+
+_C = [[0] * 28 for _ in range(28)]
+for _n in range(28):
+    _C[_n][0] = 1
+    for _k in range(1, _n + 1):
+        _C[_n][_k] = _C[_n - 1][_k - 1] + _C[_n - 1][_k]
+
+_EVAL_LUT = np.load(os.path.join(os.path.dirname(__file__), "eval_table.npy"))
+
+
+def _lut_eval_7(cards_7):
+    s = sorted(cards_7)
+    return int(_EVAL_LUT[
+        _C[s[0]][1] + _C[s[1]][2] + _C[s[2]][3] + _C[s[3]][4] +
+        _C[s[4]][5] + _C[s[5]][6] + _C[s[6]][7]])
 
 
 def _fast_evaluate(hand, board, alt_hand, alt_board):
@@ -454,6 +473,115 @@ class _OppDiscardModel:
             self.weights[i] = max(self._WEIGHT_FLOOR, self.weights[i])
 
 
+# ── Module-level solver functions (for ProcessPoolExecutor pickling) ──────────
+
+
+def _opp_keep_weight_lut(opp_hand, community, opp_discards, model_weights,
+                         _flop_cache=None):
+    original5 = list(opp_hand) + list(opp_discards)
+    if len(original5) < 5:
+        return 1.0
+    if _flop_cache is not None:
+        fr, fs, bsc = _flop_cache
+    else:
+        flop = community[:3]
+        fr = [_RANK[c] for c in flop]
+        fs = [_SUIT[c] for c in flop]
+        bsc = [0, 0, 0]
+        for s in fs:
+            bsc[s] += 1
+    keeps_and_scores = []
+    for i, j in combinations(range(len(original5)), 2):
+        cand = [original5[i], original5[j]]
+        feats = _OppDiscardModel._extract_features(cand, None, fr, fs, bsc)
+        sc = sum(w * f for w, f in zip(model_weights, feats))
+        keeps_and_scores.append((frozenset([original5[i], original5[j]]), sc))
+    keeps_and_scores.sort(key=lambda x: x[1], reverse=True)
+    opp_set = frozenset(opp_hand)
+    for rank_idx, (kset, _) in enumerate(keeps_and_scores):
+        if kset == opp_set:
+            if rank_idx == 0:
+                return 1.0
+            elif rank_idx == 1:
+                return 0.3
+            elif rank_idx == 2:
+                return 0.1
+            else:
+                return 0.02
+    return 0.02
+
+
+def _exact_discard_equity_lut(my_keep, community, dead_cards):
+    remaining = [c for c in range(DECK_SIZE) if c not in dead_cards]
+    board_needed = 5 - len(community)
+    community_l = list(community)
+    wins = 0.0
+    total = 0
+    for runout in combinations(remaining, board_needed):
+        board_5 = community_l + list(runout)
+        mr = _lut_eval_7(list(my_keep) + board_5)
+        runout_set = set(runout)
+        opp_pool = [c for c in remaining if c not in runout_set]
+        for opp in combinations(opp_pool, 2):
+            orr = _lut_eval_7(list(opp) + board_5)
+            if mr < orr:
+                wins += 1.0
+            elif mr == orr:
+                wins += 0.5
+            total += 1
+    return wins / total if total > 0 else 0.5
+
+
+def _exact_discard_equity_weighted_lut(my_keep, community, dead_cards,
+                                       opp_discards, model_weights):
+    remaining = [c for c in range(DECK_SIZE) if c not in dead_cards]
+    board_needed = 5 - len(community)
+    community_l = list(community)
+    flop = community_l[:3]
+    fr = [_RANK[c] for c in flop]
+    fs = [_SUIT[c] for c in flop]
+    bsc = [0, 0, 0]
+    for s in fs:
+        bsc[s] += 1
+    flop_cache = (fr, fs, bsc)
+
+    opp_weights = {}
+    for opp in combinations(remaining, 2):
+        w = _opp_keep_weight_lut(list(opp), community, opp_discards,
+                                 model_weights, flop_cache)
+        if w >= 0.01:
+            opp_weights[opp] = w
+
+    wins = 0.0
+    total_weight = 0.0
+    for runout in combinations(remaining, board_needed):
+        board_5 = community_l + list(runout)
+        mr = _lut_eval_7(list(my_keep) + board_5)
+        runout_set = set(runout)
+        opp_pool = [c for c in remaining if c not in runout_set]
+        for opp in combinations(opp_pool, 2):
+            entry = opp_weights.get(opp)
+            if entry is None:
+                continue
+            orr = _lut_eval_7(list(opp) + board_5)
+            if mr < orr:
+                wins += entry
+            elif mr == orr:
+                wins += 0.5 * entry
+            total_weight += entry
+    return wins / total_weight if total_weight > 0 else 0.5
+
+
+_NUM_CPUS = min(4, os.cpu_count() or 1)
+try:
+    import multiprocessing as _mp
+    _mp_ctx = _mp.get_context("fork")
+except (ValueError, AttributeError):
+    _mp_ctx = None
+_POOL = ProcessPoolExecutor(max_workers=_NUM_CPUS,
+                            mp_context=_mp_ctx)
+
+
 # ── PlayerAgent ──────────────────────────────────────────────────────────────
 
 
@@ -658,25 +786,18 @@ class PlayerAgent(Agent):
         if sample_size > len(remaining):
             return 0.5
 
-        my_h = [_INT_TO_TREYS[c] for c in my_cards]
-        my_ha = [_INT_TO_TREYS_ALT[c] for c in my_cards]
-        comm = [_INT_TO_TREYS[c] for c in community]
-        comm_a = [_INT_TO_TREYS_ALT[c] for c in community]
+        community_l = list(community)
+        my_keep = list(my_cards)
 
         wins = 0
         total = 0
         for _ in range(num_sims):
             sample = random.sample(remaining, sample_size)
             opp_cards = sample[:2]
-            runout = sample[2:]
+            board_5 = community_l + sample[2:]
 
-            oh = [_INT_TO_TREYS[c] for c in opp_cards]
-            oha = [_INT_TO_TREYS_ALT[c] for c in opp_cards]
-            board = comm + [_INT_TO_TREYS[c] for c in runout]
-            board_a = comm_a + [_INT_TO_TREYS_ALT[c] for c in runout]
-
-            my_rank = _fast_evaluate(my_h, board, my_ha, board_a)
-            opp_rank = _fast_evaluate(oh, board, oha, board_a)
+            my_rank = _lut_eval_7(my_keep + board_5)
+            opp_rank = _lut_eval_7(opp_cards + board_5)
             if my_rank < opp_rank:
                 wins += 1
             elif my_rank == opp_rank:
@@ -711,12 +832,9 @@ class PlayerAgent(Agent):
         reject_one_pair = opp_signal >= 3.5
         max_retries = 3 if reject_nothing else 0
 
-        my_h = [_INT_TO_TREYS[c] for c in my2]
-        my_ha = [_INT_TO_TREYS_ALT[c] for c in my2]
-        comm = [_INT_TO_TREYS[c] for c in community]
-        comm_a = [_INT_TO_TREYS_ALT[c] for c in community]
+        community_l = list(community)
+        my_keep = list(my2)
 
-        # OPT1: precompute opponent weight map before MC loop
         opp_weight_map = {}
         if have_discards and flop_cache:
             for pair in combinations(remaining, 2):
@@ -749,13 +867,9 @@ class PlayerAgent(Agent):
                 if w < 0.01:
                     continue
 
-            oh = [_INT_TO_TREYS[c] for c in opp]
-            oha = [_INT_TO_TREYS_ALT[c] for c in opp]
-            board = comm + [_INT_TO_TREYS[c] for c in runout]
-            board_a = comm_a + [_INT_TO_TREYS_ALT[c] for c in runout]
-
-            my_rank = _fast_evaluate(my_h, board, my_ha, board_a)
-            opp_rank = _fast_evaluate(oh, board, oha, board_a)
+            board_5 = community_l + runout
+            my_rank = _lut_eval_7(my_keep + board_5)
+            opp_rank = _lut_eval_7(opp + board_5)
             if my_rank < opp_rank:
                 wins += w
             elif my_rank == opp_rank:
@@ -780,128 +894,16 @@ class PlayerAgent(Agent):
     # ── Exact discard methods (subgame solver) ───────────────────────────────
 
     def _exact_discard_equity(self, my_keep, community, dead_cards):
-        remaining = [c for c in range(DECK_SIZE) if c not in dead_cards]
-        board_needed = 5 - len(community)
-
-        my_h = [_INT_TO_TREYS[c] for c in my_keep]
-        my_ha = [_INT_TO_TREYS_ALT[c] for c in my_keep]
-        comm = [_INT_TO_TREYS[c] for c in community]
-        comm_a = [_INT_TO_TREYS_ALT[c] for c in community]
-
-        # OPT2: pre-build opponent treys pairs
-        opp_treys = {}
-        for pair in combinations(remaining, 2):
-            opp_treys[pair] = (
-                [_INT_TO_TREYS[pair[0]], _INT_TO_TREYS[pair[1]]],
-                [_INT_TO_TREYS_ALT[pair[0]], _INT_TO_TREYS_ALT[pair[1]]],
-            )
-
-        wins = 0.0
-        total = 0
-
-        for runout in combinations(remaining, board_needed):
-            board = comm + [_INT_TO_TREYS[c] for c in runout]
-            board_a = comm_a + [_INT_TO_TREYS_ALT[c] for c in runout]
-            mr = _fast_evaluate(my_h, board, my_ha, board_a)
-            runout_set = set(runout)
-            opp_pool = [c for c in remaining if c not in runout_set]
-            for opp in combinations(opp_pool, 2):
-                oh, oha = opp_treys[opp]
-                orr = _fast_evaluate(oh, board, oha, board_a)
-                if mr < orr:
-                    wins += 1.0
-                elif mr == orr:
-                    wins += 0.5
-                total += 1
-
-        return wins / total if total > 0 else 0.5
+        return _exact_discard_equity_lut(my_keep, community, dead_cards)
 
     def _opp_keep_weight(self, opp_hand, community, opp_discards, _flop_cache=None):
-        original5 = list(opp_hand) + list(opp_discards)
-        if len(original5) < 5:
-            return 1.0
-
-        if _flop_cache is not None:
-            fr, fs, bsc = _flop_cache
-        else:
-            flop = community[:3]
-            fr = [_RANK[c] for c in flop]
-            fs = [_SUIT[c] for c in flop]
-            bsc = [0, 0, 0]
-            for s in fs:
-                bsc[s] += 1
-
-        keeps_and_scores = []
-        for i, j in combinations(range(len(original5)), 2):
-            cand = [original5[i], original5[j]]
-            sc = self._opp_model.score_precomputed(cand, fr, fs, bsc)
-            keeps_and_scores.append((frozenset([original5[i], original5[j]]), sc))
-
-        keeps_and_scores.sort(key=lambda x: x[1], reverse=True)
-        opp_set = frozenset(opp_hand)
-
-        for rank_idx, (kset, _) in enumerate(keeps_and_scores):
-            if kset == opp_set:
-                if rank_idx == 0:
-                    return 1.0
-                elif rank_idx == 1:
-                    return 0.3
-                elif rank_idx == 2:
-                    return 0.1
-                else:
-                    return 0.02
-        return 0.02
+        return _opp_keep_weight_lut(opp_hand, community, opp_discards,
+                                    self._opp_model.weights, _flop_cache)
 
     def _exact_discard_equity_weighted(self, my_keep, community, dead_cards, opp_discards):
-        remaining = [c for c in range(DECK_SIZE) if c not in dead_cards]
-        board_needed = 5 - len(community)
-
-        my_h = [_INT_TO_TREYS[c] for c in my_keep]
-        my_ha = [_INT_TO_TREYS_ALT[c] for c in my_keep]
-        comm = [_INT_TO_TREYS[c] for c in community]
-        comm_a = [_INT_TO_TREYS_ALT[c] for c in community]
-
-        flop = community[:3]
-        fr = [_RANK[c] for c in flop]
-        fs = [_SUIT[c] for c in flop]
-        bsc = [0, 0, 0]
-        for s in fs:
-            bsc[s] += 1
-        flop_cache = (fr, fs, bsc)
-
-        # OPT2: pre-build opponent treys pairs + weights together
-        opp_data = {}
-        for opp in combinations(remaining, 2):
-            w = self._opp_keep_weight(list(opp), community, opp_discards, flop_cache)
-            if w >= 0.01:
-                opp_data[opp] = (
-                    w,
-                    [_INT_TO_TREYS[opp[0]], _INT_TO_TREYS[opp[1]]],
-                    [_INT_TO_TREYS_ALT[opp[0]], _INT_TO_TREYS_ALT[opp[1]]],
-                )
-
-        wins = 0.0
-        total_weight = 0.0
-
-        for runout in combinations(remaining, board_needed):
-            board = comm + [_INT_TO_TREYS[c] for c in runout]
-            board_a = comm_a + [_INT_TO_TREYS_ALT[c] for c in runout]
-            mr = _fast_evaluate(my_h, board, my_ha, board_a)
-            runout_set = set(runout)
-            opp_pool = [c for c in remaining if c not in runout_set]
-            for opp in combinations(opp_pool, 2):
-                entry = opp_data.get(opp)
-                if entry is None:
-                    continue
-                w, oh, oha = entry
-                orr = _fast_evaluate(oh, board, oha, board_a)
-                if mr < orr:
-                    wins += w
-                elif mr == orr:
-                    wins += 0.5 * w
-                total_weight += w
-
-        return wins / total_weight if total_weight > 0 else 0.5
+        return _exact_discard_equity_weighted_lut(
+            my_keep, community, dead_cards, opp_discards,
+            self._opp_model.weights)
 
     # ── Postflop helper systems ──────────────────────────────────────────────
 
@@ -1042,6 +1044,16 @@ class PlayerAgent(Agent):
 
         in_early_phase = self._hands_completed < EARLY_PHASE_HANDS
 
+        time_left = observation.get("time_left", 1000.0)
+        hands_left = max(1, TOTAL_HANDS - self._hands_completed)
+        budget_per_hand = time_left / hands_left
+        if budget_per_hand < 0.15:
+            sim_mode = "emergency"
+        elif budget_per_hand < 0.50:
+            sim_mode = "conservative"
+        else:
+            sim_mode = "full"
+
         raw = observation.get("opp_last_action", "")
         opp_action = _normalize_action(raw)
         if opp_action:
@@ -1079,21 +1091,63 @@ class PlayerAgent(Agent):
                 all_keeps.append((i, j, keep, toss))
 
             if have_opp_discards:
-                best_eq = -1.0
-                best_ij = (0, 1)
-                for i, j, keep, toss in all_keeps:
-                    dead = dead_base | set(toss) | set(opp_discards)
-                    eq = self._exact_discard_equity_weighted(keep, community, dead, opp_discards)
-                    if eq > best_eq:
-                        best_eq = eq
-                        best_ij = (i, j)
+                if sim_mode == "emergency":
+                    opp_disc_set = set(opp_discards)
+                    community_l = list(community)
+                    board_needed = 5 - len(community)
+                    ss = 2 + board_needed
+                    best_eq = -1.0
+                    best_ij = (0, 1)
+                    for i, j, keep, toss in all_keeps:
+                        per_dead = dead_base | set(toss) | opp_disc_set
+                        per_remaining = [c for c in range(DECK_SIZE) if c not in per_dead]
+                        if ss > len(per_remaining):
+                            eq = 0.5
+                        else:
+                            w = 0
+                            t = 0
+                            for _ in range(100):
+                                samp = random.sample(per_remaining, ss)
+                                board_5 = community_l + samp[2:]
+                                mr = _lut_eval_7(list(keep) + board_5)
+                                orr = _lut_eval_7(samp[:2] + board_5)
+                                if mr < orr:
+                                    w += 1
+                                elif mr == orr:
+                                    w += 0.5
+                                t += 1
+                            eq = w / t if t else 0.5
+                        if eq > best_eq:
+                            best_eq = eq
+                            best_ij = (i, j)
+                else:
+                    weights = list(self._opp_model.weights)
+                    futures = []
+                    for i, j, keep, toss in all_keeps:
+                        dead = dead_base | set(toss) | set(opp_discards)
+                        fut = _POOL.submit(_exact_discard_equity_weighted_lut,
+                                           keep, community, dead, opp_discards,
+                                           weights)
+                        futures.append((i, j, fut))
+                    best_eq = -1.0
+                    best_ij = (0, 1)
+                    for i, j, fut in futures:
+                        eq = fut.result()
+                        if eq > best_eq:
+                            best_eq = eq
+                            best_ij = (i, j)
             else:
-                # OPT3: shared dead-set and treys for MC screen
                 opp_disc_set = set(opp_discards)
-                comm_treys = [_INT_TO_TREYS[c] for c in community]
-                comm_alt = [_INT_TO_TREYS_ALT[c] for c in community]
+                community_l = list(community)
                 board_needed = 5 - len(community)
                 screen_sample_size = 2 + board_needed
+
+                if sim_mode == "emergency":
+                    mc_sims = 100
+                elif sim_mode == "conservative":
+                    mc_sims = 300
+                else:
+                    mc_sims = 500
 
                 candidates = []
                 for i, j, keep, toss in all_keeps:
@@ -1103,20 +1157,13 @@ class PlayerAgent(Agent):
                         candidates.append((i, j, 0.5, keep, toss))
                         continue
 
-                    kh = [_INT_TO_TREYS[c] for c in keep]
-                    kha = [_INT_TO_TREYS_ALT[c] for c in keep]
                     w = 0
                     t = 0
-                    for _ in range(500):
+                    for _ in range(mc_sims):
                         samp = random.sample(per_remaining, screen_sample_size)
-                        oc = samp[:2]
-                        ro = samp[2:]
-                        oh = [_INT_TO_TREYS[c] for c in oc]
-                        oha = [_INT_TO_TREYS_ALT[c] for c in oc]
-                        bd = comm_treys + [_INT_TO_TREYS[c] for c in ro]
-                        bda = comm_alt + [_INT_TO_TREYS_ALT[c] for c in ro]
-                        mr = _fast_evaluate(kh, bd, kha, bda)
-                        orr = _fast_evaluate(oh, bd, oha, bda)
+                        board_5 = community_l + samp[2:]
+                        mr = _lut_eval_7(list(keep) + board_5)
+                        orr = _lut_eval_7(samp[:2] + board_5)
                         if mr < orr:
                             w += 1
                         elif mr == orr:
@@ -1126,14 +1173,23 @@ class PlayerAgent(Agent):
 
                 candidates.sort(key=lambda c: c[2], reverse=True)
 
-                best_eq = -1.0
-                best_ij = (0, 1)
-                for i, j, _, keep, toss in candidates[:5]:
-                    dead = dead_base | set(toss) | opp_disc_set
-                    eq = self._exact_discard_equity(keep, community, dead)
-                    if eq > best_eq:
-                        best_eq = eq
-                        best_ij = (i, j)
+                if sim_mode == "emergency":
+                    best_ij = (candidates[0][0], candidates[0][1])
+                else:
+                    top_n = 3 if sim_mode == "conservative" else 5
+                    futures = []
+                    for i, j, _, keep, toss in candidates[:top_n]:
+                        dead = dead_base | set(toss) | opp_disc_set
+                        fut = _POOL.submit(_exact_discard_equity_lut,
+                                           keep, community, dead)
+                        futures.append((i, j, fut))
+                    best_eq = -1.0
+                    best_ij = (0, 1)
+                    for i, j, fut in futures:
+                        eq = fut.result()
+                        if eq > best_eq:
+                            best_eq = eq
+                            best_ij = (i, j)
 
             return (DISCARD, 0, best_ij[0], best_ij[1])
 
@@ -1218,8 +1274,9 @@ class PlayerAgent(Agent):
             dead = set(my_cards) | set(community) | set(opp_discards) | set(my_discards)
 
             opp_signal = 0.0 if self._opp_archetype == "maniac" else self._opp_hand_aggr
+            eq_sims = 100 if sim_mode == "emergency" else (200 if sim_mode == "conservative" else 300)
             equity = self._compute_equity_ranged(
-                my_cards, community, dead, opp_discards, opp_signal, num_sims=300)
+                my_cards, community, dead, opp_discards, opp_signal, num_sims=eq_sims)
 
             hand_cat = _hand_rank_category(my_cards, community)
             # OPT7: compute outs once, derive has_draw without re-calling
@@ -1338,3 +1395,13 @@ class PlayerAgent(Agent):
                 result = (CHECK, 0, 0, 0)
 
         return result
+
+
+# Ensure module is in sys.modules for ProcessPoolExecutor pickle compatibility
+# (needed when loaded dynamically via importlib)
+import sys as _sys
+if __name__ not in _sys.modules:
+    from types import ModuleType as _MT
+    _self_mod = _MT(__name__)
+    _self_mod.__dict__.update(globals())
+    _sys.modules[__name__] = _self_mod
