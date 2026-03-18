@@ -1,0 +1,26 @@
+{
+  "current_generation": 0,
+  "config": {
+    "hands_per_gen": 500,
+    "epochs": 40,
+    "lr": 0.001,
+    "genesis_weight": 1.0,
+    "human_weight": 3.0,
+    "min_samples_to_train": 200,
+    "hidden_dim": 256,
+    "rl_rollout_steps": 2048,
+    "rl_lr": 0.0003,
+    "rl_generations": 5,
+    "rl_entropy_coeff": 0.01
+  },
+  "models": [
+    {
+      "gen": 0,
+      "type": "genesis",
+      "path": null,
+      "hands": 0,
+      "trained_at": null,
+      "notes": "Baseline — genesisV2 hardcoded thresholds"
+    }
+  ]
+}

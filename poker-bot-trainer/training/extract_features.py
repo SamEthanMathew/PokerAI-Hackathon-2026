@@ -299,6 +299,48 @@ def process_session(path: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     )
 
 
+def process_session_data(records: list) -> tuple:
+    """
+    Process a list of GameState dicts (not a file path).
+    Same output format as process_session().
+    Used by selfplay.py to train on accumulated in-memory data.
+    """
+    KEEP_COMBOS = [(i, j) for i in range(5) for j in range(i + 1, 5)]
+
+    betting_features, betting_labels, raise_buckets = [], [], []
+    discard_features, discard_labels = [], []
+
+    for hand in records:
+        feat = extract_features(hand)
+        action = hand.get("action_taken", {})
+        atype = action.get("type", "fold")
+
+        if atype == "discard":
+            kept = action.get("kept_cards")
+            if kept and len(kept) == 2:
+                pair = tuple(sorted(kept))
+                if pair in [(i, j) for i, j in KEEP_COMBOS]:
+                    label = KEEP_COMBOS.index(pair)
+                    discard_features.append(feat)
+                    discard_labels.append(label)
+        else:
+            label = {"fold": 0, "raise": 1, "check": 2, "call": 3}.get(atype, 2)
+            betting_features.append(feat)
+            betting_labels.append(label)
+            raise_amt = action.get("raise_amount", 0) or 0
+            max_raise = hand.get("max_raise", 100) or 100
+            bucket = min(int(raise_amt / max_raise * 10), 9) if max_raise > 0 else 0
+            raise_buckets.append(bucket)
+
+    return (
+        np.array(betting_features, dtype=np.float32) if betting_features else np.zeros((0, 98), dtype=np.float32),
+        np.array(betting_labels, dtype=np.int64),
+        np.array(raise_buckets, dtype=np.int64),
+        np.array(discard_features, dtype=np.float32) if discard_features else np.zeros((0, 98), dtype=np.float32),
+        np.array(discard_labels, dtype=np.int64),
+    )
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python extract_features.py <session.json> [output_dir]")

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useGameStore } from '@/lib/store/gameStore';
 import OpponentArea from './OpponentArea';
 import CommunityCards from './CommunityCards';
@@ -23,6 +24,8 @@ export default function GameBoard() {
     lastBotAction,
     lastHandResult,
     isShowdown,
+    botMode,
+    botLabel,
     startNewHand,
     submitAction,
     toggleKeep,
@@ -31,7 +34,13 @@ export default function GameBoard() {
     exportCurrentSession,
     dismissHandResult,
     resetSession,
+    checkPythonServer,
   } = useGameStore();
+
+  // Check if Python bot server is running on mount
+  useEffect(() => {
+    checkPythonServer();
+  }, [checkPythonServer]);
 
   // ── Idle / start screen ────────────────────────────────────────────────────
   if (phase === 'idle') {
@@ -41,6 +50,10 @@ export default function GameBoard() {
         <p className="text-gray-400 text-center max-w-md">
           Play 1000 hands of 27-card Hold'em against the bot. Every decision you make is recorded to train your personal poker AI.
         </p>
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${botMode === 'python' ? 'bg-green-900/60 text-green-300 border border-green-700' : 'bg-gray-800 text-gray-400 border border-gray-700'}`}>
+          <span className={`w-2 h-2 rounded-full ${botMode === 'python' ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
+          {botMode === 'python' ? `Opponent: ${botLabel}` : 'Opponent: Heuristic Bot'}
+        </div>
         <button
           onClick={startNewHand}
           className="px-8 py-3 bg-yellow-400 text-gray-900 font-bold rounded-xl text-lg hover:bg-yellow-300 transition-all shadow-lg"
@@ -168,6 +181,10 @@ export default function GameBoard() {
           >
             Export
           </button>
+        </div>
+        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs ${botMode === 'python' ? 'bg-green-900/40 text-green-400' : 'bg-gray-800/60 text-gray-500'}`}>
+          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${botMode === 'python' ? 'bg-green-400' : 'bg-gray-500'}`} />
+          <span className="truncate">{botMode === 'python' ? botLabel : 'Heuristic'}</span>
         </div>
         <div className="bg-gray-800/50 rounded-xl p-3">
           <StatsPanel stats={sessionStats} />

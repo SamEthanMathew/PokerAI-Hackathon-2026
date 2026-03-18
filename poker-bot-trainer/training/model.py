@@ -128,6 +128,90 @@ class PokerCloneNet(nn.Module):
         return discard_logits[0].argmax().item()
 
 
+class PokerPolicyNet(nn.Module):
+    """
+    Actor-Critic network for PPO reinforcement learning.
+
+    Extends the PokerCloneNet backbone with a value_head for advantage estimation.
+    The three policy heads (action/raise/discard) are structurally identical to
+    PokerCloneNet so BC checkpoints can be used as warm-start weights.
+
+    forward() returns 4-tuple: (action_logits, raise_logits, discard_logits, values)
+    """
+
+    def __init__(self, input_dim: int = FEATURE_DIM, hidden_dim: int = 256):
+        super().__init__()
+        half = hidden_dim // 2
+
+        self.backbone = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.GELU(),
+            nn.Dropout(0.2),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.GELU(),
+            nn.Dropout(0.2),
+            nn.Linear(hidden_dim, half),
+            nn.LayerNorm(half),
+            nn.GELU(),
+        )
+        self.action_head = nn.Sequential(nn.Linear(half, 64), nn.GELU(), nn.Linear(64, NUM_ACTIONS))
+        self.raise_head = nn.Sequential(nn.Linear(half, 64), nn.GELU(), nn.Linear(64, NUM_RAISE_BUCKETS))
+        self.discard_head = nn.Sequential(nn.Linear(half, 64), nn.GELU(), nn.Linear(64, NUM_DISCARD_COMBOS))
+        # Critic — shared backbone, separate head
+        self.value_head = nn.Sequential(nn.Linear(half, 64), nn.GELU(), nn.Linear(64, 1))
+
+        self._init_weights()
+
+    def _init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
+    def forward(self, x: torch.Tensor):
+        """
+        Args:
+            x: (B, 98)
+        Returns:
+            action_logits:  (B, 4)
+            raise_logits:   (B, 10)
+            discard_logits: (B, 10)
+            values:         (B,)
+        """
+        shared = self.backbone(x)
+        return (
+            self.action_head(shared),
+            self.raise_head(shared),
+            self.discard_head(shared),
+            self.value_head(shared).squeeze(-1),
+        )
+
+    @classmethod
+    def from_clone_checkpoint(cls, path: str, hidden_dim: int = 256) -> "PokerPolicyNet":
+        """
+        Warm-start from a PokerCloneNet BC checkpoint.
+        Backbone and policy heads transfer exactly; value_head stays randomly initialized.
+        """
+        net = cls(hidden_dim=hidden_dim)
+        bc_state = torch.load(path, map_location="cpu", weights_only=True)
+        missing, unexpected = net.load_state_dict(bc_state, strict=False)
+        # Only value_head keys should be missing
+        non_value_missing = [k for k in missing if "value_head" not in k]
+        if non_value_missing:
+            raise ValueError(f"Unexpected missing keys from BC checkpoint: {non_value_missing}")
+        return net
+
+    def to_clone_state_dict(self) -> dict:
+        """
+        Return state dict compatible with PokerCloneNet / CloneBotAdapter
+        (strips value_head keys). Save this for hot-swapping into bot_server.
+        """
+        return {k: v for k, v in self.state_dict().items() if not k.startswith("value_head")}
+
+
 def raise_bucket_to_amount(bucket: int, min_raise: int, max_raise: int) -> int:
     """Convert a 0-9 bucket index to a chip amount in [min_raise, max_raise]."""
     if max_raise <= min_raise:
