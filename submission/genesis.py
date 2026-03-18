@@ -72,8 +72,8 @@ from submission.street3_river import (
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-DEFAULT_N_FLOP_SAMPLES = 150
-DEFAULT_N_TR_SAMPLES = 50
+DEFAULT_N_FLOP_SAMPLES = 80
+DEFAULT_N_TR_SAMPLES = 30
 
 STREET0_LOG_PREFIX = "STREET0"
 STREET1_LOG_PREFIX = "STREET1"
@@ -298,7 +298,6 @@ class GenesisAgent(Agent):
             return at.FOLD.value, 0, 0, 1
 
         opponent_profile = to_opponent_profile(self.recon)
-        # Street 0 scoring can use multiple workers; set POKER_N_WORKERS=2 (default) or 4 for next phase.
         score, breakdown = final_street0_score(
             hand5,
             opponent_profile=opponent_profile,
@@ -589,6 +588,7 @@ class GenesisAgent(Agent):
             river_texture=river_texture,
             our_discard_class=self._street1_discard_class,
             opp_discard_class=self.recon.opp_flop_discard_class,
+            opp_type=get_opponent_type(self.recon),
         )
 
         action_type, raise_amount, size_bucket, breakdown = get_street3_action(ctx)

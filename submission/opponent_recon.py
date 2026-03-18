@@ -979,12 +979,18 @@ def get_non_river_bet_percentage(recon: OpponentRecon) -> float:
     return recon.opp_non_river_bet_count / recon.opp_non_river_streets_seen
 
 
+# Min hands before we use opp_type (avoid over-adapting early; we lose when classified "loose" on noisy data)
+OPP_TYPE_MIN_HANDS = 50
+
+
 def get_opponent_type(recon: OpponentRecon) -> str:
-    """'tight' if fold_to_non_river > 70%, 'loose' if < 30%, else 'balanced'."""
+    """'tight' if fold_to_non_river > 70%, 'loose' if < 25%, else 'balanced'. Returns 'balanced' until OPP_TYPE_MIN_HANDS."""
+    if recon.total_hands < OPP_TYPE_MIN_HANDS:
+        return "balanced"
     f = get_fold_to_non_river_bet(recon)
     if f > 0.70:
         return "tight"
-    if f < 0.30:
+    if f < 0.25:  # Stricter: was 0.30, so we don't classify "loose" too easily
         return "loose"
     return "balanced"
 

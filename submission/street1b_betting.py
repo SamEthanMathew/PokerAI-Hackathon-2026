@@ -495,6 +495,16 @@ def _facing_bet_action(
     if m_defend > 0.20 and pot_odds < 0.30 and can_call:
         return CALL, 0, m_defend, ""
 
+    # Call with pair or strong draw at reasonable pot odds (reduce flop over-fold)
+    dc = (ctx.our_discard_class or "").strip().lower()
+    if dc in ("pair_transparent", "flush_transparent") and pot_odds < 0.38 and s1b > 0.20 and can_call:
+        return CALL, 0, 0.25, ""
+    if dc == "straight_transparent" and pot_odds < 0.36 and s1b > 0.22 and can_call:
+        return CALL, 0, 0.25, ""
+    # Big pot: call more with pair/straight when already invested (reduce "we folded in big pots")
+    if ctx.pot_size >= 40 and dc in ("pair_transparent", "straight_transparent") and pot_odds < 0.40 and s1b > 0.18 and can_call:
+        return CALL, 0, 0.22, ""
+
     # Small calls
     if ctx.amount_to_call <= 5 and s1b > 0.15 and can_call:
         return CALL, 0, 0.3, ""

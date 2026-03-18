@@ -89,7 +89,7 @@ _W_TURN = 0.35
 _W_RIVER = 0.65
 
 # Sampling limits for future value
-_N_TR_SAMPLES = 40
+_N_TR_SAMPLES = 25
 
 HAND_CLASS_NAMES = [
     "Straight Flush", "Full House", "Flush", "Three of a Kind",

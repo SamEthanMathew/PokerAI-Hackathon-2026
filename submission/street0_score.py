@@ -16,14 +16,9 @@ import pickle
 import random
 import sys
 from collections import Counter
-from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from itertools import combinations
 from typing import Dict, List, Optional, Tuple
-
-# Parallel Street 0: chunk size for flop batching (reduce IPC)
-_FLOP_CHUNK_SIZE = 15
-_MIN_FLOPS_FOR_PARALLEL = 20
 
 # ---------------------------------------------------------------------------
 # Import the engine's hand evaluator
@@ -257,6 +252,75 @@ def hand_structure_features(hand5: List[int]) -> dict:
         "near_straight_windows": near_straight_windows(rank_set),
         **ace_f,
     }
+
+
+# =========================================================================
+# Card abstraction – hand5 bucket (for stratified cache / analytics)
+# =========================================================================
+
+def hand5_to_bucket_id(hand5: List[int]) -> int:
+    """
+    Map a 5-card starting hand to a deterministic bucket id (0..79).
+    Uses multiplicity, suit concentration, connectivity, and high-card presence
+    so that flush/straight potential is preserved across buckets.
+    """
+    f = hand_structure_features(hand5)
+    # Multiplicity: 0=trips/2pair, 1=pair, 2=high_card with run>=2, 3=high_card else
+    if f.get("has_trips") or f.get("has_two_pair"):
+        mult = 0
+    elif f.get("has_one_pair"):
+        mult = 1
+    elif f.get("all_distinct") and f.get("longest_run", 0) >= 2:
+        mult = 2
+    else:
+        mult = 3
+    # Suit: 5-suited -> 0, 4 -> 1, 3 -> 2, 2 -> 3, 1 -> 4
+    max_suit = f.get("max_suit_count", 1)
+    if max_suit >= 5:
+        suit_class = 0
+    elif max_suit == 4:
+        suit_class = 1
+    elif max_suit == 3:
+        suit_class = 2
+    elif max_suit == 2:
+        suit_class = 3
+    else:
+        suit_class = 4
+    # Connectivity: run >= 2 -> 0, else 1
+    conn = 0 if f.get("longest_run", 0) >= 2 else 1
+    # High: has_ace or highest_rank >= 6 (9,T,A) -> 0, else 1
+    high = 0 if (f.get("num_aces", 0) >= 1 or f.get("highest_rank", 0) >= 6) else 1
+    return mult * 20 + suit_class * 4 + conn * 2 + high
+
+
+def hand5_to_bucket_id_slight(hand5: List[int]) -> int:
+    """
+    Map hand to bucket id 0..239 (80 base buckets x 3 rank tiers).
+    Used for bucket-based precomputed table lookup.
+    """
+    base = hand5_to_bucket_id(hand5)
+    f = hand_structure_features(hand5)
+    rc = f.get("rank_counts", hand_rank_counts(hand5))
+    if f.get("has_trips") or f.get("has_two_pair") or f.get("has_one_pair"):
+        primary_rank = max((r for r, cnt in rc.items() if cnt >= 2), default=0)
+    else:
+        primary_rank = f.get("highest_rank", 0)
+    tier = 0 if primary_rank <= 3 else (1 if primary_rank <= 6 else 2)
+    return base * 3 + tier
+
+
+def flop_abstract_key(flop: Tuple[int, ...], hand5: List[int]) -> Tuple[str, int]:
+    """
+    Abstract key for a flop given our hand: (texture, our_cards_in_dominant_suit).
+    Used to group flops so we evaluate one representative per group (flush-aware).
+    """
+    texture = classify_board_texture(list(flop))
+    flop_suit_counts = hand_suit_counts(list(flop))
+    dominant_suit = max(flop_suit_counts, key=flop_suit_counts.get) if flop_suit_counts else 0
+    our_in_dominant = sum(1 for c in hand5 if suit(c) == dominant_suit)
+    # Cap at 2 for key size so we get 0, 1, or 2
+    overlap = min(2, our_in_dominant)
+    return (texture, overlap)
 
 
 # =========================================================================
@@ -776,94 +840,6 @@ def keep_score_Q(
     return A_G * g + A_R * r - A_L * l - A_I * i
 
 
-def _compute_flop_chunk(
-    args: Tuple[List[Tuple[int, ...]], List[int], Optional[int]],
-) -> Tuple[float, float, float, float, Dict[Tuple[int, int], int]]:
-    """
-    Worker for parallel Street 0: process a chunk of flops.
-    args = (flops_chunk, hand5, n_tr_samples). Returns aggregated contributions
-    for this chunk so the main process can sum and merge best_keep_counts.
-    Top-level and picklable for ProcessPoolExecutor.
-    """
-    flops_chunk, hand5, n_tr_samples = args
-    keeps = all_keeps(hand5)
-    rem = remaining_cards(hand5)
-    v_future_sum = 0.0
-    v_opt_sum = 0.0
-    c_disc_sum = 0.0
-    c_rev_sum = 0.0
-    best_keep_counts: Counter = Counter()
-
-    for flop in flops_chunk:
-        flop_set = set(flop)
-        rem_after_flop = [c for c in rem if c not in flop_set]
-
-        gr_values: List[Tuple[float, float]] = []
-        for _, kc, dc in keeps:
-            g = future_strength_G(kc, flop, rem_after_flop, n_tr_samples)
-            r = retained_richness_R(kc, flop, rem_after_flop)
-            gr_values.append((g, r))
-
-        all_gr_scores = [g + r for g, r in gr_values]
-
-        q_values: List[float] = []
-        for idx, ((ki, kc, dc), (g, r)) in enumerate(zip(keeps, gr_values)):
-            current_gr = all_gr_scores[idx]
-            l = discard_loss_L(kc, dc, hand5, current_gr, all_gr_scores)
-            i = reveal_cost_I(kc, dc, flop, keeps)
-            q = keep_score_Q(g, r, l, i)
-            q_values.append(q)
-
-        best_idx = max(range(len(q_values)), key=lambda x: q_values[x])
-        best_keep_counts[keeps[best_idx][0]] += 1
-
-        v_future_sum += max(q_values)
-
-        sorted_q = sorted(q_values, reverse=True)
-        v_opt = OPT_W1 * sorted_q[0]
-        if len(sorted_q) > 1:
-            v_opt += OPT_W2 * sorted_q[1]
-        if len(sorted_q) > 2:
-            v_opt += OPT_W3 * sorted_q[2]
-        v_opt_sum += v_opt
-
-        best_kc = keeps[best_idx][1]
-        best_dc = keeps[best_idx][2]
-        best_gr = all_gr_scores[best_idx]
-        c_disc_sum += discard_loss_L(best_kc, best_dc, hand5, best_gr, all_gr_scores)
-        c_rev_sum += reveal_cost_I(best_kc, best_dc, flop, keeps)
-
-    return (
-        v_future_sum,
-        v_opt_sum,
-        c_disc_sum,
-        c_rev_sum,
-        dict(best_keep_counts),
-    )
-
-
-def _get_n_workers() -> int:
-    """Number of workers for parallel Street 0 (1 = sequential). Capped 1-4."""
-    try:
-        n = int(os.environ.get("POKER_N_WORKERS", "0"))
-    except (ValueError, TypeError):
-        n = 0
-    if n <= 0:
-        n = min(2, os.cpu_count() or 2)
-    return max(1, min(n, 4))
-
-
-# Reused pool (created on first parallel use, reused for process lifetime)
-_executor: Optional[ProcessPoolExecutor] = None
-
-
-def _get_executor() -> ProcessPoolExecutor:
-    global _executor
-    if _executor is None:
-        _executor = ProcessPoolExecutor(max_workers=_get_n_workers())
-    return _executor
-
-
 def compute_base_street0_score(
     hand5: List[int],
     n_flop_samples: Optional[int] = 150,
@@ -872,8 +848,6 @@ def compute_base_street0_score(
     """
     Compute the full base Street 0 score for a 5-card starting hand.
     Returns (raw_score, breakdown).
-    Uses parallel flop chunks when len(flops) >= _MIN_FLOPS_FOR_PARALLEL and
-    POKER_N_WORKERS > 1 (env POKER_N_WORKERS, default 2).
     """
     keeps = all_keeps(hand5)
     rem = remaining_cards(hand5)
@@ -883,70 +857,59 @@ def compute_base_street0_score(
         return 0.0, ScoreBreakdown()
 
     n_flops = len(flops)
-    n_workers = _get_n_workers()
-    use_parallel = n_flops >= _MIN_FLOPS_FOR_PARALLEL and n_workers > 1
+    # Group flops by abstract key (texture, our_cards_in_dominant_suit); evaluate one representative per group
+    groups: Dict[Tuple[str, int], List[Tuple[int, ...]]] = {}
+    for flop in flops:
+        key = flop_abstract_key(flop, hand5)
+        if key not in groups:
+            groups[key] = []
+        groups[key].append(flop)
 
-    if use_parallel:
-        # Chunk flops (10–15 per task to limit IPC)
-        chunks: List[List[Tuple[int, ...]]] = []
-        for i in range(0, n_flops, _FLOP_CHUNK_SIZE):
-            chunks.append(flops[i : i + _FLOP_CHUNK_SIZE])
-        args_list: List[Tuple[List[Tuple[int, ...]], List[int], Optional[int]]] = [
-            (chunk, hand5, n_tr_samples) for chunk in chunks
-        ]
-        executor = _get_executor()
-        chunk_results = list(executor.map(_compute_flop_chunk, args_list))
-        v_future_sum = sum(r[0] for r in chunk_results)
-        v_opt_sum = sum(r[1] for r in chunk_results)
-        c_disc_sum = sum(r[2] for r in chunk_results)
-        c_rev_sum = sum(r[3] for r in chunk_results)
-        best_keep_counts = Counter()
-        for r in chunk_results:
-            best_keep_counts.update(r[4])
-    else:
-        v_future_sum = 0.0
-        v_opt_sum = 0.0
-        c_disc_sum = 0.0
-        c_rev_sum = 0.0
-        best_keep_counts = Counter()
-        for flop in flops:
-            flop_set = set(flop)
-            rem_after_flop = [c for c in rem if c not in flop_set]
+    v_future_sum = 0.0
+    v_opt_sum = 0.0
+    c_disc_sum = 0.0
+    c_rev_sum = 0.0
+    best_keep_counts = Counter()
+    for _key, group in groups.items():
+        rep_flop = group[0]
+        weight = len(group)
+        flop_set = set(rep_flop)
+        rem_after_flop = [c for c in rem if c not in flop_set]
 
-            gr_values: List[Tuple[float, float]] = []
-            for _, kc, dc in keeps:
-                g = future_strength_G(kc, flop, rem_after_flop, n_tr_samples)
-                r = retained_richness_R(kc, flop, rem_after_flop)
-                gr_values.append((g, r))
+        gr_values: List[Tuple[float, float]] = []
+        for _, kc, dc in keeps:
+            g = future_strength_G(kc, rep_flop, rem_after_flop, n_tr_samples)
+            r = retained_richness_R(kc, rep_flop, rem_after_flop)
+            gr_values.append((g, r))
 
-            all_gr_scores = [g + r for g, r in gr_values]
+        all_gr_scores = [g + r for g, r in gr_values]
 
-            q_values: List[float] = []
-            for idx, ((ki, kc, dc), (g, r)) in enumerate(zip(keeps, gr_values)):
-                current_gr = all_gr_scores[idx]
-                l = discard_loss_L(kc, dc, hand5, current_gr, all_gr_scores)
-                i = reveal_cost_I(kc, dc, flop, keeps)
-                q = keep_score_Q(g, r, l, i)
-                q_values.append(q)
+        q_values: List[float] = []
+        for idx, ((ki, kc, dc), (g, r)) in enumerate(zip(keeps, gr_values)):
+            current_gr = all_gr_scores[idx]
+            l = discard_loss_L(kc, dc, hand5, current_gr, all_gr_scores)
+            i = reveal_cost_I(kc, dc, rep_flop, keeps)
+            q = keep_score_Q(g, r, l, i)
+            q_values.append(q)
 
-            best_idx = max(range(len(q_values)), key=lambda x: q_values[x])
-            best_keep_counts[keeps[best_idx][0]] += 1
+        best_idx = max(range(len(q_values)), key=lambda x: q_values[x])
+        best_keep_counts[keeps[best_idx][0]] += weight
 
-            v_future_sum += max(q_values)
+        v_future_sum += weight * max(q_values)
 
-            sorted_q = sorted(q_values, reverse=True)
-            v_opt = OPT_W1 * sorted_q[0]
-            if len(sorted_q) > 1:
-                v_opt += OPT_W2 * sorted_q[1]
-            if len(sorted_q) > 2:
-                v_opt += OPT_W3 * sorted_q[2]
-            v_opt_sum += v_opt
+        sorted_q = sorted(q_values, reverse=True)
+        v_opt = OPT_W1 * sorted_q[0]
+        if len(sorted_q) > 1:
+            v_opt += OPT_W2 * sorted_q[1]
+        if len(sorted_q) > 2:
+            v_opt += OPT_W3 * sorted_q[2]
+        v_opt_sum += weight * v_opt
 
-            best_kc = keeps[best_idx][1]
-            best_dc = keeps[best_idx][2]
-            best_gr = all_gr_scores[best_idx]
-            c_disc_sum += discard_loss_L(best_kc, best_dc, hand5, best_gr, all_gr_scores)
-            c_rev_sum += reveal_cost_I(best_kc, best_dc, flop, keeps)
+        best_kc = keeps[best_idx][1]
+        best_dc = keeps[best_idx][2]
+        best_gr = all_gr_scores[best_idx]
+        c_disc_sum += weight * discard_loss_L(best_kc, best_dc, hand5, best_gr, all_gr_scores)
+        c_rev_sum += weight * reveal_cost_I(best_kc, best_dc, rep_flop, keeps)
 
     n = n_flops
     v_future = v_future_sum / n
@@ -1298,12 +1261,48 @@ def final_street0_score(
     Args:
         hand5: list of 5 card ints in [0, 27)
         opponent_profile: OpponentProfile or None for base-only scoring
-        n_flop_samples: None for exact enumeration, int for sampled
-        n_tr_samples: None for exact enumeration, int for sampled
+        n_flop_samples: None for exact enumeration, int for sampled (ignored if precomputed table loaded)
+        n_tr_samples: None for exact enumeration, int for sampled (ignored if precomputed table loaded)
 
     Returns:
         (score_0_to_1, breakdown)
     """
+    if _precomputed is None:
+        _load_precomputed()
+
+    if _precomputed is not None:
+        table, global_min, global_max = _precomputed[0], _precomputed[1], _precomputed[2]
+        by_bucket = _precomputed[3] if len(_precomputed) > 3 else False
+        key = hand5_to_bucket_id_slight(hand5) if by_bucket else tuple(sorted(hand5))
+        if key in table:
+            raw_base, v_future, v_opt, c_disc, c_rev, best_keep_counts = table[key]
+            breakdown = ScoreBreakdown(
+                v_future=v_future,
+                v_optionality=v_opt,
+                c_discard=c_disc,
+                c_reveal=c_rev,
+                best_keep_counts=best_keep_counts,
+            )
+            s_base = normalize_score(raw_base, global_min, global_max)
+            breakdown.s_base = s_base
+
+            if opponent_profile is None:
+                breakdown.s_final = s_base
+                return s_base, breakdown
+
+            features = hand_structure_features(hand5)
+            s_opp_raw = opponent_adjusted_score(breakdown, opponent_profile, features)
+            s_opp = normalize_score(s_opp_raw, global_min, global_max)
+            breakdown.s_opp = s_opp
+
+            lam = opponent_confidence(opponent_profile)
+            breakdown.confidence = lam
+
+            s_final = (1.0 - lam) * s_base + lam * s_opp
+            breakdown.s_final = s_final
+            return s_final, breakdown
+
+    # Fallback: compute base score
     raw_base, breakdown = compute_base_street0_score(hand5, n_flop_samples, n_tr_samples)
     s_base = normalize_score(raw_base)
     breakdown.s_base = s_base
@@ -1432,6 +1431,38 @@ def classify_board_texture(community: List[int]) -> str:
         return "river_standard"
 
     return "unknown_texture"
+
+
+# --- Precomputed lookup table (optional) ---
+
+PRECOMPUTED_TABLE_PATH = os.environ.get(
+    "STREET0_PRECOMPUTED_TABLE",
+    os.path.join(os.path.dirname(__file__), "street0_precomputed.pkl"),
+)
+_precomputed: Optional[Tuple[Dict[Tuple[int, ...], Tuple[float, float, float, float, float, dict]], float, float]] = None
+
+
+def _load_precomputed() -> bool:
+    """Load precomputed table from disk. Returns True if loaded."""
+    global _precomputed
+    if _precomputed is not None:
+        return True
+    path = os.path.abspath(PRECOMPUTED_TABLE_PATH)
+    if not os.path.exists(path):
+        return False
+    try:
+        with open(path, "rb") as f:
+            data = pickle.load(f)
+        table = data.get("table")
+        global_min = data.get("global_min", _GLOBAL_MIN)
+        global_max = data.get("global_max", _GLOBAL_MAX)
+        if table is None or not isinstance(table, dict):
+            return False
+        by_bucket = data.get("by_bucket", False)
+        _precomputed = (table, global_min, global_max, by_bucket)
+        return True
+    except Exception:
+        return False
 
 
 # --- Score cache ---

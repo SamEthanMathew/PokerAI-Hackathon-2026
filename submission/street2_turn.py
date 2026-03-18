@@ -585,14 +585,19 @@ def _turn_facing_bet(
 
     pot_odds = ctx.amount_to_call / (ctx.pot_size + ctx.amount_to_call + 1) if (ctx.pot_size + ctx.amount_to_call) > 0 else 0.5
 
+    # Flop-line relax: call more when we_checked_opp_check; defend more when we_bet_small_opp_unknown
+    flop_line = (ctx.flop_line or "").strip().lower()
+    s2_margin = 0.02 if flop_line == "we_checked_opp_check" else 0.04
+    defend_thresh = 0.12 if flop_line == "we_bet_small_opp_unknown" else 0.15
+
     if m_raise > 0.28 and s2 > 0.52 and can_raise:
         amount, bucket = _compute_turn_bet_size(ctx, s2, "value", descriptors, motives)
         return RAISE, amount, m_raise, bucket
-    if s2 > pot_odds + 0.06 and can_call:
+    if s2 > pot_odds + s2_margin and can_call:
         return CALL, 0, m_continue, ""
-    if motives["M_defend_2"] > 0.18 and pot_odds < 0.28 and can_call:
+    if motives["M_defend_2"] > defend_thresh and pot_odds < 0.32 and can_call:
         return CALL, 0, m_defend, ""
-    if ctx.amount_to_call <= 5 and s2 > 0.12 and can_call:
+    if ctx.amount_to_call <= 6 and s2 > 0.10 and can_call:
         return CALL, 0, 0.25, ""
     if can_check:
         return CHECK, 0, 0.0, ""

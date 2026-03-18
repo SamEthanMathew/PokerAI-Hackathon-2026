@@ -46,19 +46,28 @@ def main():
     st.markdown("Drop match runner log, match CSV, and bot log; set **We are Team 0** or **Team 1**; then load and view.")
 
     data_dir = st.text_input("Data directory (or leave default)", DATA_DIR)
-    if not data_dir or not os.path.isdir(data_dir):
+    base_dir = (data_dir or DATA_DIR) if os.path.isdir(data_dir or DATA_DIR) else DATA_DIR
+    if not data_dir or not os.path.isdir(data_dir or DATA_DIR):
         st.info("Enter a directory containing match log, CSV, and bot log, or use file pickers below.")
-    else:
-        files = [f for f in os.listdir(data_dir) if os.path.isfile(os.path.join(data_dir, f))]
+    files = [f for f in os.listdir(base_dir)] if os.path.isdir(base_dir) else []
+    if base_dir and os.path.isdir(base_dir):
         st.caption(f"Files in directory: {', '.join(files) if files else 'none'}")
+
+    # Default paths: prefer M1_* if present (Genesis match data), else legacy names
+    m1_game = os.path.join(base_dir, "M1_Game.md") if os.path.isfile(os.path.join(base_dir, "M1_Game.md")) else None
+    m1_csv = os.path.join(base_dir, "M1_CSV.md") if os.path.isfile(os.path.join(base_dir, "M1_CSV.md")) else None
+    m1_bot = os.path.join(base_dir, "M1_Bot.md") if os.path.isfile(os.path.join(base_dir, "M1_Bot.md")) else None
+    default_match = m1_game or os.path.join(base_dir, "match_25757.txt")
+    default_csv = m1_csv or os.path.join(base_dir, "match_25770.csv")
+    default_bot = m1_bot or os.path.join(base_dir, "bot.log")
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        match_log_path = st.text_input("Match log path", os.path.join(data_dir or DATA_DIR, "match_25757.txt"))
+        match_log_path = st.text_input("Match log path", default_match)
     with col2:
-        csv_path = st.text_input("Match CSV path", os.path.join(data_dir or DATA_DIR, "match_25770.csv"))
+        csv_path = st.text_input("Match CSV path", default_csv)
     with col3:
-        bot_log_path = st.text_input("Bot log path", os.path.join(data_dir or DATA_DIR, "bot.log"))
+        bot_log_path = st.text_input("Bot log path", default_bot)
 
     our_team_id = st.radio("We are", [0, 1], format_func=lambda x: f"Team {x}", horizontal=True)
 
@@ -174,6 +183,7 @@ def main():
             acc = compute_read_accuracy(bot_data["opp_recon"], csv_data["hands"], our_team_id)
             if acc:
                 df = pd.DataFrame(acc)
+                st.caption("Trailing 50-hand window for actuals. Our read = OPP_RECON at end of each hand.")
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(x=df["hand_number"], y=df["our_vpip"], name="our vpip", mode="lines+markers"))
                 fig.add_trace(go.Scatter(x=df["hand_number"], y=df["actual_vpip"], name="actual vpip (trailing 50)", mode="lines+markers"))
@@ -184,6 +194,31 @@ def main():
                 fig2.add_trace(go.Scatter(x=df["hand_number"], y=df["actual_pfr"], name="actual pfr (trailing 50)", mode="lines+markers"))
                 fig2.update_layout(title="PFR: our read vs actual")
                 st.plotly_chart(fig2, use_container_width=True)
+                if "our_af" in df.columns and "actual_af" in df.columns:
+                    fig_af = go.Figure()
+                    fig_af.add_trace(go.Scatter(x=df["hand_number"], y=df["our_af"], name="our AF", mode="lines+markers"))
+                    fig_af.add_trace(go.Scatter(x=df["hand_number"], y=df["actual_af"], name="actual AF (trailing 50)", mode="lines+markers"))
+                    fig_af.update_layout(title="Aggression factor (raises/calls, flop/turn/river): our read vs actual")
+                    st.plotly_chart(fig_af, use_container_width=True)
+                if "our_fold_non_river" in df.columns and "actual_fold_non_river" in df.columns:
+                    fig_fnr = go.Figure()
+                    fig_fnr.add_trace(go.Scatter(x=df["hand_number"], y=df["our_fold_non_river"], name="our fold to non-river", mode="lines+markers"))
+                    fig_fnr.add_trace(go.Scatter(x=df["hand_number"], y=df["actual_fold_non_river"], name="actual fold to non-river (trailing 50)", mode="lines+markers"))
+                    fig_fnr.update_layout(title="Fold to non-river bet: our read vs actual")
+                    st.plotly_chart(fig_fnr, use_container_width=True)
+                if "our_fold_river" in df.columns and "actual_fold_river" in df.columns:
+                    fig_fr = go.Figure()
+                    fig_fr.add_trace(go.Scatter(x=df["hand_number"], y=df["our_fold_river"], name="our fold to river", mode="lines+markers"))
+                    fig_fr.add_trace(go.Scatter(x=df["hand_number"], y=df["actual_fold_river"], name="actual fold to river (trailing 50)", mode="lines+markers"))
+                    fig_fr.update_layout(title="Fold to river bet: our read vs actual")
+                    st.plotly_chart(fig_fr, use_container_width=True)
+                if "our_non_river_bet_pct" in df.columns and "actual_non_river_bet_pct" in df.columns:
+                    fig_nr = go.Figure()
+                    fig_nr.add_trace(go.Scatter(x=df["hand_number"], y=df["our_non_river_bet_pct"], name="our non-river bet %", mode="lines+markers"))
+                    fig_nr.add_trace(go.Scatter(x=df["hand_number"], y=df["actual_non_river_bet_pct"], name="actual non-river bet % (trailing 50)", mode="lines+markers"))
+                    fig_nr.update_layout(title="Non-river bet % (when checked to): our read vs actual")
+                    st.plotly_chart(fig_nr, use_container_width=True)
+                st.subheader("Data (first 100 hands)")
                 st.dataframe(df.head(100))
             else:
                 st.caption("No overlap between bot log hands and CSV hands.")

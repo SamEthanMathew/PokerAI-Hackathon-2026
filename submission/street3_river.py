@@ -72,6 +72,7 @@ class Street3Context:
     river_texture: str = ""  # classify_board_texture(board5) for this hand
     our_discard_class: str = ""
     opp_discard_class: str = ""
+    opp_type: str = ""  # "loose" / "tight" / "balanced" from opponent_recon
 
 
 @dataclass
@@ -369,19 +370,43 @@ def _river_facing_bet(
     pot = max(1, ctx.pot_size)
     to_call = ctx.amount_to_call
     pot_odds = to_call / (pot + to_call + 1) if (pot + to_call) > 0 else 0.5
+    opp_loose = (ctx.opp_type or "").strip().lower() == "loose"
+    r3_margin = 0.15 if opp_loose else 0.08
+    c3_floor_loose = 0.50  # require higher confidence to call vs loose (reduce showdown losses when classified loose)
+    c3_baseline = 0.42     # baseline C3 to call (slightly higher to cut marginal showdown calls)
+    c3_danger = 0.48       # C3 required on paired/completed boards
+
+    # Fold: huge river raise with marginal strength (reduce showdown losses from calling big raises)
+    if can_fold and to_call > 40 and (C3 < 0.50 or H3 < 0.55):
+        if r3 < pot_odds + 0.12:
+            return FOLD, 0, ""
+    if can_fold and pot > 0 and to_call > 0.55 * (pot + to_call) and C3 < 0.55 and r3 < pot_odds + 0.10:
+        return FOLD, 0, ""
 
     # Raise: only with very high confidence (nut/near-nut)
     if C3 >= 0.78 and H3 >= 0.70 and can_raise:
         amount, bucket = _compute_river_bet_size(ctx, C3, H3, "value")
         return RAISE, amount, bucket
 
-    # Call: good pot odds or moderate confidence
-    if r3 > pot_odds + 0.08 and can_call:
+    # Call: good pot odds or moderate confidence (stricter when opp is "loose")
+    if r3 > pot_odds + r3_margin and can_call:
+        if opp_loose and C3 < c3_floor_loose:
+            pass  # don't call with marginal confidence vs loose
+        else:
+            return CALL, 0, ""
+    # Board texture: require higher C3 on paired or completed boards (reduce showdown losses)
+    texture, paired, _ = river_texture_info(ctx.board5)
+    tex_t = (texture or "").lower()
+    board_danger = paired or "flush_completed" in tex_t or "straight_completed" in tex_t
+    c3_call_thresh = max(c3_floor_loose if opp_loose else 0.0, c3_danger if board_danger else c3_baseline)
+    if C3 >= c3_call_thresh and pot_odds < 0.35 and can_call:
         return CALL, 0, ""
-    if C3 >= 0.40 and pot_odds < 0.35 and can_call:
-        return CALL, 0, ""
-    if to_call <= 5 and C3 >= 0.25 and can_call:
-        return CALL, 0, ""
+    # Small river calls: higher bar to avoid -2 chips and marginal showdown losses
+    if to_call <= 5 and (C3 >= 0.32 or r3 > 0.38) and can_call:
+        if opp_loose and C3 < c3_floor_loose:
+            pass
+        else:
+            return CALL, 0, ""
 
     if can_fold:
         return FOLD, 0, ""

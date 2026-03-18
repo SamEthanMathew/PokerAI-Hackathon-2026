@@ -154,6 +154,12 @@ def _get_street0_action_impl(ctx: Street0Context) -> Tuple[int, int]:
 
     # --- 2) Facing a bet (amount_to_call > 0) ---
     if amount_to_call > 0:
+        # BB: play slightly tighter (reduce call caps by 2-3 to improve BB balance)
+        is_bb = ctx.blind_position == 1
+        cap_medium = 25 if is_bb else 28
+        cap_marginal = 10 if is_bb else 12
+        cap_weak = 5 if is_bb else 6
+
         # High PFR opponent: don’t fold as easily (call more)
         if pfr > 0.80 and _can_call(ctx):
             if bucket != "weak":
@@ -163,7 +169,7 @@ def _get_street0_action_impl(ctx: Street0Context) -> Tuple[int, int]:
         if pfr > 0.50 and _can_call(ctx) and amount_to_call <= 20:
             if bucket in ("premium", "strong", "medium"):
                 return CALL, -1
-            if bucket == "marginal" and amount_to_call <= 10:
+            if bucket == "marginal" and amount_to_call <= cap_marginal:
                 return CALL, -1
 
         # Premium: raise or call
@@ -182,24 +188,24 @@ def _get_street0_action_impl(ctx: Street0Context) -> Tuple[int, int]:
                 return CALL, -1
             return FOLD, -1
 
-        # Medium: call up to ~25, fold larger
+        # Medium: call up to cap (tighter from BB)
         if bucket == "medium":
-            if _can_call(ctx) and amount_to_call <= 25:
+            if _can_call(ctx) and amount_to_call <= cap_medium:
                 return CALL, -1
             if _can_check(ctx):
                 return CHECK, -1
             return FOLD, -1
 
-        # Marginal: call only small
+        # Marginal: call up to cap (tighter from BB)
         if bucket == "marginal":
-            if amount_to_call <= 10 and _can_call(ctx):
+            if amount_to_call <= cap_marginal and _can_call(ctx):
                 return CALL, -1
             if _can_check(ctx):
                 return CHECK, -1
             return FOLD, -1
 
-        # Weak: fold unless call is tiny
-        if amount_to_call <= 5 and _can_call(ctx):
+        # Weak: fold unless call is tiny (tighter from BB)
+        if amount_to_call <= cap_weak and _can_call(ctx):
             return CALL, -1
         if _can_check(ctx):
             return CHECK, -1
