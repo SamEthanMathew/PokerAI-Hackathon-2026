@@ -39,7 +39,7 @@ from model import PokerNetV2, KEEP_COMBOS
 from features import extract_features, split_features, update_opp_stats, CARD_DIM, CONTEXT_DIM
 from rewards import RewardShaper
 from opponent_pool import load_opponent_pool, OpponentPool
-from evaluation import run_evaluation
+from evaluation import run_evaluation, EvalResult
 from precompute import load_tables
 from env.poker_env import PokerTrainingEnv
 
@@ -70,6 +70,25 @@ def _latest_checkpoint() -> Optional[str]:
     if os.path.exists(bc):
         return bc
     return None
+
+
+def _log_rl_genesis_eval(result: EvalResult, logs_dir: str) -> None:
+    """Log RL+Genesis vs opponents to stdout and to logs/rl_genesis_progress.txt."""
+    os.makedirs(logs_dir, exist_ok=True)
+    progress_path = os.path.join(logs_dir, "rl_genesis_progress.txt")
+    # Per-opponent summary string
+    opp_parts = [f"{name}={result.win_rates.get(name, 0):.0%}" for name in result.win_rates]
+    opp_str = " ".join(opp_parts) if opp_parts else ""
+
+    msg = (
+        f"[RL+Genesis] cycle={result.cycle} eval | aggregate WR={result.aggregate_win_rate:.1%} "
+        f"net_chips={result.aggregate_net_chips:.0f} | vs: {opp_str} | {result.timestamp}"
+    )
+    print(msg)
+    print(f"[RL+Genesis] Full results appended to {progress_path} and logs/eval_results.csv")
+
+    with open(progress_path, "a") as f:
+        f.write(msg + "\n")
 
 
 # ── Phase: precompute ────────────────────────────────────────────────────────
@@ -670,6 +689,9 @@ def run_rl_phase():
             )
             model.train()
             model.to(device)
+
+            # Explicit RL+Genesis vs opponents log
+            _log_rl_genesis_eval(eval_result, cfg.logs_dir)
 
             if eval_result.aggregate_win_rate > best_win_rate:
                 best_win_rate = eval_result.aggregate_win_rate

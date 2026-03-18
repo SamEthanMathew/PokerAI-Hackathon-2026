@@ -58,7 +58,7 @@ class TrainingConfig:
     phase3_cycles: int = 200       # Hardening
     total_cycles: int = 400        # phase1 + phase2 + phase3
     eval_every: int = 10           # evaluate every N cycles
-    target_win_rate: float = 0.90  # training success threshold
+    target_win_rate: float = 1.0   # keep training (no early stop); set <1.0 to enable early stop
     early_stop_consecutive: int = 3  # stop if beats target for N evals in a row
 
     # ── Reward shaping ─────────────────────────────────────────────────────
