@@ -1,0 +1,30 @@
+2026-03-20 22:19:40,757 - match_71569 - INFO - Starting agents
+2026-03-20 22:19:40,761 - match_71569 - INFO - Sending match start notification
+2026-03-20 22:19:40,822 - match_71569 - INFO - Starting match
+2026-03-20 22:19:40,830 - match_71569 - INFO - Backing off for 1 seconds before retry 1
+2026-03-20 22:19:41,831 - match_71569 - INFO - Backing off for 2 seconds before retry 2
+2026-03-20 22:19:43,848 - match_71569 - INFO - Hand number: 0, super-quantum-frogtron-500M-params bankroll: -2, JumpStreet bankroll: 2
+2026-03-20 22:19:59,697 - match_71569 - INFO - Hand number: 50, super-quantum-frogtron-500M-params bankroll: -149, JumpStreet bankroll: 149
+2026-03-20 22:20:14,287 - match_71569 - INFO - Hand number: 100, super-quantum-frogtron-500M-params bankroll: 253, JumpStreet bankroll: -253
+2026-03-20 22:20:29,328 - match_71569 - INFO - Hand number: 150, super-quantum-frogtron-500M-params bankroll: 310, JumpStreet bankroll: -310
+2026-03-20 22:20:43,134 - match_71569 - INFO - Hand number: 200, super-quantum-frogtron-500M-params bankroll: 574, JumpStreet bankroll: -574
+2026-03-20 22:20:59,830 - match_71569 - INFO - Hand number: 250, super-quantum-frogtron-500M-params bankroll: 967, JumpStreet bankroll: -967
+2026-03-20 22:21:03,440 - match_71569 - INFO - Hand number: 300, super-quantum-frogtron-500M-params bankroll: 1099, JumpStreet bankroll: -1099
+2026-03-20 22:21:04,406 - match_71569 - INFO - Hand number: 350, super-quantum-frogtron-500M-params bankroll: 1024, JumpStreet bankroll: -1024
+2026-03-20 22:21:05,394 - match_71569 - INFO - Hand number: 400, super-quantum-frogtron-500M-params bankroll: 953, JumpStreet bankroll: -953
+2026-03-20 22:21:06,751 - match_71569 - INFO - Hand number: 450, super-quantum-frogtron-500M-params bankroll: 882, JumpStreet bankroll: -882
+2026-03-20 22:21:08,138 - match_71569 - INFO - Hand number: 500, super-quantum-frogtron-500M-params bankroll: 811, JumpStreet bankroll: -811
+2026-03-20 22:21:09,435 - match_71569 - INFO - Hand number: 550, super-quantum-frogtron-500M-params bankroll: 740, JumpStreet bankroll: -740
+2026-03-20 22:21:10,756 - match_71569 - INFO - Hand number: 600, super-quantum-frogtron-500M-params bankroll: 673, JumpStreet bankroll: -673
+2026-03-20 22:21:11,918 - match_71569 - INFO - Hand number: 650, super-quantum-frogtron-500M-params bankroll: 598, JumpStreet bankroll: -598
+2026-03-20 22:21:13,093 - match_71569 - INFO - Hand number: 700, super-quantum-frogtron-500M-params bankroll: 527, JumpStreet bankroll: -527
+2026-03-20 22:21:14,349 - match_71569 - INFO - Hand number: 750, super-quantum-frogtron-500M-params bankroll: 460, JumpStreet bankroll: -460
+2026-03-20 22:21:15,554 - match_71569 - INFO - Hand number: 800, super-quantum-frogtron-500M-params bankroll: 389, JumpStreet bankroll: -389
+2026-03-20 22:21:16,456 - match_71569 - INFO - Hand number: 850, super-quantum-frogtron-500M-params bankroll: 314, JumpStreet bankroll: -314
+2026-03-20 22:21:17,474 - match_71569 - INFO - Hand number: 900, super-quantum-frogtron-500M-params bankroll: 243, JumpStreet bankroll: -243
+2026-03-20 22:21:18,633 - match_71569 - INFO - Hand number: 950, super-quantum-frogtron-500M-params bankroll: 172, JumpStreet bankroll: -172
+2026-03-20 22:21:19,989 - match_71569 - INFO - All hands completed
+2026-03-20 22:21:19,989 - match_71569 - INFO - Final results - super-quantum-frogtron-500M-params bankroll: 110, JumpStreet bankroll: -110
+2026-03-20 22:21:19,990 - match_71569 - INFO - Time used - super-quantum-frogtron-500M-params: 72.46 seconds, JumpStreet: 15.66 seconds
+2026-03-20 22:21:19,990 - match_71569 - INFO - Time limit: 1500 seconds
+2026-03-20 22:21:19,994 - match_71569 - INFO - Terminating agents
