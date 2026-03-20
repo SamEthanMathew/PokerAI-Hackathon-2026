@@ -6,9 +6,12 @@
 # pairs, precomputed opponent weight maps, shared dead-sets.
 
 import json
+import logging
 import os
 import random
+import sys
 from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from datetime import datetime, timezone
 from itertools import combinations
 
@@ -588,13 +591,71 @@ def _exact_discard_equity_weighted_lut(my_keep, community, dead_cards,
 
 
 _NUM_CPUS = min(4, os.cpu_count() or 1)
-try:
+_DISCARD_POOL_ENABLED = os.getenv("OMICRON_USE_DISCARD_POOL", "1").strip().lower() not in (
+    "0",
+    "false",
+    "no",
+    "off",
+)
+_POOL = None
+_discard_pool_fallback_logged = False
+
+
+def _discard_mp_context():
     import multiprocessing as _mp
-    _mp_ctx = _mp.get_context("fork")
-except (ValueError, AttributeError):
-    _mp_ctx = None
-_POOL = ProcessPoolExecutor(max_workers=_NUM_CPUS,
-                            mp_context=_mp_ctx)
+
+    if sys.platform == "win32":
+        return _mp.get_context("spawn")
+    try:
+        return _mp.get_context("fork")
+    except ValueError:
+        return _mp.get_context("spawn")
+
+
+def _discard_pool_reset() -> None:
+    global _POOL
+    p = _POOL
+    _POOL = None
+    if p is None:
+        return
+    try:
+        p.shutdown(wait=False, cancel_futures=True)
+    except (BrokenProcessPool, OSError, RuntimeError):
+        pass
+
+
+def _discard_pool() -> ProcessPoolExecutor | None:
+    global _POOL
+    if not _DISCARD_POOL_ENABLED:
+        return None
+    if _POOL is None:
+        import multiprocessing as _mp
+
+        _POOL = ProcessPoolExecutor(
+            max_workers=_NUM_CPUS,
+            mp_context=_discard_mp_context(),
+        )
+    return _POOL
+
+
+def _run_discard_equities_parallel(fn, jobs: list[tuple]):
+    global _discard_pool_fallback_logged
+    pool = _discard_pool()
+    if pool is None:
+        return [fn(*a) for a in jobs]
+    try:
+        futs = [pool.submit(fn, *a) for a in jobs]
+        return [f.result() for f in futs]
+    except BrokenProcessPool:
+        _discard_pool_reset()
+        if not _discard_pool_fallback_logged:
+            logging.getLogger(__name__).warning(
+                "Discard solver process pool broke (worker OOM/crash); "
+                "using in-process fallback. Set OMICRON_USE_DISCARD_POOL=0 to "
+                "disable the pool."
+            )
+            _discard_pool_fallback_logged = True
+        return [fn(*a) for a in jobs]
 
 
 # ── PlayerAgent ──────────────────────────────────────────────────────────────
@@ -605,8 +666,10 @@ class PlayerAgent(Agent):
     _LIVE_STAGE = int(os.getenv("OMICRON_LIVE_STAGE", "1"))
     _SHADOW_ONLY = os.getenv("OMICRON_SHADOW_ONLY", "0") == "1"
     _DEBUG_VERBOSE = os.getenv("OMICRON_DEBUG_VERBOSE", "0") == "1"
-    _LOG_DECISIONS = os.getenv("OMICRON_LOG_DECISIONS", "1") == "1"
-    _LOG_NODE_UPDATES = os.getenv("OMICRON_LOG_NODE_UPDATES", "core").strip().lower()
+    _LOG_EVENTS = os.getenv("OMICRON_LOG_EVENTS", "0") == "1"
+    # Default low-volume logging for external validators with strict timeouts.
+    _LOG_DECISIONS = os.getenv("OMICRON_LOG_DECISIONS", "0") == "1"
+    _LOG_NODE_UPDATES = os.getenv("OMICRON_LOG_NODE_UPDATES", "off").strip().lower()
     _LOG_DISCARD_CANDIDATES = os.getenv("OMICRON_LOG_DISCARD_CANDIDATES", "0") == "1"
     _EVENT_BUFFER_LIMIT = 420
 
@@ -885,6 +948,8 @@ class PlayerAgent(Agent):
         return os.getenv("MATCH_ID", "unknown")
 
     def _log_event(self, event_type, payload):
+        if not self._LOG_EVENTS:
+            return
         try:
             event = {
                 "event_type": event_type,
@@ -892,7 +957,7 @@ class PlayerAgent(Agent):
                 "hand_idx": int(self._hand_idx),
                 "decision_idx": int(self._decision_idx),
                 "street": int(payload.get("street", self._last_street)),
-                "street_name": self._street_name_safe(int(payload.get("street", self._last_street))),
+                "street_name": payload.get("street_name", self._street_name_safe(int(payload.get("street", self._last_street)))),
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
             event.update(payload)
@@ -1848,22 +1913,63 @@ class PlayerAgent(Agent):
                         if eq > best_eq:
                             best_eq = eq
                             best_ij = (i, j)
+                    if self._LOG_DISCARD_CANDIDATES:
+                        for rank_i, (i, j, keep, toss) in enumerate(all_keeps, start=1):
+                            self._log_event("discard_candidate", {
+                                "street": street,
+                                "street_name": "discard",
+                                "phase": "discard",
+                                "candidate_keep": keep,
+                                "candidate_keep_str": self._cards_to_str(keep),
+                                "candidate_toss": toss,
+                                "candidate_toss_str": self._cards_to_str(toss),
+                                "screen_eq": None,
+                                "exact_eq": None,
+                                "weighted_eq": None,
+                                "rank_among_candidates": rank_i,
+                                "selected": bool((i, j) == best_ij),
+                            })
                 else:
                     weights = list(self._opp_model.weights)
-                    futures = []
+                    jobs_w = []
                     for i, j, keep, toss in all_keeps:
                         dead = dead_base | set(toss) | set(opp_discards)
-                        fut = _POOL.submit(_exact_discard_equity_weighted_lut,
-                                           keep, community, dead, opp_discards,
-                                           weights)
-                        futures.append((i, j, fut))
+                        jobs_w.append(
+                            (keep, community, dead, opp_discards, weights)
+                        )
+                    results_w = _run_discard_equities_parallel(
+                        _exact_discard_equity_weighted_lut, jobs_w
+                    )
                     best_eq = -1.0
                     best_ij = (0, 1)
-                    for i, j, fut in futures:
-                        eq = fut.result()
-                        if eq > best_eq:
-                            best_eq = eq
+                    weighted_map = {}
+                    for (i, j, keep, toss), eq in zip(all_keeps, results_w):
+                        eqf = float(eq)
+                        weighted_map[(i, j)] = eqf
+                        if eqf > best_eq:
+                            best_eq = eqf
                             best_ij = (i, j)
+                    if self._LOG_DISCARD_CANDIDATES:
+                        ranked_weighted = sorted(
+                            [(i, j, keep, toss, weighted_map.get((i, j))) for i, j, keep, toss in all_keeps],
+                            key=lambda x: x[4] if x[4] is not None else -1.0,
+                            reverse=True
+                        )
+                        for rank_i, (i, j, keep, toss, weq) in enumerate(ranked_weighted, start=1):
+                            self._log_event("discard_candidate", {
+                                "street": street,
+                                "street_name": "discard",
+                                "phase": "discard",
+                                "candidate_keep": keep,
+                                "candidate_keep_str": self._cards_to_str(keep),
+                                "candidate_toss": toss,
+                                "candidate_toss_str": self._cards_to_str(toss),
+                                "screen_eq": None,
+                                "exact_eq": None,
+                                "weighted_eq": weq,
+                                "rank_among_candidates": rank_i,
+                                "selected": bool((i, j) == best_ij),
+                            })
             else:
                 opp_disc_set = set(opp_discards)
                 community_l = list(community)
@@ -1907,6 +2013,7 @@ class PlayerAgent(Agent):
                         for rank_i, (i, j, s_eq, keep, toss) in enumerate(candidates, start=1):
                             self._log_event("discard_candidate", {
                                 "street": street,
+                                "street_name": "discard",
                                 "phase": "discard",
                                 "candidate_keep": keep,
                                 "candidate_keep_str": self._cards_to_str(keep),
@@ -1920,20 +2027,23 @@ class PlayerAgent(Agent):
                             })
                 else:
                     top_n = 3 if sim_mode == "conservative" else 5
-                    futures = []
+                    jobs_u = []
+                    ij_top = []
                     for i, j, _, keep, toss in candidates[:top_n]:
                         dead = dead_base | set(toss) | opp_disc_set
-                        fut = _POOL.submit(_exact_discard_equity_lut,
-                                           keep, community, dead)
-                        futures.append((i, j, fut))
+                        ij_top.append((i, j))
+                        jobs_u.append((keep, community, dead))
+                    results_u = _run_discard_equities_parallel(
+                        _exact_discard_equity_lut, jobs_u
+                    )
                     best_eq = -1.0
                     best_ij = (0, 1)
                     exact_map = {}
-                    for i, j, fut in futures:
-                        eq = fut.result()
-                        exact_map[(i, j)] = float(eq)
-                        if eq > best_eq:
-                            best_eq = eq
+                    for (i, j), eq in zip(ij_top, results_u):
+                        eqf = float(eq)
+                        exact_map[(i, j)] = eqf
+                        if eqf > best_eq:
+                            best_eq = eqf
                             best_ij = (i, j)
                     if self._LOG_DISCARD_CANDIDATES:
                         ranked = sorted(
@@ -1944,6 +2054,7 @@ class PlayerAgent(Agent):
                         for rank_i, (i, j, keep, toss, xeq) in enumerate(ranked, start=1):
                             self._log_event("discard_candidate", {
                                 "street": street,
+                                "street_name": "discard",
                                 "phase": "discard",
                                 "candidate_keep": keep,
                                 "candidate_keep_str": self._cards_to_str(keep),
@@ -1962,6 +2073,7 @@ class PlayerAgent(Agent):
             solver_mode = "exact_weighted" if have_opp_discards and sim_mode != "emergency" else ("mc_only" if sim_mode == "emergency" else "exact_unweighted")
             self._log_event("discard_choice", {
                 "street": street,
+                "street_name": "discard",
                 "phase": "discard",
                 "sim_mode": sim_mode,
                 "have_opp_discards": bool(have_opp_discards),

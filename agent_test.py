@@ -6,6 +6,7 @@ from ast import Call
 import importlib.util
 import multiprocessing
 import os
+import socket
 import sys
 import time
 import logging
@@ -18,6 +19,31 @@ from match import run_api_match
 
 NUM_HANDS = 5
 TIME_PER_HAND = 5
+
+
+def _shutdown_process(proc: multiprocessing.Process, join_timeout: float = 10.0) -> None:
+    """Terminate child agent servers so fixed ports (8000/8001) are released for the next match."""
+    if proc is None:
+        return
+    if proc.is_alive():
+        proc.terminate()
+        proc.join(timeout=join_timeout)
+        if proc.is_alive():
+            proc.kill()
+            proc.join(timeout=3.0)
+    else:
+        proc.join(timeout=0.2)
+
+
+def _reserve_free_port() -> int:
+    """
+    Reserve and return an ephemeral local TCP port.
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
 
 
 def verify_submission() -> Optional[str]:
@@ -89,8 +115,13 @@ def run_test_match(test_agent_class: Agent, logger):
     if PlayerAgent is None:
         raise RuntimeError("Could not import PlayerAgent")
 
-    process0 = multiprocessing.Process(target=PlayerAgent.run, args=(False, 8000))
-    process1 = multiprocessing.Process(target=test_agent_class.run, args=(False, 8001))
+    port0 = _reserve_free_port()
+    port1 = _reserve_free_port()
+    while port1 == port0:
+        port1 = _reserve_free_port()
+
+    process0 = multiprocessing.Process(target=PlayerAgent.run, args=(False, port0))
+    process1 = multiprocessing.Process(target=test_agent_class.run, args=(False, port1))
 
     try:
         process0.start()
@@ -98,15 +129,21 @@ def run_test_match(test_agent_class: Agent, logger):
 
         time.sleep(2)
 
-        result = run_api_match("http://127.0.0.1:8000", "http://127.0.0.1:8001", logger, num_hands=NUM_HANDS, csv_path=f"./match_{test_agent_class.__name__}.csv")
+        result = run_api_match(
+            f"http://127.0.0.1:{port0}",
+            f"http://127.0.0.1:{port1}",
+            logger,
+            num_hands=NUM_HANDS,
+            csv_path=f"./match_{test_agent_class.__name__}.csv",
+        )
 
         return result
 
     finally:
-        process0.terminate()
-        process1.terminate()
-        process0.join()
-        process1.join()
+        _shutdown_process(process0)
+        _shutdown_process(process1)
+        # Brief pause so the OS releases listening ports before the next subprocess starts.
+        time.sleep(0.5)
 
 
 def main():
@@ -128,6 +165,10 @@ def main():
     """
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     logger = getLogger(__name__)
+    # Keep telemetry overhead low during verification runs.
+    os.environ.setdefault("OMICRON_LOG_EVENTS", "0")
+    os.environ["OMICRON_LOG_NODE_UPDATES"] = "off"
+    os.environ["OMICRON_LOG_DISCARD_CANDIDATES"] = "0"
 
     verification_error = verify_submission()
     if verification_error:

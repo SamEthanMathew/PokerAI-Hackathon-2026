@@ -1,5 +1,6 @@
 import logging
 import os
+import socket
 import sys
 import tempfile
 from abc import ABC, abstractmethod
@@ -171,4 +172,36 @@ class Agent(ABC):
             os.environ["PLAYER_ID"] = player_id
         bot = cls(stream)
         bot.logger.info(f"Starting agent server on {host}:{port}")
-        uvicorn.run(bot.app, host=host, port=port, log_level="info", access_log=False)
+        # Linux/macOS: pre-bind with SO_REUSEADDR so fixed-port validators can rebind quickly
+        # after a prior process exits (reduces errno 98 "address already in use").
+        # Windows: uvicorn's fd path uses AF_UNIX in fromfd() and breaks; use normal bind.
+        if sys.platform == "win32":
+            uvicorn.run(bot.app, host=host, port=port, log_level="info", access_log=False)
+            return
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            if hasattr(socket, "SO_REUSEPORT"):
+                try:
+                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+                except OSError:
+                    pass
+            sock.bind((host, port))
+            sock.listen(2048)
+            sock.setblocking(False)
+            fd = sock.detach()
+        except Exception:
+            sock.close()
+            raise
+
+        config = uvicorn.Config(
+            bot.app,
+            host=host,
+            port=port,
+            fd=fd,
+            log_level="info",
+            access_log=False,
+        )
+        server = uvicorn.Server(config)
+        server.run()
