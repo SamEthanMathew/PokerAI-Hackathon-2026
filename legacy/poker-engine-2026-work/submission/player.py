@@ -63,6 +63,17 @@ _base_eval = Evaluator()
 _RANK = [i % NUM_RANKS for i in range(DECK_SIZE)]
 _SUIT = [i // NUM_RANKS for i in range(DECK_SIZE)]
 
+# Preflop equity LUT (C(27,5) = 80,730 entries; both players keep best 2 from 5, optimal opponent)
+_PY_TO_CPP = [(i % 9) * 3 + (i // 9) for i in range(DECK_SIZE)]
+_PREFLOP_LUT: dict = {}
+_preflop_lut_path = os.path.join(os.path.dirname(__file__), "preflop_equities_50k.json")
+if os.path.isfile(_preflop_lut_path):
+    try:
+        with open(_preflop_lut_path, encoding="utf-8") as _f:
+            _PREFLOP_LUT = json.load(_f)
+    except (json.JSONDecodeError, OSError):
+        pass
+
 # ── Evaluation Lookup Table ──────────────────────────────────────────────────
 
 _C = [[0] * 28 for _ in range(28)]
@@ -487,12 +498,12 @@ def _opp_keep_weight_lut(opp_hand, community, opp_discards, model_weights,
             if rank_idx == 0:
                 return 1.0
             elif rank_idx == 1:
-                return 0.3
+                return 0.06
             elif rank_idx == 2:
-                return 0.1
+                return 0.01
             else:
-                return 0.02
-    return 0.02
+                return 0.002
+    return 0.002
 
 
 def _exact_discard_equity_lut(my_keep, community, dead_cards):
@@ -554,6 +565,43 @@ def _exact_discard_equity_weighted_lut(my_keep, community, dead_cards,
                 wins += 0.5 * entry
             total_weight += entry
     return wins / total_weight if total_weight > 0 else 0.5
+
+
+def _compute_discard_equity_mc_optimal(my_keep, community, dead_cards, num_sims=600):
+    """MC equity where opponent draws 5 cards and keeps their best 2-card combination.
+
+    This correctly models the discard game: both players start with 5 cards and
+    keep only their best 2. Using random 2-card opponent sampling (the old approach)
+    systematically overestimates our equity by ~40pp because it ignores that the
+    opponent also selects optimally from 5 cards.
+    """
+    remaining = [c for c in range(DECK_SIZE) if c not in dead_cards]
+    board_needed = 5 - len(community)
+    sample_size = 5 + board_needed
+    if sample_size > len(remaining):
+        return 0.5
+    community_l = list(community)
+    my_keep_l = list(my_keep)
+    wins = 0.0
+    total = 0
+    _opp_indices = list(combinations(range(5), 2))  # pre-compute C(5,2)=10 pairs
+    for _ in range(num_sims):
+        sample = random.sample(remaining, sample_size)
+        opp5 = sample[:5]
+        board_5 = community_l + sample[5:]
+        # opponent picks their best (lowest rank = strongest) 2-card keep
+        best_opp_rank = None
+        for oi, oj in _opp_indices:
+            r = _lut_eval_7([opp5[oi], opp5[oj]] + board_5)
+            if best_opp_rank is None or r < best_opp_rank:
+                best_opp_rank = r
+        my_rank = _lut_eval_7(my_keep_l + board_5)
+        if my_rank < best_opp_rank:
+            wins += 1.0
+        elif my_rank == best_opp_rank:
+            wins += 0.5
+        total += 1
+    return wins / total if total > 0 else 0.5
 
 
 _NUM_CPUS = min(4, os.cpu_count() or 1)
@@ -1483,7 +1531,8 @@ class PlayerAgent(Agent):
 
     # ── MC Equity (random range — for discard screening + preflop) ───────────
 
-    def _compute_equity(self, my_cards, community, opp_discards, my_discards, num_sims=300):
+    def _compute_equity(self, my_cards, community, opp_discards, my_discards,
+                        num_sims=300, opp_optimal=False):
         dead = set(my_cards)
         for c in community:
             if c != -1:
@@ -1497,23 +1546,34 @@ class PlayerAgent(Agent):
 
         remaining = [i for i in range(DECK_SIZE) if i not in dead]
         board_needed = 5 - len(community)
-        sample_size = 2 + board_needed
+        # opp_optimal: draw 5 cards for opponent so they can pick their best 2
+        sample_size = (5 if opp_optimal else 2) + board_needed
 
         if sample_size > len(remaining):
             return 0.5
 
         community_l = list(community)
         my_keep = list(my_cards)
+        _opp_idx = list(combinations(range(5), 2)) if opp_optimal else None
 
-        wins = 0
+        wins = 0.0
         total = 0
         for _ in range(num_sims):
             sample = random.sample(remaining, sample_size)
-            opp_cards = sample[:2]
-            board_5 = community_l + sample[2:]
+            if opp_optimal:
+                opp5 = sample[:5]
+                board_5 = community_l + sample[5:]
+                best_opp_rank = None
+                for oi, oj in _opp_idx:
+                    r = _lut_eval_7([opp5[oi], opp5[oj]] + board_5)
+                    if best_opp_rank is None or r < best_opp_rank:
+                        best_opp_rank = r
+                opp_rank = best_opp_rank
+            else:
+                board_5 = community_l + sample[2:]
+                opp_rank = _lut_eval_7(sample[:2] + board_5)
 
             my_rank = _lut_eval_7(my_keep + board_5)
-            opp_rank = _lut_eval_7(opp_cards + board_5)
             if my_rank < opp_rank:
                 wins += 1
             elif my_rank == opp_rank:
@@ -1522,10 +1582,16 @@ class PlayerAgent(Agent):
 
         return wins / total if total > 0 else 0.5
 
+    def _compute_equity_optimal(self, my_cards, community, opp_discards, my_discards,
+                                num_sims=300):
+        """Equity simulation with optimal-opponent model (draws 5, keeps best 2)."""
+        return self._compute_equity(my_cards, community, opp_discards, my_discards,
+                                    num_sims=num_sims, opp_optimal=True)
+
     # ── Range-weighted MC Equity (for postflop decisions) ────────────────────
 
     def _compute_equity_ranged(self, my2, community, dead, opp_discards,
-                               passive_signal, aggr_signal, num_sims=300):
+                               passive_signal, aggr_signal, num_sims=500):
         remaining = [i for i in range(DECK_SIZE) if i not in dead]
         board_needed = 5 - len(community)
         sample_size = 2 + board_needed
@@ -1601,15 +1667,8 @@ class PlayerAgent(Agent):
     # ── Preflop equity ───────────────────────────────────────────────────────
 
     def _preflop_equity(self, my5):
-        scores = []
-        for i, j in combinations(range(len(my5)), 2):
-            keep = [my5[i], my5[j]]
-            toss = [my5[k] for k in range(len(my5)) if k not in (i, j)]
-            eq = self._compute_equity(keep, [], [], toss, num_sims=80)
-            scores.append(eq)
-        scores.sort(reverse=True)
-        top = scores[:3]
-        return sum(top) / len(top) if top else 0.45
+        key = str(sorted(_PY_TO_CPP[c] for c in my5))
+        return _PREFLOP_LUT.get(key, 0.45)
 
     # ── Exact discard methods (subgame solver) ───────────────────────────────
 
@@ -1911,6 +1970,9 @@ class PlayerAgent(Agent):
 
             if have_opp_discards:
                 if sim_mode == "emergency":
+                    # SB path: we know opponent's 3 discards so their kept hand is
+                    # among the remaining cards. Sample 2 random cards as opponent.
+                    # (Non-emergency path uses the full weighted exact solver.)
                     opp_disc_set = set(opp_discards)
                     community_l = list(community)
                     board_needed = 5 - len(community)
@@ -1925,7 +1987,7 @@ class PlayerAgent(Agent):
                         else:
                             w = 0
                             t = 0
-                            for _ in range(100):
+                            for _ in range(200):
                                 samp = random.sample(per_remaining, ss)
                                 board_5 = community_l + samp[2:]
                                 mr = _lut_eval_7(list(keep) + board_5)
@@ -1960,63 +2022,61 @@ class PlayerAgent(Agent):
                             best_eq = eqf
                             best_ij = (i, j)
             else:
-                opp_disc_set = set(opp_discards)
+                # No opp discards known (simultaneous discard phase).
+                # Use optimal-opponent MC: opponent draws 5 cards, keeps their best 2.
+                # This replaces the old 2-stage MC-screen + exact-combinatorial pipeline
+                # which incorrectly modeled opponent as having 2 random cards.
+                opp_disc_set = set(opp_discards)  # empty set at discard time
                 community_l = list(community)
                 board_needed = 5 - len(community)
-                screen_sample_size = 2 + board_needed
 
                 if sim_mode == "emergency":
-                    mc_sims = 100
-                elif sim_mode == "conservative":
-                    mc_sims = 300
+                    # Inline loop — avoid pool overhead in tight time budget
+                    ss = 5 + board_needed
+                    _opp_idx = list(combinations(range(5), 2))
+                    best_eq = -1.0
+                    best_ij = (0, 1)
+                    for i, j, keep, toss in all_keeps:
+                        per_dead = dead_base | set(toss) | opp_disc_set
+                        per_remaining = [c for c in range(DECK_SIZE) if c not in per_dead]
+                        if ss > len(per_remaining):
+                            eq = 0.5
+                        else:
+                            w = 0.0
+                            t = 0
+                            for _ in range(300):
+                                samp = random.sample(per_remaining, ss)
+                                board_5 = community_l + samp[5:]
+                                best_opp_rank = None
+                                for oi, oj in _opp_idx:
+                                    r = _lut_eval_7([samp[oi], samp[oj]] + board_5)
+                                    if best_opp_rank is None or r < best_opp_rank:
+                                        best_opp_rank = r
+                                mr = _lut_eval_7(list(keep) + board_5)
+                                if mr < best_opp_rank:
+                                    w += 1.0
+                                elif mr == best_opp_rank:
+                                    w += 0.5
+                                t += 1
+                            eq = w / t if t else 0.5
+                        combo_equities[(i, j)] = float(eq)
+                        if eq > best_eq:
+                            best_eq = eq
+                            best_ij = (i, j)
                 else:
-                    mc_sims = 500
-
-                candidates = []
-                for i, j, keep, toss in all_keeps:
-                    per_dead = dead_base | set(toss) | opp_disc_set
-                    per_remaining = [c for c in range(DECK_SIZE) if c not in per_dead]
-                    if screen_sample_size > len(per_remaining):
-                        candidates.append((i, j, 0.5, keep, toss))
-                        continue
-
-                    w = 0
-                    t = 0
-                    for _ in range(mc_sims):
-                        samp = random.sample(per_remaining, screen_sample_size)
-                        board_5 = community_l + samp[2:]
-                        mr = _lut_eval_7(list(keep) + board_5)
-                        orr = _lut_eval_7(samp[:2] + board_5)
-                        if mr < orr:
-                            w += 1
-                        elif mr == orr:
-                            w += 0.5
-                        t += 1
-                    candidates.append((i, j, w / t if t else 0.5, keep, toss))
-
-                candidates.sort(key=lambda c: c[2], reverse=True)
-                for i, j, mc_eq, keep, toss in candidates:
-                    combo_equities[(i, j)] = float(mc_eq)
-
-                if sim_mode == "emergency":
-                    best_ij = (candidates[0][0], candidates[0][1])
-                    best_eq = candidates[0][2]
-                else:
-                    top_n = 3 if sim_mode == "conservative" else 5
-                    jobs_u = []
-                    ij_top = []
-                    for i, j, _, keep, toss in candidates[:top_n]:
+                    # Conservative or full: dispatch to process pool (parallelizes 10 keeps)
+                    jobs_opt = []
+                    for i, j, keep, toss in all_keeps:
                         dead = dead_base | set(toss) | opp_disc_set
-                        ij_top.append((i, j))
-                        jobs_u.append((keep, community, dead))
-                    results_u = _run_discard_equities_parallel(
-                        _exact_discard_equity_lut, jobs_u
+                        jobs_opt.append((keep, community, dead, 600))
+                    results_opt = _run_discard_equities_parallel(
+                        _compute_discard_equity_mc_optimal, jobs_opt
                     )
                     best_eq = -1.0
                     best_ij = (0, 1)
-                    for (i, j), eq in zip(ij_top, results_u):
+                    for (i, j, keep, toss), eq in zip(all_keeps, results_opt):
                         eqf = float(eq)
-                        combo_equities[(i, j)] = eqf  # overwrite MC with exact equity
+                        combo_equities[(i, j)] = eqf
                         if eqf > best_eq:
                             best_eq = eqf
                             best_ij = (i, j)
@@ -2187,7 +2247,7 @@ class PlayerAgent(Agent):
             use_profile_signal = (not self._SHADOW_ONLY) and self._LIVE_STAGE >= 3
             signal_passive = passive_sticky_signal if use_profile_signal else baseline_passive_signal
             signal_aggr = aggr_value_signal if use_profile_signal else baseline_aggr_signal
-            eq_sims = 100 if sim_mode == "emergency" else (200 if sim_mode == "conservative" else 300)
+            eq_sims = 100 if sim_mode == "emergency" else (200 if sim_mode == "conservative" else 500)
             equity = self._compute_equity_ranged(
                 my_cards, community, dead, opp_discards, signal_passive, signal_aggr, num_sims=eq_sims)
 
