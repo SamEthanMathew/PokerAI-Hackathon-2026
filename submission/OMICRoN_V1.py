@@ -9,6 +9,7 @@ import json
 import os
 import random
 from concurrent.futures import ProcessPoolExecutor
+from datetime import datetime, timezone
 from itertools import combinations
 
 import numpy as np
@@ -604,6 +605,9 @@ class PlayerAgent(Agent):
     _LIVE_STAGE = int(os.getenv("OMICRON_LIVE_STAGE", "1"))
     _SHADOW_ONLY = os.getenv("OMICRON_SHADOW_ONLY", "0") == "1"
     _DEBUG_VERBOSE = os.getenv("OMICRON_DEBUG_VERBOSE", "0") == "1"
+    _LOG_DECISIONS = os.getenv("OMICRON_LOG_DECISIONS", "1") == "1"
+    _LOG_NODE_UPDATES = os.getenv("OMICRON_LOG_NODE_UPDATES", "core").strip().lower()
+    _LOG_DISCARD_CANDIDATES = os.getenv("OMICRON_LOG_DISCARD_CANDIDATES", "0") == "1"
     _EVENT_BUFFER_LIMIT = 420
 
     _FACE_BET_NODES = tuple(
@@ -736,6 +740,7 @@ class PlayerAgent(Agent):
         self._last_opp_aggr_street = 0
         self._last_preflop_raise = False
         self._last_after_shock = False
+        self._we_folded = False
         self._event_store = []
         self._debug_snapshots = []
         self._line_state = {
@@ -804,6 +809,10 @@ class PlayerAgent(Agent):
         self._last_profile = {}
         self._last_applied_adjustments = {}
         self._last_shadow_compare = {}
+        self._decision_idx = 0
+        self._last_opp_semantic_action = ""
+        self._last_decision_snapshot = {}
+        self._in_hand = False
 
     # ── Opponent profiling helpers ───────────────────────────────────────────
 
@@ -825,6 +834,80 @@ class PlayerAgent(Agent):
         if street == 2:
             return "turn"
         return "river"
+
+    @staticmethod
+    def _street_name_safe(street):
+        if street == 0:
+            return "preflop"
+        if street == DISCARD:
+            return "discard"
+        if street == 1:
+            return "flop"
+        if street == 2:
+            return "turn"
+        if street == 3:
+            return "river"
+        return "unknown"
+
+    @staticmethod
+    def _action_name(action_id):
+        m = {
+            FOLD: "fold",
+            CHECK: "check",
+            CALL: "call",
+            RAISE: "raise",
+            DISCARD: "discard",
+        }
+        return m.get(int(action_id), "unknown")
+
+    @staticmethod
+    def _cards_to_str(cards):
+        out = []
+        for c in cards:
+            try:
+                out.append(PokerEnv.int_card_to_str(int(c)))
+            except Exception:
+                out.append(str(c))
+        return out
+
+    @staticmethod
+    def _valid_actions_map(valid):
+        return {
+            "fold": bool(valid[FOLD]),
+            "check": bool(valid[CHECK]),
+            "call": bool(valid[CALL]),
+            "raise": bool(valid[RAISE]),
+            "discard": bool(valid[DISCARD]),
+        }
+
+    @staticmethod
+    def _match_id():
+        return os.getenv("MATCH_ID", "unknown")
+
+    def _log_event(self, event_type, payload):
+        try:
+            event = {
+                "event_type": event_type,
+                "match_id": self._match_id(),
+                "hand_idx": int(self._hand_idx),
+                "decision_idx": int(self._decision_idx),
+                "street": int(payload.get("street", self._last_street)),
+                "street_name": self._street_name_safe(int(payload.get("street", self._last_street))),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            event.update(payload)
+            self.logger.info(json.dumps(event, default=str, separators=(",", ":")))
+        except Exception:
+            return
+
+    def _should_log_node_update(self, key):
+        mode = self._LOG_NODE_UPDATES
+        if mode == "off":
+            return False
+        if mode == "all":
+            return True
+        core_prefixes = ("face_bet_", "raise_vs_bet_", "check_raise_", "stab_after_check_", "barrel_", "call_down_")
+        return key.startswith(core_prefixes)
 
     @staticmethod
     def _size_bucket(to_call, pot):
@@ -880,7 +963,53 @@ class PlayerAgent(Agent):
     def _node_binary(self, key, cond):
         est = self._binary_nodes.get(key)
         if est is not None:
-            est.observe(bool(cond))
+            pre = est.metrics()
+            obs = bool(cond)
+            est.observe(obs)
+            if self._should_log_node_update(key):
+                post = est.metrics()
+                self._log_event("node_update", {
+                    "street": self._last_street,
+                    "node_updated": key,
+                    "node_kind": "binary",
+                    "observed_outcome": obs,
+                    "pre_life_n": pre[0],
+                    "post_life_n": post[0],
+                    "pre_recent_n": pre[1],
+                    "post_recent_n": post[1],
+                    "pre_blend": pre[2],
+                    "post_blend": post[2],
+                    "pre_vol": pre[5],
+                    "post_vol": post[5],
+                    "pre_conf": pre[6],
+                    "post_conf": post[6],
+                })
+
+    def _node_continuous(self, key, value, street):
+        est = self._continuous_nodes.get(key)
+        if est is None:
+            return
+        pre = est.metrics()
+        x = float(value)
+        est.observe(x)
+        if self._should_log_node_update(key):
+            post = est.metrics()
+            self._log_event("node_update", {
+                "street": street,
+                "node_updated": key,
+                "node_kind": "continuous",
+                "observed_outcome": x,
+                "pre_life_n": pre[0],
+                "post_life_n": post[0],
+                "pre_recent_n": pre[1],
+                "post_recent_n": post[1],
+                "pre_blend": pre[2],
+                "post_blend": post[2],
+                "pre_vol": pre[5],
+                "post_vol": post[5],
+                "pre_conf": pre[6],
+                "post_conf": post[6],
+            })
 
     def _update_regime_signal(self):
         def metric_bin(k):
@@ -948,6 +1077,7 @@ class PlayerAgent(Agent):
         line_we_checked = bool(self._line_state.get("we_checked_this_node", False))
         line_we_bet = bool(self._line_state.get("we_bet_this_node", False))
         opp_sem = self._classify_opp_action(opp_action, line_we_bet, line_we_checked)
+        self._last_opp_semantic_action = opp_sem
         inc_raise = to_call
 
         if last_was_bet and last_street >= 1:
@@ -1012,13 +1142,13 @@ class PlayerAgent(Agent):
             street_name = self._street_name(last_street if last_street >= 1 else current_street)
             if opp_sem == "initiative_bet":
                 if street_name in ("flop", "turn", "river"):
-                    self._continuous_nodes[f"bet_size_frac_{street_name}"].observe(_clamp(inc_raise / max(1.0, pot_obs), 0.0, 2.5))
+                    self._node_continuous(f"bet_size_frac_{street_name}", _clamp(inc_raise / max(1.0, pot_obs), 0.0, 2.5), last_street)
             else:
                 if street_name in ("flop", "turn", "river"):
-                    self._continuous_nodes[f"raise_size_frac_{street_name}"].observe(_clamp(inc_raise / max(1.0, pot_obs), 0.0, 2.5))
+                    self._node_continuous(f"raise_size_frac_{street_name}", _clamp(inc_raise / max(1.0, pot_obs), 0.0, 2.5), last_street)
 
         if last_street == 0 and opp_action in ("raise", "call", "check", "fold"):
-            self._continuous_nodes["opp_preflop_raise_rate"].observe(1.0 if opp_action == "raise" else 0.0)
+            self._node_continuous("opp_preflop_raise_rate", 1.0 if opp_action == "raise" else 0.0, last_street)
 
         if opp_sem in ("initiative_bet", "raise_vs_bet") and last_street >= 1:
             self._last_opp_aggr_street = last_street
@@ -1185,14 +1315,35 @@ class PlayerAgent(Agent):
             self._opp_folded = True
 
         if terminated:
+            pot_final = int(observation.get("pot_size", observation.get("my_bet", 0) + observation.get("opp_bet", 0)))
+            my_cards_now = [c for c in observation.get("my_cards", []) if c != -1]
+            board_now = [c for c in observation.get("community_cards", []) if c != -1]
+            opp_disc = [c for c in observation.get("opp_discarded_cards", []) if c != -1]
             self._running_pnl += int(reward)
             self._hands_completed += 1
-            self._hand_idx += 1
             self._last_after_shock = abs(int(reward)) >= 20
+
+            self._log_event("bankroll_progress", {
+                "street": observation.get("street", self._last_street),
+                "running_pnl": int(self._running_pnl),
+                "reward_delta": int(reward),
+                "hand_number": int(info.get("hand_number", self._hand_idx)),
+                "went_to_showdown": bool(info.get("player_0_cards") and info.get("player_1_cards")),
+                "hero_folded": bool(self._we_folded),
+                "villain_folded": bool(self._opp_folded),
+                "pot_size_final": pot_final,
+                "my_cards": my_cards_now,
+                "my_cards_str": self._cards_to_str(my_cards_now),
+                "community": board_now,
+                "community_str": self._cards_to_str(board_now),
+                "opp_discards": opp_disc,
+                "opp_discards_str": self._cards_to_str(opp_disc),
+            })
 
             self._learn_from_showdown(observation, info)
 
             self._opp_folded = False
+            self._we_folded = False
             self._last_was_bet = False
             self._last_street = 0
             self._opp_raised_prev_street = False
@@ -1202,6 +1353,8 @@ class PlayerAgent(Agent):
             self._line_state["initiative_owner_entering_street"] = "none"
             self._line_state["last_aggressor_previous_street"] = "none"
             self._line_state["is_continuation_of_prior_initiative"] = False
+            self._hand_idx += 1
+            self._in_hand = False
 
     @staticmethod
     def _showdown_bucket_value(hand_cat, board_len):
@@ -1241,6 +1394,45 @@ class PlayerAgent(Agent):
             cat = _hand_rank_category(opp_kept[:2], river_board)
             strength = self._showdown_bucket_value(cat, len(river_board))
             revealed_bluff = strength <= 0.25
+            my_cat = _hand_rank_category(self._last_my_cards[:2], river_board) if len(self._last_my_cards) >= 2 else "unknown"
+            try:
+                my_rank = int(_lut_eval_7(self._last_my_cards[:2] + river_board)) if len(self._last_my_cards) >= 2 else -1
+                opp_rank = int(_lut_eval_7(opp_kept[:2] + river_board))
+            except Exception:
+                my_rank = -1
+                opp_rank = -1
+            winner = "tie"
+            if my_rank >= 0 and opp_rank >= 0:
+                if my_rank < opp_rank:
+                    winner = "hero"
+                elif opp_rank < my_rank:
+                    winner = "villain"
+            self._log_event("showdown_result", {
+                "street": 3,
+                "went_to_showdown": True,
+                "my_final_cards": self._last_my_cards[:2],
+                "my_final_cards_str": self._cards_to_str(self._last_my_cards[:2]),
+                "opp_final_cards": opp_kept[:2],
+                "opp_final_cards_str": self._cards_to_str(opp_kept[:2]),
+                "board": river_board,
+                "board_str": self._cards_to_str(river_board),
+                "my_hand_cat": my_cat,
+                "opp_hand_cat": cat,
+                "my_rank": my_rank,
+                "opp_rank": opp_rank,
+                "winner": winner,
+                "pot_size_final": int(observation.get("pot_size", observation.get("my_bet", 0) + observation.get("opp_bet", 0))),
+                "hero_equity_before_showdown": self._last_decision_snapshot.get("equity"),
+                "hero_decision_before_showdown": self._last_decision_snapshot.get("action_name"),
+            })
+            self._log_event("showdown_interpretation", {
+                "street": 3,
+                "opp_strength_bucket": float(strength),
+                "revealed_bluff": bool(revealed_bluff),
+                "revealed_value": bool(strength >= 0.75),
+                "hero_equity_before_showdown": self._last_decision_snapshot.get("equity"),
+                "prior_action_context": self._last_decision_snapshot,
+            })
             for i in range(len(self._event_store) - 1, -1, -1):
                 ev = self._event_store[i]
                 if ev["hand_idx"] != self._hand_idx:
@@ -1252,15 +1444,15 @@ class PlayerAgent(Agent):
                 node = ev.get("node_id", "")
                 s_bucket = ev.get("size_bucket", "medium")
                 if node.startswith("bet_initiative_river_") and ev.get("opp_action") in ("bet", "raise"):
-                    self._continuous_nodes[f"river_bet_strength_{s_bucket}"].observe(strength)
+                    self._node_continuous(f"river_bet_strength_{s_bucket}", strength, 3)
                 elif node == "raise_vs_bet_river" and ev.get("opp_action") == "raise":
-                    self._continuous_nodes["river_raise_strength"].observe(strength)
+                    self._node_continuous("river_raise_strength", strength, 3)
                 elif node == "barrel_turn_after_flop_aggr" and ev.get("opp_action") in ("bet", "raise"):
-                    self._continuous_nodes["turn_barrel_strength"].observe(strength)
+                    self._node_continuous("turn_barrel_strength", strength, 2)
                 elif node == "check_raise_flop" and ev.get("opp_action") == "raise":
-                    self._continuous_nodes["check_raise_strength_flop"].observe(strength)
+                    self._node_continuous("check_raise_strength_flop", strength, 1)
                 elif node == "check_raise_turn" and ev.get("opp_action") == "raise":
-                    self._continuous_nodes["check_raise_strength_turn"].observe(strength)
+                    self._node_continuous("check_raise_strength_turn", strength, 2)
 
     def __name__(self):
         return "OMICRON_V1"
@@ -1565,6 +1757,11 @@ class PlayerAgent(Agent):
         if community:
             self._last_community = list(community)
         pot_size = observation.get("pot_size", my_bet + opp_bet)
+        is_new_hand = (street == 0 and len(community) == 0 and my_bet <= 2 and opp_bet <= 2)
+        if is_new_hand and not self._in_hand:
+            self._decision_idx = 0
+            self._in_hand = True
+            self._we_folded = False
 
         in_early_phase = self._hands_completed < EARLY_PHASE_HANDS
 
@@ -1706,6 +1903,21 @@ class PlayerAgent(Agent):
 
                 if sim_mode == "emergency":
                     best_ij = (candidates[0][0], candidates[0][1])
+                    if self._LOG_DISCARD_CANDIDATES:
+                        for rank_i, (i, j, s_eq, keep, toss) in enumerate(candidates, start=1):
+                            self._log_event("discard_candidate", {
+                                "street": street,
+                                "phase": "discard",
+                                "candidate_keep": keep,
+                                "candidate_keep_str": self._cards_to_str(keep),
+                                "candidate_toss": toss,
+                                "candidate_toss_str": self._cards_to_str(toss),
+                                "screen_eq": float(s_eq),
+                                "exact_eq": None,
+                                "weighted_eq": float(s_eq),
+                                "rank_among_candidates": rank_i,
+                                "selected": bool((i, j) == best_ij),
+                            })
                 else:
                     top_n = 3 if sim_mode == "conservative" else 5
                     futures = []
@@ -1716,17 +1928,63 @@ class PlayerAgent(Agent):
                         futures.append((i, j, fut))
                     best_eq = -1.0
                     best_ij = (0, 1)
+                    exact_map = {}
                     for i, j, fut in futures:
                         eq = fut.result()
+                        exact_map[(i, j)] = float(eq)
                         if eq > best_eq:
                             best_eq = eq
                             best_ij = (i, j)
+                    if self._LOG_DISCARD_CANDIDATES:
+                        ranked = sorted(
+                            [(i, j, keep, toss, exact_map.get((i, j))) for i, j, _, keep, toss in candidates[:top_n]],
+                            key=lambda x: x[4] if x[4] is not None else -1.0,
+                            reverse=True
+                        )
+                        for rank_i, (i, j, keep, toss, xeq) in enumerate(ranked, start=1):
+                            self._log_event("discard_candidate", {
+                                "street": street,
+                                "phase": "discard",
+                                "candidate_keep": keep,
+                                "candidate_keep_str": self._cards_to_str(keep),
+                                "candidate_toss": toss,
+                                "candidate_toss_str": self._cards_to_str(toss),
+                                "screen_eq": None,
+                                "exact_eq": xeq,
+                                "weighted_eq": xeq,
+                                "rank_among_candidates": rank_i,
+                                "selected": bool((i, j) == best_ij),
+                            })
 
-            return (DISCARD, 0, best_ij[0], best_ij[1])
+            k1, k2 = best_ij
+            keep_cards = [my_cards[k1], my_cards[k2]]
+            toss_cards = [my_cards[k] for k in range(len(my_cards)) if k not in best_ij]
+            solver_mode = "exact_weighted" if have_opp_discards and sim_mode != "emergency" else ("mc_only" if sim_mode == "emergency" else "exact_unweighted")
+            self._log_event("discard_choice", {
+                "street": street,
+                "phase": "discard",
+                "sim_mode": sim_mode,
+                "have_opp_discards": bool(have_opp_discards),
+                "community": community,
+                "community_str": self._cards_to_str(community),
+                "my_5_cards": my_cards,
+                "my_5_cards_str": self._cards_to_str(my_cards),
+                "chosen_keep_idx": [int(k1), int(k2)],
+                "chosen_keep_cards": keep_cards,
+                "chosen_keep_cards_str": self._cards_to_str(keep_cards),
+                "chosen_toss_cards": toss_cards,
+                "chosen_toss_cards_str": self._cards_to_str(toss_cards),
+                "chosen_eq": float(best_eq) if 'best_eq' in locals() and best_eq >= 0 else None,
+                "solver_mode": solver_mode,
+            })
+            return (DISCARD, 0, k1, k2)
 
         # ── Pre-flop (street 0) ──────────────────────────────────────────────
         result = None
+        baseline_result = None
         baseline_action_kind = "same"
+        decision_tags = []
+        preflop_reason = "none"
 
         if street == 0:
             premium = _has_any_premium(my_cards)
@@ -1803,6 +2061,20 @@ class PlayerAgent(Agent):
                             result = (CHECK, 0, 0, 0)
                         else:
                             result = (FOLD, 0, 0, 0)
+            if result[0] == RAISE and premium_pair and opp_bet >= PREFLOP_COMMIT_THRESHOLD:
+                preflop_reason = "premium_pair_commit"
+            elif result[0] == RAISE and premium:
+                preflop_reason = "premium_open"
+            elif result[0] == RAISE:
+                preflop_reason = "eq_gate_open"
+            elif result[0] == CALL and premium:
+                preflop_reason = "premium_call"
+            elif result[0] == CALL:
+                preflop_reason = "eq_gate_call"
+            elif result[0] == CHECK:
+                preflop_reason = "default_check"
+            else:
+                preflop_reason = "default_fold"
 
         # ── Post-flop (streets 1-3) ──────────────────────────────────────────
         else:
@@ -1832,9 +2104,18 @@ class PlayerAgent(Agent):
             run_count, straight_outs, _ = _count_straight_outs(my_cards, community, opp_discards, my_discards)
             has_draw = (suit_count >= 4 and flush_outs >= 2) or (run_count >= 4 and straight_outs >= 3)
             strength = self._cat_to_strength(hand_cat, has_draw, my_cards, community)
-
-            equity = self._street_adjust(equity, street, has_draw, flush_outs, straight_outs,
-                                         hand_cat, my_cards, community, opp_discards)
+            equity_before_adjust = float(equity)
+            outs = max(flush_outs, straight_outs)
+            draw_adj = 0.0
+            if street == 1 and has_draw and outs > 0:
+                draw_adj = min(0.10, outs * 0.025)
+            elif street == 3 and has_draw and hand_cat in ("nothing", "one_pair"):
+                draw_adj = -0.10
+            board_monotone_penalty = _board_monotone_penalty(my_cards, community)
+            board_connected_penalty = _board_connected_penalty(my_cards, community)
+            opp_flush_inference_penalty = _opp_flush_inference(community, opp_discards)
+            street_adjust_total = draw_adj + board_monotone_penalty + board_connected_penalty + opp_flush_inference_penalty
+            equity = _clamp(equity_before_adjust + street_adjust_total, 0.0, 0.98)
 
             to_call = max(0, opp_bet - my_bet)
             pot_ref = max(pot_size, 1)
@@ -1988,6 +2269,37 @@ class PlayerAgent(Agent):
 
         if forced_lock_action is not None:
             result = forced_lock_action
+            decision_tags.append("forced_lock")
+
+        if street == 0 and self._LOG_DECISIONS:
+            self._log_event("preflop_decision", {
+                "street": street,
+                "premium": bool(_has_any_premium(my_cards)),
+                "premium_pair": bool(_has_premium_pair(my_cards)),
+                "preflop_eq": float(locals().get("preflop_eq", 0.45)),
+                "early_phase": bool(in_early_phase),
+                "early_eq_gate": float(locals().get("early_eq_gate", EARLY_PREFLOP_MIN_EQUITY)),
+                "normal_eq_gate": float(locals().get("normal_eq_gate", NORMAL_PREFLOP_MIN_EQUITY)),
+                "pressure_adj": float(locals().get("pressure", 0.0)),
+                "open_prob": float(locals().get("open_prob", 0.0)) if "open_prob" in locals() else None,
+                "to_call": int(locals().get("to_call", 0)),
+                "decision_reason": preflop_reason,
+                "final_action_name": self._action_name(result[0]),
+                "final_action_amount": int(result[1]),
+            })
+
+        if street > 0 and self._LOG_DECISIONS:
+            self._log_event("postflop_line_context", {
+                "street": street,
+                "we_checked_this_node": bool(self._line_state.get("we_checked_this_node", False)),
+                "we_bet_this_node": bool(self._line_state.get("we_bet_this_node", False)),
+                "villain_checked_this_node": bool(self._line_state.get("villain_checked_this_node", False)),
+                "initiative_owner_entering_street": self._line_state.get("initiative_owner_entering_street", "none"),
+                "is_continuation_of_prior_initiative": bool(self._line_state.get("is_continuation_of_prior_initiative", False)),
+                "last_aggressor_previous_street": self._line_state.get("last_aggressor_previous_street", "none"),
+                "opp_last_action": opp_action,
+                "opp_semantic_action": self._last_opp_semantic_action,
+            })
 
         if not valid[DISCARD] and (street == 3 or self._hands_completed % 20 == 0):
             final_kind = "fold" if result[0] == FOLD else ("call" if result[0] == CALL else ("aggressive" if result[0] == RAISE else "check"))
@@ -2014,20 +2326,21 @@ class PlayerAgent(Agent):
                     "scaffolding_probe_freq_adj": self._last_applied_adjustments.get("probe_freq_adj", 0.0),
                 },
             }
-            print(
-                "[OMICRON] profile="
-                f"fMturn={profile.get('fold_medium_turn', 0.0):.2f}/c{profile.get('conf_fold_medium_turn', 0.0):.2f} "
-                f"cdr={profile.get('call_down_vs_bet_river', 0.0):.2f}/c{profile.get('conf_call_down_vs_bet_river', 0.0):.2f} "
-                f"rvbR={profile.get('raise_vs_bet_river', 0.0):.2f} "
-                f"vol={profile.get('style_volatility', 0.0):.2f} "
-                f"reg={self._regime_shift_score:.2f} "
-                f"live_stage={self._LIVE_STAGE} shadow={int(self._SHADOW_ONLY)} "
-                f"adj={self._last_applied_adjustments} "
-                f"baseline={baseline_action_kind} final={final_kind} "
-                f"b_act={baseline_tuple[0]}:{baseline_tuple[1]} f_act={result[0]}:{result[1]} "
-                f"category_changed={int(category_changed)} size_only={int(size_changed_only)}",
-                flush=True
-            )
+            if self._DEBUG_VERBOSE:
+                print(
+                    "[OMICRON] profile="
+                    f"fMturn={profile.get('fold_medium_turn', 0.0):.2f}/c{profile.get('conf_fold_medium_turn', 0.0):.2f} "
+                    f"cdr={profile.get('call_down_vs_bet_river', 0.0):.2f}/c{profile.get('conf_call_down_vs_bet_river', 0.0):.2f} "
+                    f"rvbR={profile.get('raise_vs_bet_river', 0.0):.2f} "
+                    f"vol={profile.get('style_volatility', 0.0):.2f} "
+                    f"reg={self._regime_shift_score:.2f} "
+                    f"live_stage={self._LIVE_STAGE} shadow={int(self._SHADOW_ONLY)} "
+                    f"adj={self._last_applied_adjustments} "
+                    f"baseline={baseline_action_kind} final={final_kind} "
+                    f"b_act={baseline_tuple[0]}:{baseline_tuple[1]} f_act={result[0]}:{result[1]} "
+                    f"category_changed={int(category_changed)} size_only={int(size_changed_only)}",
+                    flush=True
+                )
             if self._DEBUG_VERBOSE:
                 self._debug_snapshots.append({
                     "hand": self._hand_idx,
@@ -2039,7 +2352,105 @@ class PlayerAgent(Agent):
                 if len(self._debug_snapshots) > 120:
                     self._debug_snapshots = self._debug_snapshots[-80:]
 
+        if self._LOG_DECISIONS and not valid[DISCARD]:
+            baseline_tuple = baseline_result if street > 0 and baseline_result is not None else result
+            category_changed = self._action_category(baseline_tuple) != self._action_category(result)
+            size_changed_only = (baseline_tuple[0] == result[0]) and (int(baseline_tuple[1]) != int(result[1])) and (not category_changed)
+            if street > 0:
+                if result[0] == RAISE and equity > monster_gate:
+                    decision_tags.append("monster_value")
+                elif result[0] == RAISE and equity > strong_gate:
+                    decision_tags.append("strong_value")
+                elif result[0] == CALL and equity >= call_gate:
+                    decision_tags.append("bluff_catch")
+                elif result[0] == RAISE and to_call <= 0:
+                    decision_tags.append("thin_value")
+                elif result[0] == CHECK:
+                    decision_tags.append("pot_control")
+            else:
+                if result[0] == RAISE and _has_any_premium(my_cards):
+                    decision_tags.append("premium_preflop")
+            self._log_event("decision_common", {
+                "street": street,
+                "phase": "preflop" if street == 0 else "postflop",
+                "valid_actions": self._valid_actions_map(valid),
+                "my_bet": int(my_bet),
+                "opp_bet": int(opp_bet),
+                "pot_size": int(pot_size),
+                "to_call": int(max(0, opp_bet - my_bet)),
+                "min_raise": int(min_raise),
+                "max_raise": int(max_raise),
+                "blind_position": int(observation.get("blind_position", 0)),
+                "time_left": float(observation.get("time_left", 0.0)),
+                "sim_mode": sim_mode,
+                "my_cards": my_cards,
+                "community": community,
+                "opp_discards": opp_discards,
+                "my_discards": my_discards,
+                "my_cards_str": self._cards_to_str(my_cards),
+                "community_str": self._cards_to_str(community),
+                "opp_discards_str": self._cards_to_str(opp_discards),
+                "my_discards_str": self._cards_to_str(my_discards),
+                "equity": float(locals().get("equity")) if "equity" in locals() else None,
+                "hand_cat": locals().get("hand_cat"),
+                "strength": locals().get("strength"),
+                "has_draw": bool(locals().get("has_draw")) if "has_draw" in locals() else None,
+                "flush_outs": int(locals().get("flush_outs")) if "flush_outs" in locals() else None,
+                "straight_outs": int(locals().get("straight_outs")) if "straight_outs" in locals() else None,
+                "suit_count": int(locals().get("suit_count")) if "suit_count" in locals() else None,
+                "run_count": int(locals().get("run_count")) if "run_count" in locals() else None,
+                "pot_odds": float(locals().get("pot_odds")) if "pot_odds" in locals() else None,
+                "monster_gate": float(locals().get("monster_gate")) if "monster_gate" in locals() else None,
+                "strong_gate": float(locals().get("strong_gate")) if "strong_gate" in locals() else None,
+                "good_gate": float(locals().get("good_gate")) if "good_gate" in locals() else None,
+                "call_gate": float(locals().get("call_gate")) if "call_gate" in locals() else None,
+                "baseline_call_gate": float(locals().get("baseline_call_gate")) if "baseline_call_gate" in locals() else None,
+                "board_monotone_penalty": float(locals().get("board_monotone_penalty", 0.0)),
+                "board_connected_penalty": float(locals().get("board_connected_penalty", 0.0)),
+                "opp_flush_inference_penalty": float(locals().get("opp_flush_inference_penalty", 0.0)),
+                "street_adjust_total": float(locals().get("street_adjust_total", 0.0)),
+                "equity_before_adjust": float(locals().get("equity_before_adjust")) if "equity_before_adjust" in locals() else None,
+                "equity_after_adjust": float(locals().get("equity")) if "equity" in locals() else None,
+                "profile_fold_medium_flop": profile.get("fold_medium_flop"),
+                "profile_fold_medium_turn": profile.get("fold_medium_turn"),
+                "profile_fold_medium_river": profile.get("fold_medium_river"),
+                "profile_call_down_turn": profile.get("call_down_vs_bet_turn"),
+                "profile_call_down_river": profile.get("call_down_vs_bet_river"),
+                "profile_raise_vs_bet_flop": profile.get("raise_vs_bet_flop"),
+                "profile_raise_vs_bet_turn": profile.get("raise_vs_bet_turn"),
+                "profile_raise_vs_bet_river": profile.get("raise_vs_bet_river"),
+                "profile_check_raise_flop": profile.get("check_raise_flop"),
+                "profile_check_raise_turn": profile.get("check_raise_turn"),
+                "profile_bet_initiative_flop_small": profile.get("bet_initiative_small_flop"),
+                "profile_bet_initiative_flop_medium": profile.get("bet_initiative_medium_flop"),
+                "profile_bet_initiative_flop_large": profile.get("bet_initiative_large_flop"),
+                "style_volatility": profile.get("style_volatility"),
+                "global_regime_shift": profile.get("global_regime_shift"),
+                "conf_fold_medium_turn": profile.get("conf_fold_medium_turn"),
+                "conf_call_down_vs_bet_river": profile.get("conf_call_down_vs_bet_river"),
+                "conf_raise_vs_bet_turn": profile.get("conf_raise_vs_bet_turn"),
+                "conf_raise_vs_bet_river": profile.get("conf_raise_vs_bet_river"),
+                "exploit_adj": dict(self._last_applied_adjustments),
+                "baseline_action_type": int(baseline_tuple[0]),
+                "baseline_action_name": self._action_name(baseline_tuple[0]),
+                "baseline_action_amount": int(baseline_tuple[1]),
+                "final_action_type": int(result[0]),
+                "final_action_name": self._action_name(result[0]),
+                "final_action_amount": int(result[1]),
+                "category_changed": bool(category_changed),
+                "size_changed_only": bool(size_changed_only),
+                "decision_tags": list(dict.fromkeys(decision_tags)),
+            })
+            self._last_decision_snapshot = {
+                "street": street,
+                "equity": float(locals().get("equity")) if "equity" in locals() else None,
+                "action_name": self._action_name(result[0]),
+                "action_amount": int(result[1]),
+            }
+            self._decision_idx += 1
+
         # ── Track our action ─────────────────────────────────────────────────
+        self._we_folded = (result[0] == FOLD)
         self._last_was_bet = result[0] == RAISE
         self._last_street = street
         self._line_state["we_checked_this_node"] = (result[0] == CHECK)
