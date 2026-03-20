@@ -155,18 +155,18 @@ def main():
 
             if result["status"] == "completed":
                 test_results["games_completed"] += NUM_HANDS
-                print(f"✓ Completed {NUM_HANDS} games successfully")
+                print(f"[OK] Completed {NUM_HANDS} games successfully")
             elif result["status"] == "timeout":
                 test_results["timeout_errors"] += 1
-                print(f"✗ Failed: Time limit exceeded")
+                print("[FAIL] Time limit exceeded")
             else:
                 test_results["runtime_errors"] += 1
-                print(f"✗ Failed: Runtime error")
+                print("[FAIL] Runtime error")
                 print(f"  {result.get('error', 'Unknown error')}")
 
         except Exception as e:
             test_results["runtime_errors"] += 1
-            print(f"✗ Failed: Runtime error")
+            print("[FAIL] Runtime error")
             print(f"  {str(e)}")
             continue
 
@@ -175,9 +175,9 @@ def main():
 
         if time_per_hand > TIME_PER_HAND:
             test_results["timeout_errors"] += 1
-            print(f"✗ Time limit exceeded: {time_per_hand:.2f}s per hand (limit: {TIME_PER_HAND}s)")
+            print(f"[FAIL] Time limit exceeded: {time_per_hand:.2f}s per hand (limit: {TIME_PER_HAND}s)")
         else:
-            print(f"✓ Time check passed: {time_per_hand:.2f}s per hand")
+            print(f"[OK] Time check passed: {time_per_hand:.2f}s per hand")
 
     print("\nTest Suite Summary")
     print("-" * 50)

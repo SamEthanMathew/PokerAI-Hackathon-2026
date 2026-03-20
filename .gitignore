@@ -167,3 +167,7 @@ cython_debug/
 
 # Poker engine logs
 agent_logs/
+
+# Trainer app dependencies/build cache
+poker-bot-trainer/node_modules/
+poker-bot-trainer/.next/
