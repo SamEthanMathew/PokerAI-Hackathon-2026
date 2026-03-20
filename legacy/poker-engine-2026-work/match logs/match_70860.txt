@@ -1,0 +1,31 @@
+2026-03-20 21:11:11,165 - match_70860 - INFO - Starting agents
+2026-03-20 21:11:11,170 - match_70860 - INFO - Sending match start notification
+2026-03-20 21:11:11,235 - match_70860 - INFO - Starting match
+2026-03-20 21:11:11,242 - match_70860 - INFO - Backing off for 1 seconds before retry 1
+2026-03-20 21:11:12,243 - match_70860 - INFO - Backing off for 2 seconds before retry 2
+2026-03-20 21:11:14,245 - match_70860 - INFO - Backing off for 4 seconds before retry 3
+2026-03-20 21:11:18,264 - match_70860 - INFO - Hand number: 0, never fold 67 bankroll: -2, JumpStreet bankroll: 2
+2026-03-20 21:11:26,885 - match_70860 - INFO - Hand number: 50, never fold 67 bankroll: 355, JumpStreet bankroll: -355
+2026-03-20 21:11:37,513 - match_70860 - INFO - Hand number: 100, never fold 67 bankroll: 442, JumpStreet bankroll: -442
+2026-03-20 21:11:49,554 - match_70860 - INFO - Hand number: 150, never fold 67 bankroll: 656, JumpStreet bankroll: -656
+2026-03-20 21:12:01,348 - match_70860 - INFO - Hand number: 200, never fold 67 bankroll: 729, JumpStreet bankroll: -729
+2026-03-20 21:12:12,802 - match_70860 - INFO - Hand number: 250, never fold 67 bankroll: 101, JumpStreet bankroll: -101
+2026-03-20 21:12:29,132 - match_70860 - INFO - Hand number: 300, never fold 67 bankroll: 353, JumpStreet bankroll: -353
+2026-03-20 21:12:41,447 - match_70860 - INFO - Hand number: 350, never fold 67 bankroll: 481, JumpStreet bankroll: -481
+2026-03-20 21:12:48,815 - match_70860 - INFO - Hand number: 400, never fold 67 bankroll: 932, JumpStreet bankroll: -932
+2026-03-20 21:12:50,187 - match_70860 - INFO - Hand number: 450, never fold 67 bankroll: 863, JumpStreet bankroll: -863
+2026-03-20 21:12:51,905 - match_70860 - INFO - Hand number: 500, never fold 67 bankroll: 794, JumpStreet bankroll: -794
+2026-03-20 21:12:53,204 - match_70860 - INFO - Hand number: 550, never fold 67 bankroll: 719, JumpStreet bankroll: -719
+2026-03-20 21:12:54,490 - match_70860 - INFO - Hand number: 600, never fold 67 bankroll: 644, JumpStreet bankroll: -644
+2026-03-20 21:12:55,849 - match_70860 - INFO - Hand number: 650, never fold 67 bankroll: 569, JumpStreet bankroll: -569
+2026-03-20 21:12:56,979 - match_70860 - INFO - Hand number: 700, never fold 67 bankroll: 494, JumpStreet bankroll: -494
+2026-03-20 21:12:58,138 - match_70860 - INFO - Hand number: 750, never fold 67 bankroll: 419, JumpStreet bankroll: -419
+2026-03-20 21:12:59,527 - match_70860 - INFO - Hand number: 800, never fold 67 bankroll: 352, JumpStreet bankroll: -352
+2026-03-20 21:13:01,182 - match_70860 - INFO - Hand number: 850, never fold 67 bankroll: 281, JumpStreet bankroll: -281
+2026-03-20 21:13:02,451 - match_70860 - INFO - Hand number: 900, never fold 67 bankroll: 214, JumpStreet bankroll: -214
+2026-03-20 21:13:03,725 - match_70860 - INFO - Hand number: 950, never fold 67 bankroll: 145, JumpStreet bankroll: -145
+2026-03-20 21:13:04,968 - match_70860 - INFO - All hands completed
+2026-03-20 21:13:04,968 - match_70860 - INFO - Final results - never fold 67 bankroll: 75, JumpStreet bankroll: -75
+2026-03-20 21:13:04,968 - match_70860 - INFO - Time used - never fold 67: 78.73 seconds, JumpStreet: 21.79 seconds
+2026-03-20 21:13:04,968 - match_70860 - INFO - Time limit: 1500 seconds
+2026-03-20 21:13:04,968 - match_70860 - INFO - Terminating agents

@@ -1,0 +1,235 @@
+
+Testing user bot against FoldAgent
+--------------------------------------------------
+2026-03-20 20:08:25,085 - INFO - Starting agent server on 0.0.0.0:8000
+2026-03-20 20:08:25,086 - INFO - Starting agent server on 0.0.0.0:8001
+INFO:     Started server process [12]
+INFO:     Started server process [13]
+INFO:     Waiting for application startup.
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+2026-03-20 20:08:27,094 - INFO - {"event": "hand_start", "ts": 1774037307.095, "hand": 0, "position": "SB", "hole_cards": ["4d", "2d", "5s", "3h", "6h"], "running_pnl": 0, "time_left": 1000.0, "hands_remaining": 1000, "budget_per_hand": 1.0, "early_phase": true, "urgency": 0.0, "lead_ratio": 0.0, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:27,100 - INFO - {"event": "preflop_decision", "ts": 1774037307.1, "hand": 0, "position": "SB", "hole_cards": ["4d", "2d", "5s", "3h", "6h"], "is_early_phase": true, "is_premium": false, "is_premium_pair": false, "equity": 0.54167, "eq_gate": 0.48, "open_prob": null, "to_call": 1, "pot": 3, "action": "CALL", "amount": 0, "reason": "equity_call", "urgency": 0.0, "comeback_mode": false, "protecting_lead": false, "pressure_adj": 0.0, "preflop_defense_adj": 0.0}
+2026-03-20 20:08:27,109 - INFO - {"event": "hand_result", "ts": 1774037307.109, "hand": 0, "pnl": 2, "running_pnl": 2, "outcome": "win", "showdown": false, "our_kept_cards": ["4d", "2d"], "opp_kept_cards": [], "community": [], "we_folded": false, "opp_folded": true, "large_swing": false, "urgency": 0.0, "lead_ratio": 0.0}
+2026-03-20 20:08:27,111 - INFO - Hand number: 0, Team 0 bankroll: 2, Team 1 bankroll: -2
+2026-03-20 20:08:27,122 - INFO - {"event": "hand_result", "ts": 1774037307.123, "hand": 1, "pnl": 1, "running_pnl": 3, "outcome": "win", "showdown": false, "our_kept_cards": ["4d", "2d"], "opp_kept_cards": [], "community": [], "we_folded": false, "opp_folded": true, "large_swing": false, "urgency": 0.0, "lead_ratio": 0.0}
+2026-03-20 20:08:27,132 - INFO - {"event": "hand_start", "ts": 1774037307.132, "hand": 2, "position": "SB", "hole_cards": ["As", "4h", "5d", "9h", "6d"], "running_pnl": 3, "time_left": 999.99, "hands_remaining": 998, "budget_per_hand": 1.002, "early_phase": true, "urgency": 0.0, "lead_ratio": 0.002, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:27,137 - INFO - {"event": "preflop_decision", "ts": 1774037307.137, "hand": 2, "position": "SB", "hole_cards": ["As", "4h", "5d", "9h", "6d"], "is_early_phase": true, "is_premium": true, "is_premium_pair": false, "equity": 0.65625, "eq_gate": 0.48, "open_prob": null, "to_call": 1, "pot": 3, "action": "RAISE", "amount": 2, "reason": "premium_3bet_reraise", "urgency": 0.0, "comeback_mode": false, "protecting_lead": false, "pressure_adj": 0.0, "preflop_defense_adj": 0.0}
+2026-03-20 20:08:27,144 - INFO - {"event": "hand_result", "ts": 1774037307.144, "hand": 2, "pnl": 2, "running_pnl": 5, "outcome": "win", "showdown": false, "our_kept_cards": ["As", "4h"], "opp_kept_cards": [], "community": [], "we_folded": false, "opp_folded": true, "large_swing": false, "urgency": 0.0, "lead_ratio": 0.002}
+2026-03-20 20:08:27,157 - INFO - {"event": "hand_result", "ts": 1774037307.157, "hand": 3, "pnl": 1, "running_pnl": 6, "outcome": "win", "showdown": false, "our_kept_cards": ["As", "4h"], "opp_kept_cards": [], "community": [], "we_folded": false, "opp_folded": true, "large_swing": false, "urgency": 0.0, "lead_ratio": 0.002}
+2026-03-20 20:08:27,166 - INFO - {"event": "hand_start", "ts": 1774037307.166, "hand": 4, "position": "SB", "hole_cards": ["8s", "7h", "6s", "9d", "7d"], "running_pnl": 6, "time_left": 999.98, "hands_remaining": 996, "budget_per_hand": 1.004, "early_phase": true, "urgency": 0.0, "lead_ratio": 0.004, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:27,171 - INFO - {"event": "preflop_decision", "ts": 1774037307.171, "hand": 4, "position": "SB", "hole_cards": ["8s", "7h", "6s", "9d", "7d"], "is_early_phase": true, "is_premium": true, "is_premium_pair": false, "equity": 0.63958, "eq_gate": 0.48, "open_prob": null, "to_call": 1, "pot": 3, "action": "RAISE", "amount": 2, "reason": "premium_3bet_reraise", "urgency": 0.0, "comeback_mode": false, "protecting_lead": false, "pressure_adj": 0.0, "preflop_defense_adj": 0.0}
+2026-03-20 20:08:27,178 - INFO - {"event": "hand_result", "ts": 1774037307.179, "hand": 4, "pnl": 2, "running_pnl": 8, "outcome": "win", "showdown": false, "our_kept_cards": ["8s", "7h"], "opp_kept_cards": [], "community": [], "we_folded": false, "opp_folded": true, "large_swing": false, "urgency": 0.0, "lead_ratio": 0.004}
+2026-03-20 20:08:27,180 - INFO - All hands completed
+2026-03-20 20:08:27,181 - INFO - Final results - Team 0 bankroll: 8, Team 1 bankroll: -8
+2026-03-20 20:08:27,181 - INFO - Time used - Team 0: 0.03 seconds, Team 1: 0.01 seconds
+2026-03-20 20:08:27,181 - INFO - Time limit: 1000 seconds
+INFO:     Shutting down
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [13]
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [12]
+✓ Completed 5 games successfully
+✓ Time check passed: 0.45s per hand (limit: 25s)
+
+Testing user bot against CallingStationAgent
+--------------------------------------------------
+2026-03-20 20:08:27,319 - INFO - Starting agent server on 0.0.0.0:8000
+2026-03-20 20:08:27,320 - INFO - Starting agent server on 0.0.0.0:8001
+INFO:     Started server process [14]
+INFO:     Waiting for application startup.
+INFO:     Started server process [15]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+2026-03-20 20:08:29,325 - INFO - {"event": "hand_start", "ts": 1774037309.325, "hand": 0, "position": "SB", "hole_cards": ["Ad", "5d", "2h", "2d", "6h"], "running_pnl": 0, "time_left": 999.97, "hands_remaining": 1000, "budget_per_hand": 1.0, "early_phase": true, "urgency": 0.0, "lead_ratio": 0.0, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:29,330 - INFO - {"event": "preflop_decision", "ts": 1774037309.331, "hand": 0, "position": "SB", "hole_cards": ["Ad", "5d", "2h", "2d", "6h"], "is_early_phase": true, "is_premium": false, "is_premium_pair": false, "equity": 0.59375, "eq_gate": 0.48, "open_prob": null, "to_call": 1, "pot": 3, "action": "CALL", "amount": 0, "reason": "equity_call", "urgency": 0.0, "comeback_mode": false, "protecting_lead": false, "pressure_adj": 0.0, "preflop_defense_adj": 0.0}
+2026-03-20 20:08:29,401 - INFO - {"event": "discard_decision", "ts": 1774037309.401, "hand": 0, "mode": "full", "budget_per_hand": 1.0, "flop_cards": ["9h", "8h", "6d"], "all_hole_cards": ["Ad", "5d", "2h", "2d", "6h"], "opp_discards_known": true, "opp_discards": ["4h", "9d", "3s"], "keep_combos": [{"keep": ["2h", "6h"], "discard": ["Ad", "5d", "2d"], "equity": 0.5883, "rank": 1}, {"keep": ["Ad", "6h"], "discard": ["5d", "2h", "2d"], "equity": 0.5761, "rank": 2}, {"keep": ["Ad", "5d"], "discard": ["2h", "2d", "6h"], "equity": 0.4358, "rank": 3}, {"keep": ["5d", "6h"], "discard": ["Ad", "2h", "2d"], "equity": 0.4199, "rank": 4}, {"keep": ["Ad", "2d"], "discard": ["5d", "2h", "6h"], "equity": 0.4193, "rank": 5}, {"keep": ["Ad", "2h"], "discard": ["5d", "2d", "6h"], "equity": 0.4108, "rank": 6}, {"keep": ["5d", "2h"], "discard": ["Ad", "2d", "6h"], "equity": 0.2934, "rank": 7}, {"keep": ["5d", "2d"], "discard": ["Ad", "2h", "6h"], "equity": 0.2893, "rank": 8}, {"keep": ["2d", "6h"], "discard": ["Ad", "5d", "2h"], "equity": 0.2838, "rank": 9}, {"keep": ["2h", "2d"], "discard": ["Ad", "5d", "6h"], "equity": 0.2063, "rank": 10}], "chosen_keep": ["2h", "6h"], "chosen_equity": 0.5883, "equity_margin": 0.0122, "opp_model_weights": [10.0, 8.0, 6.0, 3.0, 2.0, 4.0, 3.0]}
+2026-03-20 20:08:29,415 - INFO - {"event": "postflop_decision", "ts": 1774037309.416, "hand": 0, "street": 1, "street_name": "flop", "position": "SB", "my_cards": ["2h", "6h"], "community": ["9h", "8h", "6d"], "opp_last_action": "check", "raw_equity": 0.5913, "adj_equity": 0.6913, "hand_cat": "one_pair", "strength": "strong", "has_draw": true, "flush_outs": 4, "straight_outs": 5, "texture_adj": 0.1, "texture_dampen_factor": 1.0, "texture_breakdown": {"draw": 0.1, "monotone": 0.0, "connected": 0.0, "flush_inference": 0.0}, "to_call": 0, "pot": 4, "pot_odds": 0.0, "thresholds": {"monster": 0.8204, "strong": 0.6504, "good": 0.48, "call": 0.0}, "exploit_adj_active": {"bluff_freq_adj": 0.0021, "value_bet_size_adj": -0.0137, "semi_bluff_freq_adj": -0.0041, "probe_freq_adj": -0.0028, "delayed_barrel_adj": 0.0033}, "baseline_action": "aggressive", "final_action": "RAISE", "final_amount": 2, "baseline_changed": false, "semi_bluff_fired": true, "bleedout_lock": false, "urgency": 0.0, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:29,431 - INFO - {"event": "postflop_decision", "ts": 1774037309.432, "hand": 0, "street": 2, "street_name": "turn", "position": "SB", "my_cards": ["2h", "6h"], "community": ["9h", "8h", "6d", "4s"], "opp_last_action": "check", "raw_equity": 0.4351, "adj_equity": 0.4351, "hand_cat": "one_pair", "strength": "strong", "has_draw": true, "flush_outs": 4, "straight_outs": 5, "texture_adj": 0.0, "texture_dampen_factor": 1.0, "texture_breakdown": {"draw": 0.0, "monotone": 0.0, "connected": 0.0, "flush_inference": 0.0}, "to_call": 0, "pot": 8, "pot_odds": 0.0, "thresholds": {"monster": 0.8205, "strong": 0.6505, "good": 0.48, "call": 0.0}, "exploit_adj_active": {"bluff_freq_adj": 0.0026, "value_bet_size_adj": -0.017, "semi_bluff_freq_adj": -0.005, "probe_freq_adj": -0.0035, "delayed_barrel_adj": 0.0041}, "baseline_action": "aggressive", "final_action": "RAISE", "final_amount": 4, "baseline_changed": false, "semi_bluff_fired": true, "bleedout_lock": false, "urgency": 0.0, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:29,446 - INFO - {"event": "postflop_decision", "ts": 1774037309.447, "hand": 0, "street": 3, "street_name": "river", "position": "SB", "my_cards": ["2h", "6h"], "community": ["9h", "8h", "6d", "4s", "6s"], "opp_last_action": "check", "raw_equity": 0.9243, "adj_equity": 0.9243, "hand_cat": "trips_plus", "strength": "monster", "has_draw": true, "flush_outs": 4, "straight_outs": 5, "texture_adj": 0.0, "texture_dampen_factor": 1.0, "texture_breakdown": {"draw": 0.0, "monotone": 0.0, "connected": 0.0, "flush_inference": 0.0}, "to_call": 0, "pot": 16, "pot_odds": 0.0, "thresholds": {"monster": 0.8207, "strong": 0.6507, "good": 0.48, "call": 0.0}, "exploit_adj_active": {"bluff_freq_adj": 0.0031, "value_bet_size_adj": -0.0223, "semi_bluff_freq_adj": -0.0052, "probe_freq_adj": -0.0041, "delayed_barrel_adj": 0.0033}, "baseline_action": "aggressive", "final_action": "RAISE", "final_amount": 92, "baseline_changed": false, "semi_bluff_fired": false, "bleedout_lock": false, "urgency": 0.0, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:29,454 - INFO - {"event": "hand_result", "ts": 1774037309.455, "hand": 0, "pnl": 100, "running_pnl": 100, "outcome": "win", "showdown": true, "our_kept_cards": ["2h", "6h"], "opp_kept_cards": ["7d", "7s"], "community": ["9h", "8h", "6d", "4s", "6s"], "we_folded": false, "opp_folded": false, "large_swing": true, "urgency": 0.0, "lead_ratio": 0.0}
+2026-03-20 20:08:29,456 - INFO - Hand number: 0, Team 0 bankroll: 108, Team 1 bankroll: -108
+2026-03-20 20:08:29,467 - INFO - {"event": "hand_start", "ts": 1774037309.467, "hand": 1, "position": "BB", "hole_cards": ["6h", "4d", "5s", "9d", "7h"], "running_pnl": 100, "time_left": 999.88, "hands_remaining": 999, "budget_per_hand": 1.001, "early_phase": true, "urgency": 0.0, "lead_ratio": 0.067, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:29,472 - INFO - {"event": "preflop_decision", "ts": 1774037309.472, "hand": 1, "position": "BB", "hole_cards": ["6h", "4d", "5s", "9d", "7h"], "is_early_phase": true, "is_premium": true, "is_premium_pair": false, "equity": 0.60417, "eq_gate": 0.48, "open_prob": null, "to_call": 0, "pot": 4, "action": "RAISE", "amount": 12, "reason": "premium_early_open", "urgency": 0.0, "comeback_mode": false, "protecting_lead": false, "pressure_adj": 0.0, "preflop_defense_adj": 0.0}
+2026-03-20 20:08:29,545 - INFO - {"event": "discard_decision", "ts": 1774037309.546, "hand": 1, "mode": "full", "budget_per_hand": 1.001, "flop_cards": ["7s", "5h", "4h"], "all_hole_cards": ["6h", "4d", "5s", "9d", "7h"], "opp_discards_known": false, "opp_discards": [], "keep_combos": [{"keep": ["6h", "7h"], "discard": ["4d", "5s", "9d"], "equity": 0.8083, "rank": 1}, {"keep": ["6h", "5s"], "discard": ["4d", "9d", "7h"], "equity": 0.6492, "rank": 2}, {"keep": ["5s", "7h"], "discard": ["6h", "4d", "9d"], "equity": 0.6332, "rank": 3}, {"keep": ["4d", "7h"], "discard": ["6h", "5s", "9d"], "equity": 0.6248, "rank": 4}, {"keep": ["6h", "9d"], "discard": ["4d", "5s", "7h"], "equity": 0.6069, "rank": 5}, {"keep": ["4d", "5s"], "discard": ["6h", "9d", "7h"], "equity": 0.599, "rank": 6}, {"keep": ["6h", "4d"], "discard": ["5s", "9d", "7h"], "equity": 0.587, "rank": 7}, {"keep": ["9d", "7h"], "discard": ["6h", "4d", "5s"], "equity": 0.558, "rank": 8}, {"keep": ["5s", "9d"], "discard": ["6h", "4d", "7h"], "equity": 0.483, "rank": 9}, {"keep": ["4d", "9d"], "discard": ["6h", "5s", "7h"], "equity": 0.426, "rank": 10}], "chosen_keep": ["6h", "7h"], "chosen_equity": 0.8083, "equity_margin": 0.1591, "opp_model_weights": [9.85, 8.15, 6.0, 2.85, 2.0, 3.962, 3.0]}
+2026-03-20 20:08:29,558 - INFO - {"event": "postflop_decision", "ts": 1774037309.559, "hand": 1, "street": 1, "street_name": "flop", "position": "BB", "my_cards": ["6h", "7h"], "community": ["7s", "5h", "4h"], "opp_last_action": "discard", "raw_equity": 0.8397, "adj_equity": 0.9397, "hand_cat": "one_pair", "strength": "strong", "has_draw": true, "flush_outs": 4, "straight_outs": 3, "texture_adj": 0.1, "texture_dampen_factor": 1.0, "texture_breakdown": {"draw": 0.1, "monotone": 0.0, "connected": 0.0, "flush_inference": 0.0}, "to_call": 0, "pot": 28, "pot_odds": 0.0, "thresholds": {"monster": 0.821, "strong": 0.651, "good": 0.48, "call": 0.0}, "exploit_adj_active": {"bluff_freq_adj": 0.004, "value_bet_size_adj": -0.034, "semi_bluff_freq_adj": -0.0056, "probe_freq_adj": -0.0055, "delayed_barrel_adj": 0.0016, "trap_freq_adj": -0.0019}, "baseline_action": "aggressive", "final_action": "RAISE", "final_amount": 19, "baseline_changed": false, "semi_bluff_fired": true, "bleedout_lock": false, "urgency": 0.0, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:29,570 - INFO - {"event": "postflop_decision", "ts": 1774037309.571, "hand": 1, "street": 2, "street_name": "turn", "position": "BB", "my_cards": ["6h", "7h"], "community": ["7s", "5h", "4h", "9h"], "opp_last_action": "call", "raw_equity": 0.9891, "adj_equity": 0.98, "hand_cat": "trips_plus", "strength": "monster", "has_draw": true, "flush_outs": 3, "straight_outs": 3, "texture_adj": 0.0, "texture_dampen_factor": 1.0, "texture_breakdown": {"draw": 0.0, "monotone": 0.0, "connected": 0.0, "flush_inference": 0.0}, "to_call": 0, "pot": 66, "pot_odds": 0.0, "thresholds": {"monster": 0.8211, "strong": 0.6511, "good": 0.48, "call": 0.0}, "exploit_adj_active": {"bluff_freq_adj": 0.0043, "value_bet_size_adj": -0.0368, "semi_bluff_freq_adj": -0.0057, "probe_freq_adj": -0.0058, "delayed_barrel_adj": 0.0011, "trap_freq_adj": -0.0023}, "baseline_action": "aggressive", "final_action": "RAISE", "final_amount": 45, "baseline_changed": false, "semi_bluff_fired": true, "bleedout_lock": false, "urgency": 0.0, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:29,582 - INFO - {"event": "postflop_decision", "ts": 1774037309.582, "hand": 1, "street": 3, "street_name": "river", "position": "BB", "my_cards": ["6h", "7h"], "community": ["7s", "5h", "4h", "9h", "8d"], "opp_last_action": "call", "raw_equity": 0.9892, "adj_equity": 0.98, "hand_cat": "trips_plus", "strength": "monster", "has_draw": true, "flush_outs": 3, "straight_outs": 0, "texture_adj": 0.0, "texture_dampen_factor": 1.0, "texture_breakdown": {"draw": 0.0, "monotone": 0.0, "connected": 0.0, "flush_inference": 0.0}, "to_call": 0, "pot": 156, "pot_odds": 0.0, "thresholds": {"monster": 0.821, "strong": 0.651, "good": 0.48, "call": 0.0}, "exploit_adj_active": {"bluff_freq_adj": 0.0045, "value_bet_size_adj": -0.0348, "semi_bluff_freq_adj": -0.0055, "probe_freq_adj": -0.0061, "trap_freq_adj": -0.0028}, "baseline_action": "aggressive", "final_action": "RAISE", "final_amount": 22, "baseline_changed": false, "semi_bluff_fired": false, "bleedout_lock": false, "urgency": 0.0, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:29,590 - INFO - {"event": "hand_result", "ts": 1774037309.59, "hand": 1, "pnl": 100, "running_pnl": 200, "outcome": "win", "showdown": true, "our_kept_cards": ["6h", "7h"], "opp_kept_cards": ["2d", "4s"], "community": ["7s", "5h", "4h", "9h", "8d"], "we_folded": false, "opp_folded": false, "large_swing": true, "urgency": 0.0, "lead_ratio": 0.067}
+2026-03-20 20:08:29,600 - INFO - {"event": "hand_start", "ts": 1774037309.601, "hand": 2, "position": "SB", "hole_cards": ["As", "3s", "8d", "7s", "8h"], "running_pnl": 200, "time_left": 999.79, "hands_remaining": 998, "budget_per_hand": 1.002, "early_phase": true, "urgency": 0.0, "lead_ratio": 0.134, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:29,605 - INFO - {"event": "preflop_decision", "ts": 1774037309.606, "hand": 2, "position": "SB", "hole_cards": ["As", "3s", "8d", "7s", "8h"], "is_early_phase": true, "is_premium": true, "is_premium_pair": true, "equity": 0.65, "eq_gate": 0.48, "open_prob": null, "to_call": 1, "pot": 3, "action": "RAISE", "amount": 11, "reason": "premium_early_open", "urgency": 0.0, "comeback_mode": false, "protecting_lead": false, "pressure_adj": 0.0, "preflop_defense_adj": 0.0}
+2026-03-20 20:08:29,662 - INFO - {"event": "discard_decision", "ts": 1774037309.662, "hand": 2, "mode": "full", "budget_per_hand": 1.002, "flop_cards": ["2d", "6h", "8s"], "all_hole_cards": ["As", "3s", "8d", "7s", "8h"], "opp_discards_known": true, "opp_discards": ["6d", "5h", "Ad"], "keep_combos": [{"keep": ["8d", "8h"], "discard": ["As", "3s", "7s"], "equity": 0.8652, "rank": 1}, {"keep": ["8d", "7s"], "discard": ["As", "3s", "8h"], "equity": 0.5943, "rank": 2}, {"keep": ["7s", "8h"], "discard": ["As", "3s", "8d"], "equity": 0.5943, "rank": 3}, {"keep": ["As", "7s"], "discard": ["3s", "8d", "8h"], "equity": 0.5871, "rank": 4}, {"keep": ["3s", "8d"], "discard": ["As", "7s", "8h"], "equity": 0.5523, "rank": 5}, {"keep": ["3s", "8h"], "discard": ["As", "8d", "7s"], "equity": 0.5523, "rank": 6}, {"keep": ["As", "8d"], "discard": ["3s", "7s", "8h"], "equity": 0.5457, "rank": 7}, {"keep": ["As", "8h"], "discard": ["3s", "8d", "7s"], "equity": 0.5457, "rank": 8}, {"keep": ["3s", "7s"], "discard": ["As", "8d", "8h"], "equity": 0.3827, "rank": 9}, {"keep": ["As", "3s"], "discard": ["8d", "7s", "8h"], "equity": 0.3535, "rank": 10}], "chosen_keep": ["8d", "8h"], "chosen_equity": 0.8652, "equity_margin": 0.2709, "opp_model_weights": [9.85, 8.15, 6.0, 2.7, 2.0, 3.925, 3.0]}
+2026-03-20 20:08:29,674 - INFO - {"event": "postflop_decision", "ts": 1774037309.675, "hand": 2, "street": 1, "street_name": "flop", "position": "SB", "my_cards": ["8d", "8h"], "community": ["2d", "6h", "8s"], "opp_last_action": "check", "raw_equity": 0.9156, "adj_equity": 0.9156, "hand_cat": "trips_plus", "strength": "monster", "has_draw": false, "flush_outs": 6, "straight_outs": 0, "texture_adj": 0.0, "texture_dampen_factor": 1.0, "texture_breakdown": {"draw": 0.0, "monotone": 0.0, "connected": 0.0, "flush_inference": 0.0}, "to_call": 0, "pot": 26, "pot_odds": 0.0, "thresholds": {"monster": 0.8209, "strong": 0.6509, "good": 0.48, "call": 0.0}, "exploit_adj_active": {"bluff_freq_adj": 0.0049, "value_bet_size_adj": -0.0302, "semi_bluff_freq_adj": -0.0051, "probe_freq_adj": -0.0069, "delayed_barrel_adj": -0.0023, "trap_freq_adj": -0.0041}, "baseline_action": "aggressive", "final_action": "RAISE", "final_amount": 16, "baseline_changed": false, "semi_bluff_fired": false, "bleedout_lock": false, "urgency": 0.0, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:29,689 - INFO - {"event": "postflop_decision", "ts": 1774037309.69, "hand": 2, "street": 2, "street_name": "turn", "position": "SB", "my_cards": ["8d", "8h"], "community": ["2d", "6h", "8s", "2h"], "opp_last_action": "check", "raw_equity": 1.0, "adj_equity": 0.98, "hand_cat": "trips_plus", "strength": "monster", "has_draw": false, "flush_outs": 5, "straight_outs": 0, "texture_adj": 0.0, "texture_dampen_factor": 1.0, "texture_breakdown": {"draw": 0.0, "monotone": 0.0, "connected": 0.0, "flush_inference": 0.0}, "to_call": 0, "pot": 58, "pot_odds": 0.0, "thresholds": {"monster": 0.8209, "strong": 0.6509, "good": 0.48, "call": 0.0}, "exploit_adj_active": {"bluff_freq_adj": 0.005, "value_bet_size_adj": -0.0291, "semi_bluff_freq_adj": -0.005, "probe_freq_adj": -0.007, "delayed_barrel_adj": -0.0028, "trap_freq_adj": -0.0044}, "baseline_action": "aggressive", "final_action": "RAISE", "final_amount": 45, "baseline_changed": false, "semi_bluff_fired": false, "bleedout_lock": false, "urgency": 0.0, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:29,703 - INFO - {"event": "postflop_decision", "ts": 1774037309.704, "hand": 2, "street": 3, "street_name": "river", "position": "SB", "my_cards": ["8d", "8h"], "community": ["2d", "6h", "8s", "2h", "7d"], "opp_last_action": "check", "raw_equity": 1.0, "adj_equity": 0.9, "hand_cat": "trips_plus", "strength": "monster", "has_draw": false, "flush_outs": 5, "straight_outs": 5, "texture_adj": -0.1, "texture_dampen_factor": 1.0, "texture_breakdown": {"draw": 0.0, "monotone": 0.0, "connected": -0.1, "flush_inference": 0.0}, "to_call": 0, "pot": 148, "pot_odds": 0.0, "thresholds": {"monster": 0.8209, "strong": 0.6509, "good": 0.48, "call": 0.0}, "exploit_adj_active": {"bluff_freq_adj": 0.0051, "value_bet_size_adj": -0.0304, "semi_bluff_freq_adj": -0.0048, "probe_freq_adj": -0.0073, "delayed_barrel_adj": -0.0038, "trap_freq_adj": -0.0049}, "baseline_action": "aggressive", "final_action": "RAISE", "final_amount": 26, "baseline_changed": false, "semi_bluff_fired": false, "bleedout_lock": false, "urgency": 0.0, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:29,710 - INFO - {"event": "hand_result", "ts": 1774037309.711, "hand": 2, "pnl": 100, "running_pnl": 300, "outcome": "win", "showdown": true, "our_kept_cards": ["8d", "8h"], "opp_kept_cards": ["5d", "6s"], "community": ["2d", "6h", "8s", "2h", "7d"], "we_folded": false, "opp_folded": false, "large_swing": true, "urgency": 0.0, "lead_ratio": 0.134}
+2026-03-20 20:08:29,723 - INFO - {"event": "hand_start", "ts": 1774037309.723, "hand": 3, "position": "BB", "hole_cards": ["5h", "As", "7d", "7h", "Ah"], "running_pnl": 300, "time_left": 999.71, "hands_remaining": 997, "budget_per_hand": 1.003, "early_phase": true, "urgency": 0.0, "lead_ratio": 0.201, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:29,728 - INFO - {"event": "preflop_decision", "ts": 1774037309.728, "hand": 3, "position": "BB", "hole_cards": ["5h", "As", "7d", "7h", "Ah"], "is_early_phase": true, "is_premium": true, "is_premium_pair": true, "equity": 0.6375, "eq_gate": 0.48, "open_prob": null, "to_call": 0, "pot": 4, "action": "RAISE", "amount": 13, "reason": "premium_early_open", "urgency": 0.0, "comeback_mode": false, "protecting_lead": false, "pressure_adj": 0.0, "preflop_defense_adj": 0.0}
+2026-03-20 20:08:29,802 - INFO - {"event": "discard_decision", "ts": 1774037309.802, "hand": 3, "mode": "full", "budget_per_hand": 1.003, "flop_cards": ["6d", "5s", "8h"], "all_hole_cards": ["5h", "As", "7d", "7h", "Ah"], "opp_discards_known": false, "opp_discards": [], "keep_combos": [{"keep": ["7d", "7h"], "discard": ["5h", "As", "Ah"], "equity": 0.7384, "rank": 1}, {"keep": ["5h", "7h"], "discard": ["As", "7d", "Ah"], "equity": 0.6929, "rank": 2}, {"keep": ["5h", "7d"], "discard": ["As", "7h", "Ah"], "equity": 0.6785, "rank": 3}, {"keep": ["7h", "Ah"], "discard": ["5h", "As", "7d"], "equity": 0.6514, "rank": 4}, {"keep": ["As", "Ah"], "discard": ["5h", "7d", "7h"], "equity": 0.648, "rank": 5}, {"keep": ["7d", "Ah"], "discard": ["5h", "As", "7h"], "equity": 0.646, "rank": 6}, {"keep": ["As", "7d"], "discard": ["5h", "7h", "Ah"], "equity": 0.6342, "rank": 7}, {"keep": ["As", "7h"], "discard": ["5h", "7d", "Ah"], "equity": 0.634, "rank": 8}, {"keep": ["5h", "As"], "discard": ["7d", "7h", "Ah"], "equity": 0.459, "rank": 9}, {"keep": ["5h", "Ah"], "discard": ["As", "7d", "7h"], "equity": 0.444, "rank": 10}], "chosen_keep": ["7d", "7h"], "chosen_equity": 0.7384, "equity_margin": 0.0455, "opp_model_weights": [9.85, 8.0, 6.0, 2.7, 2.0, 3.925, 3.0]}
+2026-03-20 20:08:29,815 - INFO - {"event": "postflop_decision", "ts": 1774037309.815, "hand": 3, "street": 1, "street_name": "flop", "position": "BB", "my_cards": ["7d", "7h"], "community": ["6d", "5s", "8h"], "opp_last_action": "discard", "raw_equity": 0.6144, "adj_equity": 0.6144, "hand_cat": "one_pair", "strength": "medium", "has_draw": false, "flush_outs": 6, "straight_outs": 2, "texture_adj": 0.0, "texture_dampen_factor": 1.0, "texture_breakdown": {"draw": 0.0, "monotone": 0.0, "connected": 0.0, "flush_inference": 0.0}, "to_call": 0, "pot": 30, "pot_odds": 0.0, "thresholds": {"monster": 0.821, "strong": 0.651, "good": 0.48, "call": 0.0}, "exploit_adj_active": {"bluff_freq_adj": 0.0053, "value_bet_size_adj": -0.0333, "semi_bluff_freq_adj": -0.0042, "probe_freq_adj": -0.0078, "delayed_barrel_adj": -0.0059, "trap_freq_adj": -0.006}, "baseline_action": "aggressive", "final_action": "RAISE", "final_amount": 9, "baseline_changed": false, "semi_bluff_fired": false, "bleedout_lock": false, "urgency": 0.0, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:29,827 - INFO - {"event": "postflop_decision", "ts": 1774037309.827, "hand": 3, "street": 2, "street_name": "turn", "position": "BB", "my_cards": ["7d", "7h"], "community": ["6d", "5s", "8h", "2s"], "opp_last_action": "call", "raw_equity": 0.5518, "adj_equity": 0.5518, "hand_cat": "one_pair", "strength": "medium", "has_draw": false, "flush_outs": 6, "straight_outs": 2, "texture_adj": 0.0, "texture_dampen_factor": 1.0, "texture_breakdown": {"draw": 0.0, "monotone": 0.0, "connected": 0.0, "flush_inference": 0.0}, "to_call": 0, "pot": 48, "pot_odds": 0.0, "thresholds": {"monster": 0.821, "strong": 0.651, "good": 0.48, "call": 0.0}, "exploit_adj_active": {"bluff_freq_adj": 0.0053, "value_bet_size_adj": -0.034, "semi_bluff_freq_adj": -0.0041, "probe_freq_adj": -0.0079, "delayed_barrel_adj": -0.0064, "trap_freq_adj": -0.0062}, "baseline_action": "aggressive", "final_action": "RAISE", "final_amount": 18, "baseline_changed": false, "semi_bluff_fired": false, "bleedout_lock": false, "urgency": 0.0, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:29,838 - INFO - {"event": "postflop_decision", "ts": 1774037309.838, "hand": 3, "street": 3, "street_name": "river", "position": "BB", "my_cards": ["7d", "7h"], "community": ["6d", "5s", "8h", "2s", "3h"], "opp_last_action": "call", "raw_equity": 0.2405, "adj_equity": 0.2405, "hand_cat": "one_pair", "strength": "medium", "has_draw": false, "flush_outs": 3, "straight_outs": 2, "texture_adj": 0.0, "texture_dampen_factor": 1.0, "texture_breakdown": {"draw": 0.0, "monotone": 0.0, "connected": 0.0, "flush_inference": 0.0}, "to_call": 0, "pot": 84, "pot_odds": 0.0, "thresholds": {"monster": 0.821, "strong": 0.651, "good": 0.48, "call": 0.0}, "exploit_adj_active": {"bluff_freq_adj": 0.0053, "value_bet_size_adj": -0.0318, "semi_bluff_freq_adj": -0.0039, "probe_freq_adj": -0.008, "delayed_barrel_adj": -0.0071, "trap_freq_adj": -0.0066}, "baseline_action": "check", "final_action": "CHECK", "final_amount": 0, "baseline_changed": false, "semi_bluff_fired": false, "bleedout_lock": false, "urgency": 0.0, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:29,845 - INFO - {"event": "hand_result", "ts": 1774037309.846, "hand": 3, "pnl": -42, "running_pnl": 258, "outcome": "loss", "showdown": true, "our_kept_cards": ["7d", "7h"], "opp_kept_cards": ["Ad", "8s"], "community": ["6d", "5s", "8h", "2s", "3h"], "we_folded": false, "opp_folded": false, "large_swing": true, "urgency": 0.0, "lead_ratio": 0.201}
+2026-03-20 20:08:29,854 - INFO - {"event": "hand_start", "ts": 1774037309.855, "hand": 4, "position": "SB", "hole_cards": ["9d", "4s", "8s", "5h", "7d"], "running_pnl": 258, "time_left": 999.61, "hands_remaining": 996, "budget_per_hand": 1.004, "early_phase": true, "urgency": 0.0, "lead_ratio": 0.173, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:29,859 - INFO - {"event": "preflop_decision", "ts": 1774037309.86, "hand": 4, "position": "SB", "hole_cards": ["9d", "4s", "8s", "5h", "7d"], "is_early_phase": true, "is_premium": true, "is_premium_pair": false, "equity": 0.62708, "eq_gate": 0.48, "open_prob": null, "to_call": 1, "pot": 3, "action": "RAISE", "amount": 2, "reason": "premium_3bet_reraise", "urgency": 0.0, "comeback_mode": false, "protecting_lead": false, "pressure_adj": 0.0, "preflop_defense_adj": 0.0}
+2026-03-20 20:08:29,915 - INFO - {"event": "discard_decision", "ts": 1774037309.916, "hand": 4, "mode": "full", "budget_per_hand": 1.004, "flop_cards": ["9h", "6d", "6s"], "all_hole_cards": ["9d", "4s", "8s", "5h", "7d"], "opp_discards_known": true, "opp_discards": ["Ad", "3h", "5s"], "keep_combos": [{"keep": ["9d", "7d"], "discard": ["4s", "8s", "5h"], "equity": 0.6501, "rank": 1}, {"keep": ["9d", "8s"], "discard": ["4s", "5h", "7d"], "equity": 0.63, "rank": 2}, {"keep": ["9d", "5h"], "discard": ["4s", "8s", "7d"], "equity": 0.5634, "rank": 3}, {"keep": ["9d", "4s"], "discard": ["8s", "5h", "7d"], "equity": 0.5535, "rank": 4}, {"keep": ["8s", "7d"], "discard": ["9d", "4s", "5h"], "equity": 0.4701, "rank": 5}, {"keep": ["5h", "7d"], "discard": ["9d", "4s", "8s"], "equity": 0.3635, "rank": 6}, {"keep": ["8s", "5h"], "discard": ["9d", "4s", "7d"], "equity": 0.3494, "rank": 7}, {"keep": ["4s", "8s"], "discard": ["9d", "5h", "7d"], "equity": 0.3078, "rank": 8}, {"keep": ["4s", "7d"], "discard": ["9d", "8s", "5h"], "equity": 0.2578, "rank": 9}, {"keep": ["4s", "5h"], "discard": ["9d", "8s", "7d"], "equity": 0.2555, "rank": 10}], "chosen_keep": ["9d", "7d"], "chosen_equity": 0.6501, "equity_margin": 0.02, "opp_model_weights": [9.85, 8.0, 6.0, 2.55, 2.0, 3.944, 3.0]}
+2026-03-20 20:08:29,930 - INFO - {"event": "postflop_decision", "ts": 1774037309.93, "hand": 4, "street": 1, "street_name": "flop", "position": "SB", "my_cards": ["9d", "7d"], "community": ["9h", "6d", "6s"], "opp_last_action": "check", "raw_equity": 0.7795, "adj_equity": 0.7795, "hand_cat": "two_pair", "strength": "monster", "has_draw": false, "flush_outs": 5, "straight_outs": 4, "texture_adj": 0.0, "texture_dampen_factor": 1.0, "texture_breakdown": {"draw": 0.0, "monotone": 0.0, "connected": 0.0, "flush_inference": 0.0}, "to_call": 0, "pot": 8, "pot_odds": 0.0, "thresholds": {"monster": 0.8208, "strong": 0.6508, "good": 0.48, "call": 0.0}, "exploit_adj_active": {"bluff_freq_adj": 0.0054, "value_bet_size_adj": -0.027, "semi_bluff_freq_adj": -0.0034, "probe_freq_adj": -0.0083, "delayed_barrel_adj": -0.0088, "trap_freq_adj": -0.0074}, "baseline_action": "aggressive", "final_action": "RAISE", "final_amount": 4, "baseline_changed": false, "semi_bluff_fired": false, "bleedout_lock": false, "urgency": 0.0, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:29,944 - INFO - {"event": "postflop_decision", "ts": 1774037309.944, "hand": 4, "street": 2, "street_name": "turn", "position": "SB", "my_cards": ["9d", "7d"], "community": ["9h", "6d", "6s", "7h"], "opp_last_action": "check", "raw_equity": 0.6138, "adj_equity": 0.6138, "hand_cat": "two_pair", "strength": "monster", "has_draw": false, "flush_outs": 5, "straight_outs": 4, "texture_adj": 0.0, "texture_dampen_factor": 1.0, "texture_breakdown": {"draw": 0.0, "monotone": 0.0, "connected": 0.0, "flush_inference": 0.0}, "to_call": 0, "pot": 16, "pot_odds": 0.0, "thresholds": {"monster": 0.8208, "strong": 0.6508, "good": 0.48, "call": 0.0}, "exploit_adj_active": {"bluff_freq_adj": 0.0054, "value_bet_size_adj": -0.0258, "semi_bluff_freq_adj": -0.0033, "probe_freq_adj": -0.0084, "delayed_barrel_adj": -0.0092, "trap_freq_adj": -0.0076}, "baseline_action": "aggressive", "final_action": "RAISE", "final_amount": 5, "baseline_changed": false, "semi_bluff_fired": false, "bleedout_lock": false, "urgency": 0.0, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:29,958 - INFO - {"event": "postflop_decision", "ts": 1774037309.959, "hand": 4, "street": 3, "street_name": "river", "position": "SB", "my_cards": ["9d", "7d"], "community": ["9h", "6d", "6s", "7h", "Ah"], "opp_last_action": "check", "raw_equity": 0.5015, "adj_equity": 0.3215, "hand_cat": "two_pair", "strength": "monster", "has_draw": false, "flush_outs": 5, "straight_outs": 2, "texture_adj": -0.18, "texture_dampen_factor": 1.0, "texture_breakdown": {"draw": 0.0, "monotone": -0.18, "connected": 0.0, "flush_inference": 0.0}, "to_call": 0, "pot": 26, "pot_odds": 0.0, "thresholds": {"monster": 0.8208, "strong": 0.6508, "good": 0.48, "call": 0.0}, "exploit_adj_active": {"bluff_freq_adj": 0.0055, "value_bet_size_adj": -0.0266, "semi_bluff_freq_adj": -0.0031, "probe_freq_adj": -0.0085, "delayed_barrel_adj": -0.0099, "trap_freq_adj": -0.0079}, "baseline_action": "check", "final_action": "CHECK", "final_amount": 0, "baseline_changed": false, "semi_bluff_fired": false, "bleedout_lock": false, "urgency": 0.0, "comeback_mode": false, "protecting_lead": false}
+2026-03-20 20:08:29,962 - INFO - {"event": "hand_result", "ts": 1774037309.963, "hand": 4, "pnl": 13, "running_pnl": 271, "outcome": "win", "showdown": true, "our_kept_cards": ["9d", "7d"], "opp_kept_cards": ["2d", "3d"], "community": ["9h", "6d", "6s", "7h", "Ah"], "we_folded": false, "opp_folded": false, "large_swing": false, "urgency": 0.0, "lead_ratio": 0.173}
+2026-03-20 20:08:29,964 - INFO - All hands completed
+2026-03-20 20:08:29,964 - INFO - Final results - Team 0 bankroll: 279, Team 1 bankroll: -279
+2026-03-20 20:08:29,964 - INFO - Time used - Team 0: 0.46 seconds, Team 1: 0.07 seconds
+2026-03-20 20:08:29,964 - INFO - Time limit: 1000 seconds
+INFO:     Shutting down
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [14]
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [15]
+✓ Completed 5 games successfully
+✓ Time check passed: 0.57s per hand (limit: 25s)
+
+Testing user bot against AllInAgent
+--------------------------------------------------
+2026-03-20 20:08:30,155 - INFO - Starting agent server on 0.0.0.0:8000
+2026-03-20 20:08:30,155 - INFO - Port 8000 busy (attempt 1/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:30,156 - INFO - Starting agent server on 0.0.0.0:8001
+INFO:     Started server process [23]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+2026-03-20 20:08:31,156 - INFO - Port 8000 busy (attempt 2/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:32,156 - INFO - Port 8000 busy (attempt 3/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:33,156 - INFO - Port 8000 busy (attempt 4/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:34,157 - INFO - Port 8000 busy (attempt 5/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:35,157 - INFO - Port 8000 busy (attempt 6/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:36,157 - INFO - Port 8000 busy (attempt 7/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:37,158 - INFO - Port 8000 busy (attempt 8/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:37,164 - INFO - Backing off for 1 seconds before retry 1
+2026-03-20 20:08:38,158 - INFO - Port 8000 busy (attempt 9/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:39,158 - INFO - Port 8000 busy (attempt 10/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:40,159 - INFO - Port 8000 busy (attempt 11/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:41,160 - INFO - Port 8000 busy (attempt 12/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:42,160 - INFO - Port 8000 busy (attempt 13/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:43,161 - INFO - Port 8000 busy (attempt 14/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:43,166 - INFO - Backing off for 2 seconds before retry 2
+2026-03-20 20:08:44,161 - INFO - Port 8000 busy (attempt 15/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:45,161 - INFO - Port 8000 busy (attempt 16/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:46,163 - INFO - Port 8000 busy (attempt 17/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:47,163 - INFO - Port 8000 busy (attempt 18/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:48,163 - INFO - Port 8000 busy (attempt 19/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:49,164 - INFO - Port 8000 busy (attempt 20/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:50,164 - INFO - Port 8000 busy (attempt 21/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:50,168 - INFO - Backing off for 4 seconds before retry 3
+2026-03-20 20:08:51,165 - INFO - Port 8000 busy (attempt 22/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:52,166 - INFO - Port 8000 busy (attempt 23/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:53,166 - INFO - Port 8000 busy (attempt 24/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:54,166 - INFO - Port 8000 busy (attempt 25/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:55,167 - INFO - Port 8000 busy (attempt 26/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:56,168 - INFO - Port 8000 busy (attempt 27/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:57,168 - INFO - Port 8000 busy (attempt 28/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:58,169 - INFO - Port 8000 busy (attempt 29/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:08:59,169 - ERROR - Port 8000 still in use after 30 attempts; giving up
+Process Process-5:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/usr/local/lib/python3.12/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/app/poker-engine-2026/submission/player.py", line 1417, in run
+    s.bind((host, port))
+OSError: [Errno 98] Address already in use
+2026-03-20 20:08:59,171 - INFO - Backing off for 8 seconds before retry 4
+2026-03-20 20:09:12,177 - ERROR - Bot 0 failed API call: HTTPConnectionPool(host='127.0.0.1', port=8000): Read timed out. (read timeout=5.0)
+2026-03-20 20:09:17,186 - INFO - Backing off for 1 seconds before retry 1
+2026-03-20 20:09:23,189 - INFO - Backing off for 2 seconds before retry 2
+2026-03-20 20:09:30,195 - INFO - Backing off for 4 seconds before retry 3
+2026-03-20 20:09:39,202 - INFO - Backing off for 8 seconds before retry 4
+2026-03-20 20:09:52,204 - ERROR - Bot 0 failed API call: HTTPConnectionPool(host='127.0.0.1', port=8000): Read timed out. (read timeout=5.0)
+2026-03-20 20:09:52,207 - INFO - Hand number: 0, Team 0 bankroll: 278, Team 1 bankroll: -278
+2026-03-20 20:09:52,214 - INFO - Going all-in for 98
+2026-03-20 20:09:57,220 - INFO - Backing off for 1 seconds before retry 1
+2026-03-20 20:10:03,226 - INFO - Backing off for 2 seconds before retry 2
+2026-03-20 20:10:10,233 - INFO - Backing off for 4 seconds before retry 3
+2026-03-20 20:10:19,239 - INFO - Backing off for 8 seconds before retry 4
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [23]
+✗ Failed: Time limit exceeded
+✓ Time check passed: 24.45s per hand (limit: 25s)
+
+Testing user bot against RandomAgent
+--------------------------------------------------
+2026-03-20 20:10:32,380 - INFO - Starting agent server on 0.0.0.0:8000
+2026-03-20 20:10:32,380 - INFO - Port 8000 busy (attempt 1/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:32,381 - INFO - Starting agent server on 0.0.0.0:8001
+INFO:     Started server process [25]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+2026-03-20 20:10:33,381 - INFO - Port 8000 busy (attempt 2/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:34,381 - INFO - Port 8000 busy (attempt 3/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:35,381 - INFO - Port 8000 busy (attempt 4/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:36,382 - INFO - Port 8000 busy (attempt 5/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:37,382 - INFO - Port 8000 busy (attempt 6/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:38,382 - INFO - Port 8000 busy (attempt 7/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:39,383 - INFO - Port 8000 busy (attempt 8/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:39,389 - INFO - Backing off for 1 seconds before retry 1
+2026-03-20 20:10:40,383 - INFO - Port 8000 busy (attempt 9/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:41,383 - INFO - Port 8000 busy (attempt 10/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:42,384 - INFO - Port 8000 busy (attempt 11/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:43,385 - INFO - Port 8000 busy (attempt 12/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:44,385 - INFO - Port 8000 busy (attempt 13/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:45,386 - INFO - Port 8000 busy (attempt 14/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:45,396 - INFO - Backing off for 2 seconds before retry 2
+2026-03-20 20:10:46,386 - INFO - Port 8000 busy (attempt 15/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:47,386 - INFO - Port 8000 busy (attempt 16/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:48,388 - INFO - Port 8000 busy (attempt 17/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:49,388 - INFO - Port 8000 busy (attempt 18/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:50,388 - INFO - Port 8000 busy (attempt 19/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:51,389 - INFO - Port 8000 busy (attempt 20/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:52,389 - INFO - Port 8000 busy (attempt 21/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:52,399 - INFO - Backing off for 4 seconds before retry 3
+2026-03-20 20:10:53,390 - INFO - Port 8000 busy (attempt 22/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:54,391 - INFO - Port 8000 busy (attempt 23/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:55,391 - INFO - Port 8000 busy (attempt 24/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:56,391 - INFO - Port 8000 busy (attempt 25/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:57,392 - INFO - Port 8000 busy (attempt 26/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:58,393 - INFO - Port 8000 busy (attempt 27/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:10:59,393 - INFO - Port 8000 busy (attempt 28/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:11:00,394 - INFO - Port 8000 busy (attempt 29/30): [Errno 98] Address already in use — retrying in 1s
+2026-03-20 20:11:01,394 - ERROR - Port 8000 still in use after 30 attempts; giving up
+Process Process-7:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/usr/local/lib/python3.12/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/app/poker-engine-2026/submission/player.py", line 1417, in run
+    s.bind((host, port))
+OSError: [Errno 98] Address already in use
+2026-03-20 20:11:01,401 - INFO - Backing off for 8 seconds before retry 4
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [25]
+✗ Failed: Time limit exceeded
+✓ Time check passed: 8.44s per hand (limit: 25s)
+
+Test Suite Summary
+--------------------------------------------------
+Games completed successfully: 10
+Runtime errors encountered: 0
+Time limit violations: 2
+{"statusCode": 200, "body": "{\"valid\": false, \"results\": {\"games_completed\": 10, \"runtime_errors\": 0, \"timeout_errors\": 2, \"verification_error\": null, \"passed\": false}}"}
