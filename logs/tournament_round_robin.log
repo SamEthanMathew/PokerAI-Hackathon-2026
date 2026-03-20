@@ -1,0 +1,159 @@
+Round-robin: ['ALPHANiTV8', 'ALPHANiTV7', 'METAV6', 'METAV5', 'LambdaV1']
+Each pair: 10 matches x 1000 hands
+
+=== ALPHANiTV8 vs ALPHANiTV7 (10 matches) ===
+  Match 1: ALPHANiTV8 +455  ALPHANiTV7 -455  (258s)
+  Match 2: ALPHANiTV8 +295  ALPHANiTV7 -295  (339s)
+  Match 3: ALPHANiTV8 +533  ALPHANiTV7 -533  (110s)
+  Match 4: ALPHANiTV8 +485  ALPHANiTV7 -485  (157s)
+  Match 5: ALPHANiTV8 +446  ALPHANiTV7 -446  (154s)
+  Match 6: ALPHANiTV8 +100  ALPHANiTV7 -100  (391s)
+  Match 7: ALPHANiTV8 +473  ALPHANiTV7 -473  (128s)
+  Match 8: ALPHANiTV8 -19  ALPHANiTV7 +19  (272s)
+  Match 9: ALPHANiTV8 +248  ALPHANiTV7 -248  (474s)
+  Match 10: ALPHANiTV8 +455  ALPHANiTV7 -455  (208s)
+  Total: ALPHANiTV8 +3471  ALPHANiTV7 -3471  (Wins: 9-1)
+
+=== ALPHANiTV8 vs METAV6 (10 matches) ===
+  Match 1: ALPHANiTV8 +333  METAV6 -333  (313s)
+  Match 2: ALPHANiTV8 +430  METAV6 -430  (211s)
+  Match 3: ALPHANiTV8 +398  METAV6 -398  (170s)
+  Match 4: ALPHANiTV8 +419  METAV6 -419  (278s)
+  Match 5: ALPHANiTV8 +447  METAV6 -447  (102s)
+  Match 6: ALPHANiTV8 +318  METAV6 -318  (428s)
+  Match 7: ALPHANiTV8 +501  METAV6 -501  (131s)
+  Match 8: ALPHANiTV8 +253  METAV6 -253  (510s)
+  Match 9: ALPHANiTV8 +538  METAV6 -538  (94s)
+  Match 10: ALPHANiTV8 +183  METAV6 -183  (353s)
+  Total: ALPHANiTV8 +3820  METAV6 -3820  (Wins: 10-0)
+
+=== ALPHANiTV8 vs METAV5 (10 matches) ===
+  Match 1: ALPHANiTV8 +490  METAV5 -490  (156s)
+  Match 2: ALPHANiTV8 +343  METAV5 -343  (262s)
+  Match 3: ALPHANiTV8 +477  METAV5 -477  (158s)
+  Match 4: ALPHANiTV8 -857  METAV5 +857  (346s)
+  Match 5: ALPHANiTV8 +510  METAV5 -510  (52s)
+  Match 6: ALPHANiTV8 +425  METAV5 -425  (218s)
+  Match 7: ALPHANiTV8 +462  METAV5 -462  (115s)
+  Match 8: ALPHANiTV8 +446  METAV5 -446  (172s)
+  Match 9: ALPHANiTV8 +339  METAV5 -339  (305s)
+  Match 10: ALPHANiTV8 +515  METAV5 -515  (133s)
+  Total: ALPHANiTV8 +3150  METAV5 -3150  (Wins: 9-1)
+
+=== ALPHANiTV8 vs LambdaV1 (10 matches) ===
+  Match 1: ALPHANiTV8 +225  LambdaV1 -225  (592s)
+  Match 2: ALPHANiTV8 +353  LambdaV1 -353  (312s)
+  Match 3: ALPHANiTV8 +262  LambdaV1 -262  (516s)
+  Match 4: ALPHANiTV8 +472  LambdaV1 -472  (156s)
+  Match 5: ALPHANiTV8 +402  LambdaV1 -402  (185s)
+  Match 6: ALPHANiTV8 +417  LambdaV1 -417  (275s)
+  Match 7: ALPHANiTV8 +282  LambdaV1 -282  (376s)
+  Match 8: ALPHANiTV8 +308  LambdaV1 -308  (312s)
+  Match 9: ALPHANiTV8 +359  LambdaV1 -359  (222s)
+  Match 10: ALPHANiTV8 +380  LambdaV1 -380  (184s)
+  Total: ALPHANiTV8 +3460  LambdaV1 -3460  (Wins: 10-0)
+
+=== ALPHANiTV7 vs METAV6 (10 matches) ===
+  Match 1: ALPHANiTV7 -1424  METAV6 +1424  (53s)
+  Match 2: ALPHANiTV7 +402  METAV6 -402  (26s)
+  Match 3: ALPHANiTV7 -1451  METAV6 +1451  (39s)
+  Match 4: ALPHANiTV7 -1485  METAV6 +1485  (41s)
+  Match 5: ALPHANiTV7 -1513  METAV6 +1513  (27s)
+  Match 6: ALPHANiTV7 +428  METAV6 -428  (20s)
+  Match 7: ALPHANiTV7 +338  METAV6 -338  (29s)
+  Match 8: ALPHANiTV7 +512  METAV6 -512  (13s)
+  Match 9: ALPHANiTV7 +405  METAV6 -405  (21s)
+  Match 10: ALPHANiTV7 +411  METAV6 -411  (19s)
+  Total: ALPHANiTV7 -3377  METAV6 +3377  (Wins: 6-4)
+
+=== ALPHANiTV7 vs METAV5 (10 matches) ===
+  Match 1: ALPHANiTV7 +492  METAV5 -492  (13s)
+  Match 2: ALPHANiTV7 +354  METAV5 -354  (24s)
+  Match 3: ALPHANiTV7 +411  METAV5 -411  (23s)
+  Match 4: ALPHANiTV7 +81  METAV5 -81  (51s)
+  Match 5: ALPHANiTV7 -1322  METAV5 +1322  (25s)
+  Match 6: ALPHANiTV7 -1421  METAV5 +1421  (17s)
+  Match 7: ALPHANiTV7 +400  METAV5 -400  (18s)
+  Match 8: ALPHANiTV7 +435  METAV5 -435  (15s)
+  Match 9: ALPHANiTV7 +216  METAV5 -216  (49s)
+  Match 10: ALPHANiTV7 +496  METAV5 -496  (10s)
+  Total: ALPHANiTV7 +142  METAV5 -142  (Wins: 8-2)
+
+=== ALPHANiTV7 vs LambdaV1 (10 matches) ===
+  Match 1: ALPHANiTV7 +362  LambdaV1 -362  (30s)
+  Match 2: ALPHANiTV7 +314  LambdaV1 -314  (37s)
+  Match 3: ALPHANiTV7 -1481  LambdaV1 +1481  (30s)
+  Match 4: ALPHANiTV7 +307  LambdaV1 -307  (38s)
+  Match 5: ALPHANiTV7 +218  LambdaV1 -218  (48s)
+  Match 6: ALPHANiTV7 +464  LambdaV1 -464  (12s)
+  Match 7: ALPHANiTV7 +274  LambdaV1 -274  (33s)
+  Match 8: ALPHANiTV7 -1423  LambdaV1 +1423  (53s)
+  Match 9: ALPHANiTV7 +367  LambdaV1 -367  (22s)
+  Match 10: ALPHANiTV7 +410  LambdaV1 -410  (17s)
+  Total: ALPHANiTV7 -188  LambdaV1 +188  (Wins: 8-2)
+
+=== METAV6 vs METAV5 (10 matches) ===
+  Match 1: METAV6 -274  METAV5 +274  (32s)
+  Match 2: METAV6 +385  METAV5 -385  (36s)
+  Match 3: METAV6 +424  METAV5 -424  (14s)
+  Match 4: METAV6 +523  METAV5 -523  (12s)
+  Match 5: METAV6 +141  METAV5 -141  (31s)
+  Match 6: METAV6 +381  METAV5 -381  (23s)
+  Match 7: METAV6 +1  METAV5 -1  (26s)
+  Match 8: METAV6 -280  METAV5 +280  (27s)
+  Match 9: METAV6 +446  METAV5 -446  (27s)
+  Match 10: METAV6 +398  METAV5 -398  (24s)
+  Total: METAV6 +2145  METAV5 -2145  (Wins: 8-2)
+
+=== METAV6 vs LambdaV1 (10 matches) ===
+  Match 1: METAV6 +391  LambdaV1 -391  (24s)
+  Match 2: METAV6 +423  LambdaV1 -423  (10s)
+  Match 3: METAV6 -361  LambdaV1 +361  (38s)
+  Match 4: METAV6 +116  LambdaV1 -116  (61s)
+  Match 5: METAV6 -1078  LambdaV1 +1078  (52s)
+  Match 6: METAV6 +328  LambdaV1 -328  (47s)
+  Match 7: METAV6 +431  LambdaV1 -431  (24s)
+  Match 8: METAV6 +305  LambdaV1 -305  (27s)
+  Match 9: METAV6 +325  LambdaV1 -325  (54s)
+  Match 10: METAV6 -264  LambdaV1 +264  (51s)
+  Total: METAV6 +616  LambdaV1 -616  (Wins: 7-3)
+
+=== METAV5 vs LambdaV1 (10 matches) ===
+  Match 1: METAV5 -353  LambdaV1 +353  (46s)
+  Match 2: METAV5 -253  LambdaV1 +253  (31s)
+  Match 3: METAV5 +433  LambdaV1 -433  (25s)
+  Match 4: METAV5 +342  LambdaV1 -342  (27s)
+  Match 5: METAV5 +353  LambdaV1 -353  (44s)
+  Match 6: METAV5 +464  LambdaV1 -464  (27s)
+  Match 7: METAV5 +347  LambdaV1 -347  (20s)
+  Match 8: METAV5 -1375  LambdaV1 +1375  (43s)
+  Match 9: METAV5 +293  LambdaV1 -293  (43s)
+  Match 10: METAV5 +339  LambdaV1 -339  (39s)
+  Total: METAV5 +590  LambdaV1 -590  (Wins: 7-3)
+
+
+============================================================
+FINAL STANDINGS
+============================================================
+
+Bot           Total Chips   Match Wins
+--------------------------------------
+ALPHANiTV8         +13901           38
+METAV6              +2318           19
+LambdaV1            -4478            8
+METAV5              -4847           12
+ALPHANiTV7          -6894           23
+
+Head-to-head (total chip diff in 10 matches):
+--------------------------------------------------
+  ALPHANiTV8 vs ALPHANiTV7:  ALPHANiTV8 +3471  ALPHANiTV7 -3471
+  ALPHANiTV8 vs METAV6:  ALPHANiTV8 +3820  METAV6 -3820
+  ALPHANiTV8 vs METAV5:  ALPHANiTV8 +3150  METAV5 -3150
+  ALPHANiTV8 vs LambdaV1:  ALPHANiTV8 +3460  LambdaV1 -3460
+  ALPHANiTV7 vs METAV6:  ALPHANiTV7 -3377  METAV6 +3377
+  ALPHANiTV7 vs METAV5:  ALPHANiTV7 +142  METAV5 -142
+  ALPHANiTV7 vs LambdaV1:  ALPHANiTV7 -188  LambdaV1 +188
+  METAV6 vs METAV5:  METAV6 +2145  METAV5 -2145
+  METAV6 vs LambdaV1:  METAV6 +616  LambdaV1 -616
+  METAV5 vs LambdaV1:  METAV5 +590  LambdaV1 -590
+56

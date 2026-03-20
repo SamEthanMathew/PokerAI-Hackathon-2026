@@ -1,0 +1,242 @@
+[01:47:15] ROUND-ROBIN TOURNAMENT
+[01:47:15] Started: 2026-03-18 01:47:15
+[01:47:15] Bots: DELTA, OMICRoN, MetaV5, GenesisV2
+[01:47:15] Pairs: 6, Matches/pair: 5, Hands/match: 1000
+[01:47:15] Total matches: 30
+[01:47:15] ========================================================================
+[01:47:15] 
+MATCH 1/30: DELTA vs OMICRoN (game 1/5)
+[01:47:24]   hand  250: DELTA=+1218  OMICRoN=-1218  t_a=3.7s  t_b=5.1s
+[01:47:24]   hand  500: DELTA= +968  OMICRoN= -968  t_a=3.7s  t_b=5.1s
+[01:47:24]   hand  750: DELTA= +718  OMICRoN= -718  t_a=3.7s  t_b=5.1s
+[01:47:24]   hand 1000: DELTA= +468  OMICRoN= -468  t_a=3.7s  t_b=5.1s
+[01:47:24]   RESULT: DELTA=+468  OMICRoN=-468  winner=DELTA (+936)  avg_ms: DELTA=3.7 OMICRoN=5.1  errors=0
+[01:47:24] 
+MATCH 2/30: DELTA vs OMICRoN (game 2/5)
+[01:47:36]   hand  250: DELTA= -513  OMICRoN= +513  t_a=4.9s  t_b=6.8s
+[01:47:43]   hand  500: DELTA= -807  OMICRoN= +807  t_a=8.1s  t_b=10.9s
+[01:47:47]   hand  750: DELTA= -249  OMICRoN= +249  t_a=9.6s  t_b=12.9s
+[01:47:48]   hand 1000: DELTA=   -1  OMICRoN=   +1  t_a=10.0s  t_b=13.2s
+[01:47:48]   RESULT: DELTA=-1  OMICRoN=+1  winner=OMICRoN (+2)  avg_ms: DELTA=10.0 OMICRoN=13.2  errors=0
+[01:47:48] 
+MATCH 3/30: DELTA vs OMICRoN (game 3/5)
+[01:47:55]   hand  250: DELTA=-1128  OMICRoN=+1128  t_a=3.0s  t_b=4.0s
+[01:47:59]   hand  500: DELTA= -836  OMICRoN= +836  t_a=4.8s  t_b=6.3s
+[01:47:59]   hand  750: DELTA= -463  OMICRoN= +463  t_a=5.2s  t_b=6.5s
+[01:48:00]   hand 1000: DELTA=  -68  OMICRoN=  +68  t_a=5.4s  t_b=6.5s
+[01:48:00]   RESULT: DELTA=-68  OMICRoN=+68  winner=OMICRoN (+136)  avg_ms: DELTA=5.4 OMICRoN=6.5  errors=0
+[01:48:00] 
+MATCH 4/30: DELTA vs OMICRoN (game 4/5)
+[01:48:09]   hand  250: DELTA=+1163  OMICRoN=-1163  t_a=4.1s  t_b=5.6s
+[01:48:09]   hand  500: DELTA= +913  OMICRoN= -913  t_a=4.1s  t_b=5.6s
+[01:48:10]   hand  750: DELTA= +663  OMICRoN= -663  t_a=4.1s  t_b=5.6s
+[01:48:10]   hand 1000: DELTA= +413  OMICRoN= -413  t_a=4.1s  t_b=5.6s
+[01:48:10]   RESULT: DELTA=+413  OMICRoN=-413  winner=DELTA (+826)  avg_ms: DELTA=4.1 OMICRoN=5.6  errors=0
+[01:48:10] 
+MATCH 5/30: DELTA vs OMICRoN (game 5/5)
+[01:48:22]   hand  250: DELTA= -986  OMICRoN= +986  t_a=5.1s  t_b=7.1s
+[01:48:23]   hand  500: DELTA= -762  OMICRoN= +762  t_a=5.7s  t_b=7.7s
+[01:48:27]   hand  750: DELTA= +434  OMICRoN= -434  t_a=7.3s  t_b=9.7s
+[01:48:27]   hand 1000: DELTA= +184  OMICRoN= -184  t_a=7.3s  t_b=9.7s
+[01:48:27]   RESULT: DELTA=+184  OMICRoN=-184  winner=DELTA (+368)  avg_ms: DELTA=7.3 OMICRoN=9.7  errors=0
+[01:48:27] 
+MATCH 6/30: DELTA vs MetaV5 (game 1/5)
+[01:48:42]   hand  250: DELTA= -435  MetaV5= +435  t_a=5.0s  t_b=10.2s
+[01:48:48]   hand  500: DELTA= -986  MetaV5= +986  t_a=7.0s  t_b=13.9s
+[01:49:04]   hand  750: DELTA= -749  MetaV5= +749  t_a=12.2s  t_b=24.7s
+[01:49:17]   hand 1000: DELTA= -131  MetaV5= +131  t_a=16.9s  t_b=33.5s
+[01:49:17]   RESULT: DELTA=-131  MetaV5=+131  winner=MetaV5 (+262)  avg_ms: DELTA=16.9 MetaV5=33.5  errors=0
+[01:49:17] 
+MATCH 7/30: DELTA vs MetaV5 (game 2/5)
+[01:49:34]   hand  250: DELTA=  +12  MetaV5=  -12  t_a=5.6s  t_b=11.5s
+[01:49:49]   hand  500: DELTA=  +57  MetaV5=  -57  t_a=10.5s  t_b=21.2s
+[01:49:53]   hand  750: DELTA= +511  MetaV5= -511  t_a=11.8s  t_b=24.0s
+[01:49:53]   hand 1000: DELTA= +261  MetaV5= -261  t_a=11.8s  t_b=24.0s
+[01:49:53]   RESULT: DELTA=+261  MetaV5=-261  winner=DELTA (+522)  avg_ms: DELTA=11.8 MetaV5=24.0  errors=0
+[01:49:53] 
+MATCH 8/30: DELTA vs MetaV5 (game 3/5)
+[01:50:06]   hand  250: DELTA=+1185  MetaV5=-1185  t_a=4.1s  t_b=8.7s
+[01:50:06]   hand  500: DELTA= +935  MetaV5= -935  t_a=4.1s  t_b=8.7s
+[01:50:06]   hand  750: DELTA= +685  MetaV5= -685  t_a=4.1s  t_b=8.7s
+[01:50:06]   hand 1000: DELTA= +435  MetaV5= -435  t_a=4.1s  t_b=8.7s
+[01:50:06]   RESULT: DELTA=+435  MetaV5=-435  winner=DELTA (+870)  avg_ms: DELTA=4.1 MetaV5=8.7  errors=0
+[01:50:06] 
+MATCH 9/30: DELTA vs MetaV5 (game 4/5)
+[01:50:11]   hand  250: DELTA=+1301  MetaV5=-1301  t_a=1.5s  t_b=3.2s
+[01:50:11]   hand  500: DELTA=+1051  MetaV5=-1051  t_a=1.5s  t_b=3.2s
+[01:50:11]   hand  750: DELTA= +801  MetaV5= -801  t_a=1.5s  t_b=3.2s
+[01:50:11]   hand 1000: DELTA= +551  MetaV5= -551  t_a=1.5s  t_b=3.2s
+[01:50:11]   RESULT: DELTA=+551  MetaV5=-551  winner=DELTA (+1102)  avg_ms: DELTA=1.5 MetaV5=3.2  errors=0
+[01:50:11] 
+MATCH 10/30: DELTA vs MetaV5 (game 5/5)
+[01:50:23]   hand  250: DELTA=+1216  MetaV5=-1216  t_a=3.9s  t_b=7.9s
+[01:50:23]   hand  500: DELTA= +966  MetaV5= -966  t_a=3.9s  t_b=7.9s
+[01:50:23]   hand  750: DELTA= +716  MetaV5= -716  t_a=3.9s  t_b=7.9s
+[01:50:23]   hand 1000: DELTA= +466  MetaV5= -466  t_a=3.9s  t_b=7.9s
+[01:50:23]   RESULT: DELTA=+466  MetaV5=-466  winner=DELTA (+932)  avg_ms: DELTA=3.9 MetaV5=7.9  errors=0
+[01:50:23] 
+MATCH 11/30: DELTA vs GenesisV2 (game 1/5)
+[01:53:59]   hand  250: DELTA= +687  GenesisV2= -687  t_a=5.4s  t_b=210.7s
+[01:54:28]   hand  500: DELTA= +872  GenesisV2= -872  t_a=6.1s  t_b=238.9s
+[01:54:28]   hand  750: DELTA= +622  GenesisV2= -622  t_a=6.1s  t_b=238.9s
+[01:54:28]   hand 1000: DELTA= +372  GenesisV2= -372  t_a=6.1s  t_b=238.9s
+[01:54:28]   RESULT: DELTA=+372  GenesisV2=-372  winner=DELTA (+744)  avg_ms: DELTA=6.1 GenesisV2=238.9  errors=0
+[01:54:28] 
+MATCH 12/30: DELTA vs GenesisV2 (game 2/5)
+[01:58:32]   hand  250: DELTA= -554  GenesisV2= +554  t_a=5.8s  t_b=237.9s
+[01:59:04]   hand  500: DELTA= -736  GenesisV2= +736  t_a=6.9s  t_b=269.4s
+[02:00:27]   hand  750: DELTA= -448  GenesisV2= +448  t_a=9.1s  t_b=350.1s
+[02:00:33]   hand 1000: DELTA=  +41  GenesisV2=  -41  t_a=9.4s  t_b=355.9s
+[02:00:33]   RESULT: DELTA=+41  GenesisV2=-41  winner=DELTA (+82)  avg_ms: DELTA=9.4 GenesisV2=355.9  errors=0
+[02:00:33] 
+MATCH 13/30: DELTA vs GenesisV2 (game 3/5)
+[02:04:13]   hand  250: DELTA=  -31  GenesisV2=  +31  t_a=5.3s  t_b=214.6s
+[02:04:52]   hand  500: DELTA= +915  GenesisV2= -915  t_a=6.3s  t_b=252.2s
+[02:04:52]   hand  750: DELTA= +665  GenesisV2= -665  t_a=6.3s  t_b=252.2s
+[02:04:52]   hand 1000: DELTA= +415  GenesisV2= -415  t_a=6.3s  t_b=252.2s
+[02:04:52]   RESULT: DELTA=+415  GenesisV2=-415  winner=DELTA (+830)  avg_ms: DELTA=6.3 GenesisV2=252.2  errors=0
+[02:04:52] 
+MATCH 14/30: DELTA vs GenesisV2 (game 4/5)
+[02:08:27]   hand  250: DELTA= -337  GenesisV2= +337  t_a=5.1s  t_b=209.4s
+[02:11:15]   hand  500: DELTA= -131  GenesisV2= +131  t_a=9.2s  t_b=373.6s
+[02:13:13]   hand  750: DELTA= +444  GenesisV2= -444  t_a=12.1s  t_b=488.1s
+[02:13:13]   hand 1000: DELTA= +194  GenesisV2= -194  t_a=12.1s  t_b=488.1s
+[02:13:13]   RESULT: DELTA=+194  GenesisV2=-194  winner=DELTA (+388)  avg_ms: DELTA=12.1 GenesisV2=488.1  errors=0
+[02:13:13] 
+MATCH 15/30: DELTA vs GenesisV2 (game 5/5)
+[02:16:59]   hand  250: DELTA= -950  GenesisV2= +950  t_a=5.4s  t_b=221.4s
+[02:19:53]   hand  500: DELTA= +769  GenesisV2= -769  t_a=9.7s  t_b=390.8s
+[02:19:53]   hand  750: DELTA= +519  GenesisV2= -519  t_a=9.7s  t_b=390.8s
+[02:19:53]   hand 1000: DELTA= +269  GenesisV2= -269  t_a=9.7s  t_b=390.8s
+[02:19:53]   RESULT: DELTA=+269  GenesisV2=-269  winner=DELTA (+538)  avg_ms: DELTA=9.7 GenesisV2=390.8  errors=0
+[02:19:53] 
+MATCH 16/30: OMICRoN vs MetaV5 (game 1/5)
+[02:20:08]   hand  250: OMICRoN=  +37  MetaV5=  -37  t_a=5.0s  t_b=9.7s
+[02:20:12]   hand  500: OMICRoN= +842  MetaV5= -842  t_a=6.3s  t_b=12.5s
+[02:20:12]   hand  750: OMICRoN= +592  MetaV5= -592  t_a=6.3s  t_b=12.5s
+[02:20:12]   hand 1000: OMICRoN= +342  MetaV5= -342  t_a=6.3s  t_b=12.5s
+[02:20:12]   RESULT: OMICRoN=+342  MetaV5=-342  winner=OMICRoN (+684)  avg_ms: OMICRoN=6.3 MetaV5=12.5  errors=0
+[02:20:12] 
+MATCH 17/30: OMICRoN vs MetaV5 (game 2/5)
+[02:20:27]   hand  250: OMICRoN= -335  MetaV5= +335  t_a=5.0s  t_b=10.0s
+[02:20:43]   hand  500: OMICRoN= -638  MetaV5= +638  t_a=10.2s  t_b=20.1s
+[02:20:50]   hand  750: OMICRoN= -892  MetaV5= +892  t_a=12.7s  t_b=25.1s
+[02:20:56]   hand 1000: OMICRoN=  +70  MetaV5=  -70  t_a=14.7s  t_b=29.0s
+[02:20:56]   RESULT: OMICRoN=+70  MetaV5=-70  winner=OMICRoN (+140)  avg_ms: OMICRoN=14.7 MetaV5=29.0  errors=0
+[02:20:56] 
+MATCH 18/30: OMICRoN vs MetaV5 (game 3/5)
+[02:21:14]   hand  250: OMICRoN= +939  MetaV5= -939  t_a=5.8s  t_b=11.7s
+[02:21:14]   hand  500: OMICRoN= +894  MetaV5= -894  t_a=5.9s  t_b=11.9s
+[02:21:14]   hand  750: OMICRoN= +644  MetaV5= -644  t_a=5.9s  t_b=11.9s
+[02:21:14]   hand 1000: OMICRoN= +394  MetaV5= -394  t_a=5.9s  t_b=11.9s
+[02:21:14]   RESULT: OMICRoN=+394  MetaV5=-394  winner=OMICRoN (+788)  avg_ms: OMICRoN=5.9 MetaV5=11.9  errors=0
+[02:21:14] 
+MATCH 19/30: OMICRoN vs MetaV5 (game 4/5)
+[02:21:27]   hand  250: OMICRoN=+1176  MetaV5=-1176  t_a=4.2s  t_b=8.7s
+[02:21:27]   hand  500: OMICRoN= +926  MetaV5= -926  t_a=4.2s  t_b=8.7s
+[02:21:27]   hand  750: OMICRoN= +676  MetaV5= -676  t_a=4.2s  t_b=8.7s
+[02:21:27]   hand 1000: OMICRoN= +426  MetaV5= -426  t_a=4.2s  t_b=8.7s
+[02:21:27]   RESULT: OMICRoN=+426  MetaV5=-426  winner=OMICRoN (+852)  avg_ms: OMICRoN=4.2 MetaV5=8.7  errors=0
+[02:21:27] 
+MATCH 20/30: OMICRoN vs MetaV5 (game 5/5)
+[02:21:41]   hand  250: OMICRoN=+1204  MetaV5=-1204  t_a=4.8s  t_b=9.7s
+[02:21:41]   hand  500: OMICRoN= +954  MetaV5= -954  t_a=4.8s  t_b=9.7s
+[02:21:41]   hand  750: OMICRoN= +704  MetaV5= -704  t_a=4.8s  t_b=9.7s
+[02:21:41]   hand 1000: OMICRoN= +454  MetaV5= -454  t_a=4.8s  t_b=9.7s
+[02:21:41]   RESULT: OMICRoN=+454  MetaV5=-454  winner=OMICRoN (+908)  avg_ms: OMICRoN=4.8 MetaV5=9.7  errors=0
+[02:21:41] 
+MATCH 21/30: OMICRoN vs GenesisV2 (game 1/5)
+[02:25:32]   hand  250: OMICRoN= -532  GenesisV2= +532  t_a=5.6s  t_b=225.2s
+[02:28:52]   hand  500: OMICRoN= -336  GenesisV2= +336  t_a=10.4s  t_b=419.8s
+[02:30:36]   hand  750: OMICRoN= +432  GenesisV2= -432  t_a=13.0s  t_b=521.4s
+[02:30:36]   hand 1000: OMICRoN= +182  GenesisV2= -182  t_a=13.0s  t_b=521.4s
+[02:30:36]   RESULT: OMICRoN=+182  GenesisV2=-182  winner=OMICRoN (+364)  avg_ms: OMICRoN=13.0 GenesisV2=521.4  errors=0
+[02:30:36] 
+MATCH 22/30: OMICRoN vs GenesisV2 (game 2/5)
+[02:33:36]   hand  250: OMICRoN=+1221  GenesisV2=-1221  t_a=4.7s  t_b=175.0s
+[02:33:36]   hand  500: OMICRoN= +971  GenesisV2= -971  t_a=4.7s  t_b=175.0s
+[02:33:36]   hand  750: OMICRoN= +721  GenesisV2= -721  t_a=4.7s  t_b=175.0s
+[02:33:36]   hand 1000: OMICRoN= +471  GenesisV2= -471  t_a=4.7s  t_b=175.0s
+[02:33:36]   RESULT: OMICRoN=+471  GenesisV2=-471  winner=OMICRoN (+942)  avg_ms: OMICRoN=4.7 GenesisV2=175.0  errors=0
+[02:33:36] 
+MATCH 23/30: OMICRoN vs GenesisV2 (game 3/5)
+[02:37:01]   hand  250: OMICRoN= -601  GenesisV2= +601  t_a=5.2s  t_b=200.0s
+[02:40:11]   hand  500: OMICRoN=  +90  GenesisV2=  -90  t_a=9.9s  t_b=385.0s
+[02:42:35]   hand  750: OMICRoN= +403  GenesisV2= -403  t_a=13.5s  t_b=525.6s
+[02:42:35]   hand 1000: OMICRoN= +153  GenesisV2= -153  t_a=13.5s  t_b=525.6s
+[02:42:35]   RESULT: OMICRoN=+153  GenesisV2=-153  winner=OMICRoN (+306)  avg_ms: OMICRoN=13.5 GenesisV2=525.6  errors=0
+[02:42:35] 
+MATCH 24/30: OMICRoN vs GenesisV2 (game 4/5)
+[02:44:48]   hand  250: OMICRoN=+1229  GenesisV2=-1229  t_a=3.4s  t_b=129.7s
+[02:44:48]   hand  500: OMICRoN= +979  GenesisV2= -979  t_a=3.4s  t_b=129.7s
+[02:44:48]   hand  750: OMICRoN= +729  GenesisV2= -729  t_a=3.4s  t_b=129.7s
+[02:44:49]   hand 1000: OMICRoN= +479  GenesisV2= -479  t_a=3.4s  t_b=129.7s
+[02:44:49]   RESULT: OMICRoN=+479  GenesisV2=-479  winner=OMICRoN (+958)  avg_ms: OMICRoN=3.4 GenesisV2=129.7  errors=0
+[02:44:49] 
+MATCH 25/30: OMICRoN vs GenesisV2 (game 5/5)
+[02:45:36]   hand  250: OMICRoN=+1238  GenesisV2=-1238  t_a=1.3s  t_b=45.7s
+[02:45:36]   hand  500: OMICRoN= +988  GenesisV2= -988  t_a=1.3s  t_b=45.7s
+[02:45:36]   hand  750: OMICRoN= +738  GenesisV2= -738  t_a=1.3s  t_b=45.7s
+[02:45:36]   hand 1000: OMICRoN= +488  GenesisV2= -488  t_a=1.3s  t_b=45.7s
+[02:45:36]   RESULT: OMICRoN=+488  GenesisV2=-488  winner=OMICRoN (+976)  avg_ms: OMICRoN=1.3 GenesisV2=45.7  errors=0
+[02:45:36] 
+MATCH 26/30: MetaV5 vs GenesisV2 (game 1/5)
+[02:48:12]   hand  250: MetaV5=  +83  GenesisV2=  -83  t_a=7.4s  t_b=149.0s
+[02:48:55]   hand  500: MetaV5= -770  GenesisV2= +770  t_a=11.0s  t_b=188.1s
+[02:48:59]   hand  750: MetaV5= -393  GenesisV2= +393  t_a=13.6s  t_b=189.8s
+[02:49:05]   hand 1000: MetaV5=  -33  GenesisV2=  +33  t_a=16.4s  t_b=192.8s
+[02:49:05]   RESULT: MetaV5=-33  GenesisV2=+33  winner=GenesisV2 (+66)  avg_ms: MetaV5=16.4 GenesisV2=192.8  errors=0
+[02:49:05] 
+MATCH 27/30: MetaV5 vs GenesisV2 (game 2/5)
+[02:51:55]   hand  250: MetaV5=-1167  GenesisV2=+1167  t_a=8.0s  t_b=161.9s
+[02:54:11]   hand  500: MetaV5= -826  GenesisV2= +826  t_a=14.1s  t_b=292.2s
+[02:54:27]   hand  750: MetaV5= -475  GenesisV2= +475  t_a=14.9s  t_b=307.3s
+[02:54:29]   hand 1000: MetaV5=  -81  GenesisV2=  +81  t_a=15.0s  t_b=308.8s
+[02:54:29]   RESULT: MetaV5=-81  GenesisV2=+81  winner=GenesisV2 (+162)  avg_ms: MetaV5=15.0 GenesisV2=308.8  errors=0
+[02:54:29] 
+MATCH 28/30: MetaV5 vs GenesisV2 (game 3/5)
+[02:58:28]   hand  250: MetaV5= -700  GenesisV2= +700  t_a=11.5s  t_b=227.4s
+[02:58:46]   hand  500: MetaV5= -845  GenesisV2= +845  t_a=12.3s  t_b=244.2s
+[02:58:49]   hand  750: MetaV5= -433  GenesisV2= +433  t_a=12.5s  t_b=247.2s
+[02:58:55]   hand 1000: MetaV5=  -51  GenesisV2=  +51  t_a=12.8s  t_b=253.2s
+[02:58:55]   RESULT: MetaV5=-51  GenesisV2=+51  winner=GenesisV2 (+102)  avg_ms: MetaV5=12.8 GenesisV2=253.2  errors=0
+[02:58:55] 
+MATCH 29/30: MetaV5 vs GenesisV2 (game 4/5)
+[03:01:22]   hand  250: MetaV5=-1162  GenesisV2=+1162  t_a=6.8s  t_b=140.3s
+[03:01:27]   hand  500: MetaV5= -768  GenesisV2= +768  t_a=7.0s  t_b=144.8s
+[03:01:34]   hand  750: MetaV5= -280  GenesisV2= +280  t_a=7.4s  t_b=151.0s
+[03:01:43]   hand 1000: MetaV5=  +71  GenesisV2=  -71  t_a=7.8s  t_b=160.0s
+[03:01:43]   RESULT: MetaV5=+71  GenesisV2=-71  winner=MetaV5 (+142)  avg_ms: MetaV5=7.8 GenesisV2=160.0  errors=0
+[03:01:43] 
+MATCH 30/30: MetaV5 vs GenesisV2 (game 5/5)
+[03:04:12]   hand  250: MetaV5=-1176  GenesisV2=+1176  t_a=6.9s  t_b=141.5s
+[03:04:40]   hand  500: MetaV5= -827  GenesisV2= +827  t_a=8.3s  t_b=168.8s
+[03:04:44]   hand  750: MetaV5= -399  GenesisV2= +399  t_a=8.5s  t_b=172.0s
+[03:04:45]   hand 1000: MetaV5=   -1  GenesisV2=   +1  t_a=8.5s  t_b=173.5s
+[03:04:45]   RESULT: MetaV5=-1  GenesisV2=+1  winner=GenesisV2 (+2)  avg_ms: MetaV5=8.5 GenesisV2=173.5  errors=0
+[03:04:45] 
+========================================================================
+[03:04:45] TOURNAMENT COMPLETE — elapsed 4650s
+[03:04:45] ========================================================================
+[03:04:45] 
+────────────────────────────────────────────────────────────────────────
+[03:04:45]   HEAD-TO-HEAD RESULTS
+[03:04:45] ────────────────────────────────────────────────────────────────────────
+[03:04:45]   DELTA        vs OMICRoN     :  DELTA 3W-2L-0T  PnL: DELTA=  +996  OMICRoN=  -996
+[03:04:45]   DELTA        vs MetaV5      :  DELTA 4W-1L-0T  PnL: DELTA= +1582  MetaV5= -1582
+[03:04:45]   DELTA        vs GenesisV2   :  DELTA 5W-0L-0T  PnL: DELTA= +1291  GenesisV2= -1291
+[03:04:45]   OMICRoN      vs MetaV5      :  OMICRoN 5W-0L-0T  PnL: OMICRoN= +1686  MetaV5= -1686
+[03:04:45]   OMICRoN      vs GenesisV2   :  OMICRoN 5W-0L-0T  PnL: OMICRoN= +1773  GenesisV2= -1773
+[03:04:45]   MetaV5       vs GenesisV2   :  MetaV5 1W-4L-0T  PnL: MetaV5=   -95  GenesisV2=   +95
+[03:04:45] 
+────────────────────────────────────────────────────────────────────────
+[03:04:45]   FINAL STANDINGS (sorted by wins, then PnL)
+[03:04:45] ────────────────────────────────────────────────────────────────────────
+[03:04:45]   Bot             W    L    T      PnL   Avg ms  Errors
+[03:04:45]   ────────────  ───  ───  ───  ───────  ───────  ──────
+[03:04:45]   DELTA          12    3    0    +3869      7.5       0
+[03:04:45]   OMICRoN        12    3    0    +2463      7.5       0
+[03:04:45]   GenesisV2       4   11    0    -2969    280.8       0
+[03:04:45]   MetaV5          2   13    0    -3363     14.0       0
+[03:04:45] 
+  Log saved to: /Users/rudrakshsingh/Downloads/poker-engine-2026/logs/tournament_results.log

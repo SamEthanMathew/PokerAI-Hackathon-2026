@@ -1,0 +1,141 @@
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+  ALPHANiTV8 vs ALPHANiTV7  Match 1/10: +455 vs -455  (258s)
+  ALPHANiTV8 vs ALPHANiTV7  Match 2/10: +295 vs -295  (339s)
+  ALPHANiTV8 vs ALPHANiTV7  Match 3/10: +533 vs -533  (110s)
+  ALPHANiTV8 vs ALPHANiTV7  Match 4/10: +485 vs -485  (157s)
+  ALPHANiTV8 vs ALPHANiTV7  Match 5/10: +446 vs -446  (154s)
+  ALPHANiTV8 vs ALPHANiTV7  Match 6/10: +100 vs -100  (391s)
+  ALPHANiTV8 vs ALPHANiTV7  Match 7/10: +473 vs -473  (128s)
+  ALPHANiTV8 vs ALPHANiTV7  Match 8/10: -19 vs +19  (272s)
+  ALPHANiTV8 vs ALPHANiTV7  Match 9/10: +248 vs -248  (474s)
+  ALPHANiTV8 vs ALPHANiTV7  Match 10/10: +455 vs -455  (208s)
+  ALPHANiTV8 vs METAV6  Match 1/10: +333 vs -333  (313s)
+  ALPHANiTV8 vs METAV6  Match 2/10: +430 vs -430  (211s)
+  ALPHANiTV8 vs METAV6  Match 3/10: +398 vs -398  (170s)
+  ALPHANiTV8 vs METAV6  Match 4/10: +419 vs -419  (278s)
+  ALPHANiTV8 vs METAV6  Match 5/10: +447 vs -447  (102s)
+  ALPHANiTV8 vs METAV6  Match 6/10: +318 vs -318  (428s)
+  ALPHANiTV8 vs METAV6  Match 7/10: +501 vs -501  (131s)
+  ALPHANiTV8 vs METAV6  Match 8/10: +253 vs -253  (510s)
+  ALPHANiTV8 vs METAV6  Match 9/10: +538 vs -538  (94s)
+  ALPHANiTV8 vs METAV6  Match 10/10: +183 vs -183  (353s)
+  ALPHANiTV8 vs METAV5  Match 1/10: +490 vs -490  (156s)
+  ALPHANiTV8 vs METAV5  Match 2/10: +343 vs -343  (262s)
+  ALPHANiTV8 vs METAV5  Match 3/10: +477 vs -477  (158s)
+  ALPHANiTV8 vs METAV5  Match 4/10: -857 vs +857  (346s)
+  ALPHANiTV8 vs METAV5  Match 5/10: +510 vs -510  (52s)
+  ALPHANiTV8 vs METAV5  Match 6/10: +425 vs -425  (218s)
+  ALPHANiTV8 vs METAV5  Match 7/10: +462 vs -462  (115s)
+  ALPHANiTV8 vs METAV5  Match 8/10: +446 vs -446  (172s)
+  ALPHANiTV8 vs METAV5  Match 9/10: +339 vs -339  (305s)
+  ALPHANiTV8 vs METAV5  Match 10/10: +515 vs -515  (133s)
+  ALPHANiTV8 vs LambdaV1  Match 1/10: +225 vs -225  (592s)
+  ALPHANiTV8 vs LambdaV1  Match 2/10: +353 vs -353  (312s)
+  ALPHANiTV8 vs LambdaV1  Match 3/10: +262 vs -262  (516s)
+  ALPHANiTV8 vs LambdaV1  Match 4/10: +472 vs -472  (156s)
+  ALPHANiTV8 vs LambdaV1  Match 5/10: +402 vs -402  (185s)
+  ALPHANiTV8 vs LambdaV1  Match 6/10: +417 vs -417  (275s)
+  ALPHANiTV8 vs LambdaV1  Match 7/10: +282 vs -282  (376s)
+  ALPHANiTV8 vs LambdaV1  Match 8/10: +308 vs -308  (312s)
+  ALPHANiTV8 vs LambdaV1  Match 9/10: +359 vs -359  (222s)
+  ALPHANiTV8 vs LambdaV1  Match 10/10: +380 vs -380  (184s)
+  ALPHANiTV7 vs METAV6  Match 1/10: -1424 vs +1424  (53s)
+  ALPHANiTV7 vs METAV6  Match 2/10: +402 vs -402  (26s)
+  ALPHANiTV7 vs METAV6  Match 3/10: -1451 vs +1451  (39s)
+  ALPHANiTV7 vs METAV6  Match 4/10: -1485 vs +1485  (41s)
+  ALPHANiTV7 vs METAV6  Match 5/10: -1513 vs +1513  (27s)
+  ALPHANiTV7 vs METAV6  Match 6/10: +428 vs -428  (20s)
+  ALPHANiTV7 vs METAV6  Match 7/10: +338 vs -338  (29s)
+  ALPHANiTV7 vs METAV6  Match 8/10: +512 vs -512  (13s)
+  ALPHANiTV7 vs METAV6  Match 9/10: +405 vs -405  (21s)
+  ALPHANiTV7 vs METAV6  Match 10/10: +411 vs -411  (19s)
+  ALPHANiTV7 vs METAV5  Match 1/10: +492 vs -492  (13s)
+  ALPHANiTV7 vs METAV5  Match 2/10: +354 vs -354  (24s)
+  ALPHANiTV7 vs METAV5  Match 3/10: +411 vs -411  (23s)
+  ALPHANiTV7 vs METAV5  Match 4/10: +81 vs -81  (51s)
+  ALPHANiTV7 vs METAV5  Match 5/10: -1322 vs +1322  (25s)
+  ALPHANiTV7 vs METAV5  Match 6/10: -1421 vs +1421  (17s)
+  ALPHANiTV7 vs METAV5  Match 7/10: +400 vs -400  (18s)
+  ALPHANiTV7 vs METAV5  Match 8/10: +435 vs -435  (15s)
+  ALPHANiTV7 vs METAV5  Match 9/10: +216 vs -216  (49s)
+  ALPHANiTV7 vs METAV5  Match 10/10: +496 vs -496  (10s)
+  ALPHANiTV7 vs LambdaV1  Match 1/10: +362 vs -362  (30s)
+  ALPHANiTV7 vs LambdaV1  Match 2/10: +314 vs -314  (37s)
+  ALPHANiTV7 vs LambdaV1  Match 3/10: -1481 vs +1481  (30s)
+  ALPHANiTV7 vs LambdaV1  Match 4/10: +307 vs -307  (38s)
+  ALPHANiTV7 vs LambdaV1  Match 5/10: +218 vs -218  (48s)
+  ALPHANiTV7 vs LambdaV1  Match 6/10: +464 vs -464  (12s)
+  ALPHANiTV7 vs LambdaV1  Match 7/10: +274 vs -274  (33s)
+  ALPHANiTV7 vs LambdaV1  Match 8/10: -1423 vs +1423  (53s)
+  ALPHANiTV7 vs LambdaV1  Match 9/10: +367 vs -367  (22s)
+  ALPHANiTV7 vs LambdaV1  Match 10/10: +410 vs -410  (17s)
+  METAV6 vs METAV5  Match 1/10: -274 vs +274  (32s)
+  METAV6 vs METAV5  Match 2/10: +385 vs -385  (36s)
+  METAV6 vs METAV5  Match 3/10: +424 vs -424  (14s)
+  METAV6 vs METAV5  Match 4/10: +523 vs -523  (12s)
+  METAV6 vs METAV5  Match 5/10: +141 vs -141  (31s)
+  METAV6 vs METAV5  Match 6/10: +381 vs -381  (23s)
+  METAV6 vs METAV5  Match 7/10: +1 vs -1  (26s)
+  METAV6 vs METAV5  Match 8/10: -280 vs +280  (27s)
+  METAV6 vs METAV5  Match 9/10: +446 vs -446  (27s)
+  METAV6 vs METAV5  Match 10/10: +398 vs -398  (24s)
+  METAV6 vs LambdaV1  Match 1/10: +391 vs -391  (24s)
+  METAV6 vs LambdaV1  Match 2/10: +423 vs -423  (10s)
+  METAV6 vs LambdaV1  Match 3/10: -361 vs +361  (38s)
+  METAV6 vs LambdaV1  Match 4/10: +116 vs -116  (61s)
+  METAV6 vs LambdaV1  Match 5/10: -1078 vs +1078  (52s)
+  METAV6 vs LambdaV1  Match 6/10: +328 vs -328  (47s)
+  METAV6 vs LambdaV1  Match 7/10: +431 vs -431  (24s)
+  METAV6 vs LambdaV1  Match 8/10: +305 vs -305  (27s)
+  METAV6 vs LambdaV1  Match 9/10: +325 vs -325  (54s)
+  METAV6 vs LambdaV1  Match 10/10: -264 vs +264  (51s)
+  METAV5 vs LambdaV1  Match 1/10: -353 vs +353  (46s)
+  METAV5 vs LambdaV1  Match 2/10: -253 vs +253  (31s)
+  METAV5 vs LambdaV1  Match 3/10: +433 vs -433  (25s)
+  METAV5 vs LambdaV1  Match 4/10: +342 vs -342  (27s)
+  METAV5 vs LambdaV1  Match 5/10: +353 vs -353  (44s)
+  METAV5 vs LambdaV1  Match 6/10: +464 vs -464  (27s)
+  METAV5 vs LambdaV1  Match 7/10: +347 vs -347  (20s)
+  METAV5 vs LambdaV1  Match 8/10: -1375 vs +1375  (43s)
+  METAV5 vs LambdaV1  Match 9/10: +293 vs -293  (43s)
+  METAV5 vs LambdaV1  Match 10/10: +339 vs -339  (39s)
+
+============================================================
+FINAL STANDINGS
+============================================================
+
+Bot               Total Chips   Match Wins
+------------------------------------------
+ALPHANiTV8             +13901           38
+METAV6                  +2318           19
+LambdaV1                -4478            8
+METAV5                  -4847           12
+ALPHANiTV7              -6894           23
+
+Head-to-head (total chip diff over 10 matches):
+--------------------------------------------------
+  ALPHANiTV8 vs ALPHANiTV7:  ALPHANiTV8 +3471  ALPHANiTV7 -3471
+  ALPHANiTV8 vs METAV6:  ALPHANiTV8 +3820  METAV6 -3820
+  ALPHANiTV8 vs METAV5:  ALPHANiTV8 +3150  METAV5 -3150
+  ALPHANiTV8 vs LambdaV1:  ALPHANiTV8 +3460  LambdaV1 -3460
+  ALPHANiTV7 vs METAV6:  ALPHANiTV7 -3377  METAV6 +3377
+  ALPHANiTV7 vs METAV5:  ALPHANiTV7 +142  METAV5 -142
+  ALPHANiTV7 vs LambdaV1:  ALPHANiTV7 -188  LambdaV1 +188
+  METAV6 vs METAV5:  METAV6 +2145  METAV5 -2145
+  METAV6 vs LambdaV1:  METAV6 +616  LambdaV1 -616
+  METAV5 vs LambdaV1:  METAV5 +590  LambdaV1 -590
+
+Log: /Users/rudrakshsingh/Downloads/poker-engine-2026/logs/tournament_round_robin.log
+CSV: /Users/rudrakshsingh/Downloads/poker-engine-2026/logs/tournament_round_robin_results.csv
+vs METAV6:  ALPHANiTV7 +3170  METAV6 -3170
+  ALPHANiTV7 vs METAV5:  ALPHANiTV7 +4015  METAV5 -4015
+  ALPHANiTV7 vs LambdaV1:  ALPHANiTV7 +4055  LambdaV1 -4055
+  METAV6 vs METAV5:  METAV6 +3165  METAV5 -3165
+  METAV6 vs LambdaV1:  METAV6 +2129  LambdaV1 -2129
+  METAV5 vs LambdaV1:  METAV5 +1056  LambdaV1 -1056
+
+Log: /Users/rudrakshsingh/Downloads/poker-engine-2026/logs/tournament_round_robin.log
+CSV: /Users/rudrakshsingh/Downloads/poker-engine-2026/logs/tournament_round_robin_results.csv
