@@ -1,0 +1,30 @@
+2026-03-21 07:49:51,370 - match_77659 - INFO - Starting agents
+2026-03-21 07:49:51,375 - match_77659 - INFO - Sending match start notification
+2026-03-21 07:49:51,437 - match_77659 - INFO - Starting match
+2026-03-21 07:49:51,444 - match_77659 - INFO - Backing off for 1 seconds before retry 1
+2026-03-21 07:49:52,446 - match_77659 - INFO - Backing off for 2 seconds before retry 2
+2026-03-21 07:49:54,458 - match_77659 - INFO - Hand number: 0, ALL IN bankroll: 2, Ctrl+Alt+Defeat bankroll: -2
+2026-03-21 07:50:12,093 - match_77659 - INFO - Hand number: 50, ALL IN bankroll: 732, Ctrl+Alt+Defeat bankroll: -732
+2026-03-21 07:50:29,005 - match_77659 - INFO - Hand number: 100, ALL IN bankroll: 598, Ctrl+Alt+Defeat bankroll: -598
+2026-03-21 07:50:42,081 - match_77659 - INFO - Hand number: 150, ALL IN bankroll: 738, Ctrl+Alt+Defeat bankroll: -738
+2026-03-21 07:50:58,990 - match_77659 - INFO - Hand number: 200, ALL IN bankroll: 618, Ctrl+Alt+Defeat bankroll: -618
+2026-03-21 07:51:19,611 - match_77659 - INFO - Hand number: 250, ALL IN bankroll: 508, Ctrl+Alt+Defeat bankroll: -508
+2026-03-21 07:51:36,984 - match_77659 - INFO - Hand number: 300, ALL IN bankroll: 490, Ctrl+Alt+Defeat bankroll: -490
+2026-03-21 07:51:50,459 - match_77659 - INFO - Hand number: 350, ALL IN bankroll: 278, Ctrl+Alt+Defeat bankroll: -278
+2026-03-21 07:52:07,504 - match_77659 - INFO - Hand number: 400, ALL IN bankroll: 316, Ctrl+Alt+Defeat bankroll: -316
+2026-03-21 07:52:26,922 - match_77659 - INFO - Hand number: 450, ALL IN bankroll: 71, Ctrl+Alt+Defeat bankroll: -71
+2026-03-21 07:52:42,056 - match_77659 - INFO - Hand number: 500, ALL IN bankroll: 1, Ctrl+Alt+Defeat bankroll: -1
+2026-03-21 07:52:59,100 - match_77659 - INFO - Hand number: 550, ALL IN bankroll: 231, Ctrl+Alt+Defeat bankroll: -231
+2026-03-21 07:53:12,865 - match_77659 - INFO - Hand number: 600, ALL IN bankroll: 257, Ctrl+Alt+Defeat bankroll: -257
+2026-03-21 07:53:29,288 - match_77659 - INFO - Hand number: 650, ALL IN bankroll: 331, Ctrl+Alt+Defeat bankroll: -331
+2026-03-21 07:53:32,917 - match_77659 - INFO - Hand number: 700, ALL IN bankroll: 460, Ctrl+Alt+Defeat bankroll: -460
+2026-03-21 07:53:34,042 - match_77659 - INFO - Hand number: 750, ALL IN bankroll: 385, Ctrl+Alt+Defeat bankroll: -385
+2026-03-21 07:53:35,075 - match_77659 - INFO - Hand number: 800, ALL IN bankroll: 314, Ctrl+Alt+Defeat bankroll: -314
+2026-03-21 07:53:36,234 - match_77659 - INFO - Hand number: 850, ALL IN bankroll: 251, Ctrl+Alt+Defeat bankroll: -251
+2026-03-21 07:53:37,376 - match_77659 - INFO - Hand number: 900, ALL IN bankroll: 188, Ctrl+Alt+Defeat bankroll: -188
+2026-03-21 07:53:38,499 - match_77659 - INFO - Hand number: 950, ALL IN bankroll: 121, Ctrl+Alt+Defeat bankroll: -121
+2026-03-21 07:53:39,694 - match_77659 - INFO - All hands completed
+2026-03-21 07:53:39,694 - match_77659 - INFO - Final results - ALL IN bankroll: 55, Ctrl+Alt+Defeat bankroll: -55
+2026-03-21 07:53:39,694 - match_77659 - INFO - Time used - ALL IN: 194.72 seconds, Ctrl+Alt+Defeat: 18.65 seconds
+2026-03-21 07:53:39,694 - match_77659 - INFO - Time limit: 1500 seconds
+2026-03-21 07:53:39,695 - match_77659 - INFO - Terminating agents
