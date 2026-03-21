@@ -836,6 +836,9 @@ class PlayerAgent(Agent):
         self._last_preflop_raise = False
         self._last_after_shock = False
         self._we_folded = False
+        self._opp_continued_flop = False
+        self._opp_continued_turn = False
+        self._opp_bet_into_us_river = False
         self._event_store = []
         self._line_state = {
             "we_checked_this_node": False,
@@ -1153,6 +1156,12 @@ class PlayerAgent(Agent):
         if opp_sem in ("initiative_bet", "raise_vs_bet") and last_street >= 1:
             self._last_opp_aggr_street = last_street
         self._opp_raised_prev_street = (opp_sem in ("initiative_bet", "raise_vs_bet"))
+        if last_street == 1 and opp_sem in ("call", "initiative_bet", "raise_vs_bet"):
+            self._opp_continued_flop = True
+        if last_street == 2 and opp_sem in ("call", "initiative_bet", "raise_vs_bet"):
+            self._opp_continued_turn = True
+        if last_street == 3 and opp_sem in ("initiative_bet", "raise_vs_bet"):
+            self._opp_bet_into_us_river = True
         if opp_sem == "check":
             self._line_state["villain_checked_this_node"] = True
         self._line_state["last_aggressor_previous_street"] = "villain" if self._opp_raised_prev_street else "none"
@@ -1340,6 +1349,9 @@ class PlayerAgent(Agent):
 
             self._opp_folded = False
             self._we_folded = False
+            self._opp_continued_flop = False
+            self._opp_continued_turn = False
+            self._opp_bet_into_us_river = False
             self._last_was_bet = False
             self._last_street = 0
             self._opp_raised_prev_street = False
@@ -2214,21 +2226,23 @@ class PlayerAgent(Agent):
                         if valid[RAISE]:
                             result = (RAISE, open_size, 0, 0)
                             self._preflop_reason = "premium_standard_open"
-                        elif valid[CALL]:
+                        elif valid[CALL] and to_call <= 12:
                             result = (CALL, 0, 0, 0)
                             self._preflop_reason = "premium_call"
                         else:
                             result = (CHECK, 0, 0, 0)
                             self._preflop_reason = "premium_check"
                 else:
-                    if preflop_eq >= normal_eq_gate:
+                    bb_calling = to_call > 0 and valid[CALL]
+                    call_eq_floor = normal_eq_gate + (0.03 if bb_calling else 0.0)
+                    if preflop_eq >= (call_eq_floor if bb_calling else normal_eq_gate):
                         open_prob = _clamp(0.40 + 0.35 * pressure + (0.50 * urgency if in_comeback_mode else 0.0), 0.20, 0.98)
                         self._pflog_open_prob = open_prob
                         if to_call <= 0 and valid[RAISE] and random.random() < open_prob:
                             amt = _clamp(int(8 * (1.0 + 0.25 * pressure) * random.uniform(0.9, 1.1)), min_raise, max_raise)
                             result = (RAISE, amt, 0, 0)
                             self._preflop_reason = "equity_raise"
-                        elif valid[CALL] and to_call <= (10 if in_critical_mode else 6 if in_comeback_mode else 4):
+                        elif valid[CALL] and to_call <= (6 if in_critical_mode else 3 if in_comeback_mode else 2):
                             result = (CALL, 0, 0, 0)
                             self._preflop_reason = "equity_call"
                         elif valid[CHECK]:
@@ -2262,6 +2276,15 @@ class PlayerAgent(Agent):
             eq_sims = 100 if sim_mode == "emergency" else (200 if sim_mode == "conservative" else 500)
             equity = self._compute_equity_ranged(
                 my_cards, community, dead, opp_discards, signal_passive, signal_aggr, num_sims=eq_sims)
+
+            opp_continuations = 0
+            if street >= 2 and self._opp_continued_flop:
+                opp_continuations += 1
+            if street >= 3 and self._opp_continued_turn:
+                opp_continuations += 1
+            if opp_continuations > 0:
+                deflation = 0.07 * opp_continuations
+                equity = _clamp(equity - deflation, 0.0, 0.98)
 
             hand_cat = _hand_rank_category(my_cards, community)
             # OPT7: compute outs once, derive has_draw without re-calling
@@ -2399,7 +2422,10 @@ class PlayerAgent(Agent):
                     base_amt = _clamp(int(pot_ref * bet_frac), min_raise, max_raise)
                     raise_amt = self._dynamic_sizing(base_amt, strength, street, False, exploit_adj)
                     raise_amt = _clamp(raise_amt, min_raise, max_raise)
-                    if valid[RAISE]:
+                    if street == 3 and to_call <= 0 and valid[RAISE]:
+                        thin_val = _clamp(int(pot_ref * 0.45), min_raise, max_raise)
+                        result = (RAISE, thin_val, 0, 0)
+                    elif valid[RAISE]:
                         result = (RAISE, raise_amt, 0, 0)
                     elif valid[CALL]:
                         result = (CALL, 0, 0, 0)
@@ -2414,14 +2440,19 @@ class PlayerAgent(Agent):
                     if to_call <= 0 and valid[RAISE]:
                         result = (RAISE, raise_amt, 0, 0)
                     elif to_call > 0 and equity >= call_gate and valid[CALL]:
-                        result = (CALL, 0, 0, 0)
+                        if street == 3 and equity < 0.52:
+                            result = (FOLD, 0, 0, 0) if not valid[CHECK] else (CHECK, 0, 0, 0)
+                        else:
+                            result = (CALL, 0, 0, 0)
                     elif valid[CHECK]:
                         result = (CHECK, 0, 0, 0)
                     else:
                         result = (FOLD, 0, 0, 0)
 
                 elif equity >= call_gate and to_call > 0 and to_call <= pot_ref * 0.35:
-                    if valid[CALL]:
+                    if street == 3 and equity < 0.40:
+                        result = (FOLD, 0, 0, 0)
+                    elif valid[CALL]:
                         result = (CALL, 0, 0, 0)
                     elif valid[CHECK]:
                         result = (CHECK, 0, 0, 0)
