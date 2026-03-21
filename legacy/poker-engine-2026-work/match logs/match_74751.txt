@@ -1,0 +1,29 @@
+2026-03-21 03:19:43,844 - match_74751 - INFO - Starting agents
+2026-03-21 03:19:43,849 - match_74751 - INFO - Sending match start notification
+2026-03-21 03:19:43,910 - match_74751 - INFO - Starting match
+2026-03-21 03:19:43,916 - match_74751 - INFO - Backing off for 1 seconds before retry 1
+2026-03-21 03:19:44,926 - match_74751 - INFO - Hand number: 0, Ctrl+Alt+Defeat bankroll: 2, Alan Keating bankroll: -2
+2026-03-21 03:19:47,348 - match_74751 - INFO - Hand number: 50, Ctrl+Alt+Defeat bankroll: 150, Alan Keating bankroll: -150
+2026-03-21 03:19:49,943 - match_74751 - INFO - Hand number: 100, Ctrl+Alt+Defeat bankroll: 282, Alan Keating bankroll: -282
+2026-03-21 03:19:52,472 - match_74751 - INFO - Hand number: 150, Ctrl+Alt+Defeat bankroll: 280, Alan Keating bankroll: -280
+2026-03-21 03:19:55,310 - match_74751 - INFO - Hand number: 200, Ctrl+Alt+Defeat bankroll: 156, Alan Keating bankroll: -156
+2026-03-21 03:19:57,616 - match_74751 - INFO - Hand number: 250, Ctrl+Alt+Defeat bankroll: 394, Alan Keating bankroll: -394
+2026-03-21 03:20:00,228 - match_74751 - INFO - Hand number: 300, Ctrl+Alt+Defeat bankroll: -72, Alan Keating bankroll: 72
+2026-03-21 03:20:02,979 - match_74751 - INFO - Hand number: 350, Ctrl+Alt+Defeat bankroll: -292, Alan Keating bankroll: 292
+2026-03-21 03:20:05,392 - match_74751 - INFO - Hand number: 400, Ctrl+Alt+Defeat bankroll: -433, Alan Keating bankroll: 433
+2026-03-21 03:20:07,957 - match_74751 - INFO - Hand number: 450, Ctrl+Alt+Defeat bankroll: 12, Alan Keating bankroll: -12
+2026-03-21 03:20:10,760 - match_74751 - INFO - Hand number: 500, Ctrl+Alt+Defeat bankroll: -363, Alan Keating bankroll: 363
+2026-03-21 03:20:13,622 - match_74751 - INFO - Hand number: 550, Ctrl+Alt+Defeat bankroll: -627, Alan Keating bankroll: 627
+2026-03-21 03:20:14,182 - match_74751 - INFO - Hand number: 600, Ctrl+Alt+Defeat bankroll: -653, Alan Keating bankroll: 653
+2026-03-21 03:20:14,675 - match_74751 - INFO - Hand number: 650, Ctrl+Alt+Defeat bankroll: -578, Alan Keating bankroll: 578
+2026-03-21 03:20:15,161 - match_74751 - INFO - Hand number: 700, Ctrl+Alt+Defeat bankroll: -503, Alan Keating bankroll: 503
+2026-03-21 03:20:15,643 - match_74751 - INFO - Hand number: 750, Ctrl+Alt+Defeat bankroll: -428, Alan Keating bankroll: 428
+2026-03-21 03:20:16,137 - match_74751 - INFO - Hand number: 800, Ctrl+Alt+Defeat bankroll: -353, Alan Keating bankroll: 353
+2026-03-21 03:20:16,649 - match_74751 - INFO - Hand number: 850, Ctrl+Alt+Defeat bankroll: -278, Alan Keating bankroll: 278
+2026-03-21 03:20:17,165 - match_74751 - INFO - Hand number: 900, Ctrl+Alt+Defeat bankroll: -203, Alan Keating bankroll: 203
+2026-03-21 03:20:17,679 - match_74751 - INFO - Hand number: 950, Ctrl+Alt+Defeat bankroll: -128, Alan Keating bankroll: 128
+2026-03-21 03:20:18,184 - match_74751 - INFO - All hands completed
+2026-03-21 03:20:18,184 - match_74751 - INFO - Final results - Ctrl+Alt+Defeat bankroll: -55, Alan Keating bankroll: 55
+2026-03-21 03:20:18,184 - match_74751 - INFO - Time used - Ctrl+Alt+Defeat: 18.78 seconds, Alan Keating: 3.40 seconds
+2026-03-21 03:20:18,185 - match_74751 - INFO - Time limit: 1500 seconds
+2026-03-21 03:20:18,185 - match_74751 - INFO - Terminating agents

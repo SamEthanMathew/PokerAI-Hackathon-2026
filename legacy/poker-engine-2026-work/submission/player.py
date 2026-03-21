@@ -192,9 +192,9 @@ def _board_monotone_penalty(my_cards, community):
     dom_suit = sc.index(dom_cnt)
     my_in_suit = (_SUIT[my_cards[0]] == dom_suit) + (_SUIT[my_cards[1]] == dom_suit)
     if my_in_suit == 0:
-        return -0.18
+        return -0.09
     if my_in_suit == 1:
-        return -0.06
+        return -0.03
     return 0.0
 
 
@@ -227,11 +227,11 @@ def _board_connected_penalty(my_cards, community):
                 cur_run = 1
         if best_run >= 5:
             return 0.0
-        return -0.10
-    if hcat == "two_pair":
-        return -0.10
-    if hcat == "one_pair":
         return -0.05
+    if hcat == "two_pair":
+        return -0.05
+    if hcat == "one_pair":
+        return -0.02
     return 0.0
 
 
@@ -246,7 +246,7 @@ def _opp_flush_inference(community, opp_discards):
         opp_sc[_SUIT[c]] += 1
     for s in range(3):
         if b_sc[s] >= 2 and opp_sc[s] == 0:
-            return -0.08
+            return -0.04
     return 0.0
 
 
@@ -498,12 +498,12 @@ def _opp_keep_weight_lut(opp_hand, community, opp_discards, model_weights,
             if rank_idx == 0:
                 return 1.0
             elif rank_idx == 1:
-                return 0.06
+                return 0.30
             elif rank_idx == 2:
-                return 0.01
+                return 0.10
             else:
-                return 0.002
-    return 0.002
+                return 0.03
+    return 0.03
 
 
 def _exact_discard_equity_lut(my_keep, community, dead_cards):
@@ -1704,15 +1704,21 @@ class PlayerAgent(Agent):
         return _clamp(equity, 0.0, 0.98)
 
     @staticmethod
-    def _cat_to_strength(hand_cat, has_draw, my_cards=None, community=None):
-        if hand_cat == "trips_plus":
+    def _cat_to_strength(hand_cat, has_draw, adj_equity=None, my_cards=None, community=None):
+        if adj_equity is None:
+            adj_equity = 0.50
+        if adj_equity >= 0.85:
             return "monster"
-        if hand_cat == "two_pair":
+        if hand_cat == "trips_plus" and adj_equity >= 0.68:
             return "monster"
-        if hand_cat == "one_pair" and has_draw:
+        if hand_cat in ("trips_plus", "two_pair") and adj_equity >= 0.58:
+            return "strong"
+        if hand_cat in ("trips_plus", "two_pair"):
+            return "medium"
+        if hand_cat == "one_pair" and has_draw and adj_equity >= 0.55:
             return "strong"
         if hand_cat == "one_pair":
-            return "medium"
+            return "medium" if adj_equity >= 0.42 else "weak"
         if has_draw:
             return "draw"
         return "weak"
@@ -1720,7 +1726,7 @@ class PlayerAgent(Agent):
     def _semi_bluff_check(self, my_cards, community, opp_discards, my_discards,
                           pot_size, to_call, street, valid, min_raise, max_raise,
                           exploit_adj, has_draw=None, flush_outs_v=None, straight_outs_v=None,
-                          rand_ctx=None):
+                          rand_ctx=None, adj_equity=None):
         if street not in (1, 2):
             return False, None
         if not (valid[RAISE] and max_raise >= min_raise):
@@ -1739,6 +1745,8 @@ class PlayerAgent(Agent):
 
         outs = max(f_outs, s_outs)
         if outs < 2:
+            return False, None
+        if adj_equity is not None and adj_equity < 0.12:
             return False, None
         if to_call > pot_size * 0.40:
             return False, None
@@ -2141,6 +2149,8 @@ class PlayerAgent(Agent):
                 preflop_eq = self._preflop_equity(my_cards) if len(my_cards) == 5 else 0.45
                 self._pflog_eq = preflop_eq
                 self._pflog_gate = early_eq_gate
+                if premium and preflop_eq < 0.42:
+                    premium = False
                 if premium:
                     if premium_pair and opp_bet >= PREFLOP_COMMIT_THRESHOLD and valid[RAISE]:
                         result = (RAISE, max_raise, 0, 0)
@@ -2182,6 +2192,10 @@ class PlayerAgent(Agent):
                         self._preflop_reason = "fold_no_equity"
 
             else:
+                preflop_eq = self._preflop_equity(my_cards) if len(my_cards) == 5 else 0.45
+                self._pflog_eq = preflop_eq
+                if premium and preflop_eq < 0.42:
+                    premium = False
                 if premium:
                     if premium_pair and opp_bet >= PREFLOP_COMMIT_THRESHOLD and valid[RAISE]:
                         result = (RAISE, max_raise, 0, 0)
@@ -2206,8 +2220,6 @@ class PlayerAgent(Agent):
                             result = (CHECK, 0, 0, 0)
                             self._preflop_reason = "premium_check"
                 else:
-                    preflop_eq = self._preflop_equity(my_cards) if len(my_cards) == 5 else 0.45
-                    self._pflog_eq = preflop_eq
                     self._pflog_gate = normal_eq_gate
                     if preflop_eq >= normal_eq_gate:
                         open_prob = _clamp(0.40 + 0.35 * pressure + (0.50 * urgency if in_comeback_mode else 0.0), 0.20, 0.98)
@@ -2256,7 +2268,6 @@ class PlayerAgent(Agent):
             suit_count, flush_outs, _ = _count_flush_outs(my_cards, community, opp_discards, my_discards)
             run_count, straight_outs, _ = _count_straight_outs(my_cards, community, opp_discards, my_discards)
             has_draw = (suit_count >= 4 and flush_outs >= 2) or (run_count >= 4 and straight_outs >= 3)
-            strength = self._cat_to_strength(hand_cat, has_draw, my_cards, community)
             equity_before_adjust = float(equity)
             outs = max(flush_outs, straight_outs)
             draw_adj = 0.0
@@ -2268,6 +2279,7 @@ class PlayerAgent(Agent):
             board_connected_penalty = _board_connected_penalty(my_cards, community)
             opp_flush_inference_penalty = _opp_flush_inference(community, opp_discards)
             raw_texture_adj = board_monotone_penalty + board_connected_penalty + opp_flush_inference_penalty
+            raw_texture_adj = max(raw_texture_adj, -0.15)
             if in_comeback_mode:
                 # Dampen board texture penalties — in comeback mode we need variance,
                 # not overly cautious folds on decent raw equity
@@ -2277,6 +2289,7 @@ class PlayerAgent(Agent):
                 texture_dampen_factor = 1.0
                 street_adjust_total = draw_adj + raw_texture_adj
             equity = _clamp(equity_before_adjust + street_adjust_total, 0.0, 0.98)
+            strength = self._cat_to_strength(hand_cat, has_draw, adj_equity=equity, my_cards=my_cards, community=community)
 
             to_call = max(0, opp_bet - my_bet)
             pot_ref = max(pot_size, 1)
@@ -2316,7 +2329,7 @@ class PlayerAgent(Agent):
                     my_cards, community, opp_discards, my_discards,
                     pot_size, to_call, street, valid, min_raise, max_raise, zero_adj,
                     has_draw=has_draw, flush_outs_v=flush_outs, straight_outs_v=straight_outs,
-                    rand_ctx=rand_ctx)
+                    rand_ctx=rand_ctx, adj_equity=equity)
                 if b_fire:
                     baseline_result = b_sb
             if baseline_result is None:
@@ -2324,7 +2337,7 @@ class PlayerAgent(Agent):
                     bfrac = rand_ctx["monster_flop_frac"] if street == 1 else (rand_ctx["monster_turn_frac"] if street == 2 else 1.0)
                     bamt = _clamp(int(pot_ref * bfrac), min_raise, max_raise)
                     b_raise = _clamp(self._dynamic_sizing(bamt, strength, street, False, zero_adj), min_raise, max_raise)
-                    baseline_result = (RAISE, max_raise, 0, 0) if (street == 3 and valid[RAISE]) else ((RAISE, b_raise, 0, 0) if valid[RAISE] else ((CALL, 0, 0, 0) if valid[CALL] else (CHECK, 0, 0, 0)))
+                    baseline_result = (RAISE, _clamp(int(pot_ref * 0.75), min_raise, max_raise), 0, 0) if (street == 3 and valid[RAISE]) else ((RAISE, b_raise, 0, 0) if valid[RAISE] else ((CALL, 0, 0, 0) if valid[CALL] else (CHECK, 0, 0, 0)))
                 elif equity > STRONG_THRESHOLD:
                     bfrac = rand_ctx["strong_flop_frac"] if street == 1 else (rand_ctx["strong_turn_frac"] if street == 2 else rand_ctx["strong_river_frac"])
                     bamt = _clamp(int(pot_ref * bfrac), min_raise, max_raise)
@@ -2351,7 +2364,7 @@ class PlayerAgent(Agent):
                     my_cards, community, opp_discards, my_discards,
                     pot_size, to_call, street, valid, min_raise, max_raise, exploit_adj,
                     has_draw=has_draw, flush_outs_v=flush_outs, straight_outs_v=straight_outs,
-                    rand_ctx=rand_ctx)
+                    rand_ctx=rand_ctx, adj_equity=equity)
                 if fire:
                     result = sb_action
 
@@ -2367,7 +2380,8 @@ class PlayerAgent(Agent):
                     raise_amt = self._dynamic_sizing(base_amt, strength, street, False, exploit_adj)
                     raise_amt = _clamp(raise_amt, min_raise, max_raise)
                     if street == 3 and valid[RAISE]:
-                        result = (RAISE, max_raise, 0, 0)
+                        river_val_size = _clamp(int(pot_ref * 0.75), min_raise, max_raise)
+                        result = (RAISE, river_val_size, 0, 0)
                     elif valid[RAISE]:
                         result = (RAISE, raise_amt, 0, 0)
                     elif valid[CALL]:
@@ -2425,13 +2439,10 @@ class PlayerAgent(Agent):
             if result[0] == FOLD and to_call <= 0 and valid[CHECK]:
                 result = (CHECK, 0, 0, 0)
 
-            if result[0] == FOLD and my_bet > 0 and pot_ref > 0 and my_bet >= pot_ref * 0.40:
-                if valid[CALL]:
-                    result = (CALL, 0, 0, 0)
-
             if (result[0] == FOLD and len(my_cards) == 2
                     and _is_premium_pair(my_cards[0], my_cards[1])
                     and to_call > 0 and to_call <= pot_ref * 0.20
+                    and equity >= 0.30
                     and valid[CALL]):
                 result = (CALL, 0, 0, 0)
 

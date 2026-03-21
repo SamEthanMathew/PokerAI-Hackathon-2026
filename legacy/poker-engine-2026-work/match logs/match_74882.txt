@@ -1,0 +1,29 @@
+2026-03-21 03:35:42,192 - match_74882 - INFO - Starting agents
+2026-03-21 03:35:42,196 - match_74882 - INFO - Sending match start notification
+2026-03-21 03:35:42,255 - match_74882 - INFO - Starting match
+2026-03-21 03:35:42,261 - match_74882 - INFO - Backing off for 1 seconds before retry 1
+2026-03-21 03:35:43,851 - match_74882 - INFO - Hand number: 0, wushilandb00ba bankroll: 100, Ctrl+Alt+Defeat bankroll: -100
+2026-03-21 03:36:01,737 - match_74882 - INFO - Hand number: 50, wushilandb00ba bankroll: 522, Ctrl+Alt+Defeat bankroll: -522
+2026-03-21 03:36:20,618 - match_74882 - INFO - Hand number: 100, wushilandb00ba bankroll: 912, Ctrl+Alt+Defeat bankroll: -912
+2026-03-21 03:36:39,324 - match_74882 - INFO - Hand number: 150, wushilandb00ba bankroll: 1208, Ctrl+Alt+Defeat bankroll: -1208
+2026-03-21 03:37:00,905 - match_74882 - INFO - Hand number: 200, wushilandb00ba bankroll: 1564, Ctrl+Alt+Defeat bankroll: -1564
+2026-03-21 03:37:21,754 - match_74882 - INFO - Hand number: 250, wushilandb00ba bankroll: 1379, Ctrl+Alt+Defeat bankroll: -1379
+2026-03-21 03:37:41,881 - match_74882 - INFO - Hand number: 300, wushilandb00ba bankroll: 1184, Ctrl+Alt+Defeat bankroll: -1184
+2026-03-21 03:38:00,543 - match_74882 - INFO - Hand number: 350, wushilandb00ba bankroll: 1358, Ctrl+Alt+Defeat bankroll: -1358
+2026-03-21 03:38:19,614 - match_74882 - INFO - Hand number: 400, wushilandb00ba bankroll: 1352, Ctrl+Alt+Defeat bankroll: -1352
+2026-03-21 03:38:39,278 - match_74882 - INFO - Hand number: 450, wushilandb00ba bankroll: 888, Ctrl+Alt+Defeat bankroll: -888
+2026-03-21 03:38:58,280 - match_74882 - INFO - Hand number: 500, wushilandb00ba bankroll: 710, Ctrl+Alt+Defeat bankroll: -710
+2026-03-21 03:39:18,331 - match_74882 - INFO - Hand number: 550, wushilandb00ba bankroll: 755, Ctrl+Alt+Defeat bankroll: -755
+2026-03-21 03:39:39,963 - match_74882 - INFO - Hand number: 600, wushilandb00ba bankroll: 623, Ctrl+Alt+Defeat bankroll: -623
+2026-03-21 03:40:00,317 - match_74882 - INFO - Hand number: 650, wushilandb00ba bankroll: 1175, Ctrl+Alt+Defeat bankroll: -1175
+2026-03-21 03:40:20,359 - match_74882 - INFO - Hand number: 700, wushilandb00ba bankroll: 1009, Ctrl+Alt+Defeat bankroll: -1009
+2026-03-21 03:40:39,507 - match_74882 - INFO - Hand number: 750, wushilandb00ba bankroll: 1202, Ctrl+Alt+Defeat bankroll: -1202
+2026-03-21 03:40:58,502 - match_74882 - INFO - Hand number: 800, wushilandb00ba bankroll: 945, Ctrl+Alt+Defeat bankroll: -945
+2026-03-21 03:41:18,872 - match_74882 - INFO - Hand number: 850, wushilandb00ba bankroll: 1312, Ctrl+Alt+Defeat bankroll: -1312
+2026-03-21 03:41:38,922 - match_74882 - INFO - Hand number: 900, wushilandb00ba bankroll: 1510, Ctrl+Alt+Defeat bankroll: -1510
+2026-03-21 03:41:59,228 - match_74882 - INFO - Hand number: 950, wushilandb00ba bankroll: 1277, Ctrl+Alt+Defeat bankroll: -1277
+2026-03-21 03:42:18,913 - match_74882 - INFO - All hands completed
+2026-03-21 03:42:18,913 - match_74882 - INFO - Final results - wushilandb00ba bankroll: 1143, Ctrl+Alt+Defeat bankroll: -1143
+2026-03-21 03:42:18,913 - match_74882 - INFO - Time used - wushilandb00ba: 335.49 seconds, Ctrl+Alt+Defeat: 39.81 seconds
+2026-03-21 03:42:18,913 - match_74882 - INFO - Time limit: 1500 seconds
+2026-03-21 03:42:18,913 - match_74882 - INFO - Terminating agents

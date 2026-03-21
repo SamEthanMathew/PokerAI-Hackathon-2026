@@ -1,0 +1,30 @@
+2026-03-21 02:19:44,256 - match_74088 - INFO - Starting agents
+2026-03-21 02:19:44,263 - match_74088 - INFO - Sending match start notification
+2026-03-21 02:19:44,357 - match_74088 - INFO - Starting match
+2026-03-21 02:19:44,368 - match_74088 - INFO - Backing off for 1 seconds before retry 1
+2026-03-21 02:19:51,545 - match_74088 - INFO - Hand number: 0, sheep army bankroll: 100, Ctrl+Alt+Defeat bankroll: -100
+2026-03-21 02:22:04,219 - match_74088 - INFO - Hand number: 50, sheep army bankroll: 607, Ctrl+Alt+Defeat bankroll: -607
+2026-03-21 02:24:49,748 - match_74088 - INFO - Hand number: 100, sheep army bankroll: 229, Ctrl+Alt+Defeat bankroll: -229
+2026-03-21 02:26:02,236 - match_74088 - INFO - Backing off for 1 seconds before retry 1
+2026-03-21 02:27:24,251 - match_74088 - INFO - Hand number: 150, sheep army bankroll: 667, Ctrl+Alt+Defeat bankroll: -667
+2026-03-21 02:29:05,013 - match_74088 - INFO - Hand number: 200, sheep army bankroll: 1221, Ctrl+Alt+Defeat bankroll: -1221
+2026-03-21 02:29:06,918 - match_74088 - INFO - Hand number: 250, sheep army bankroll: 1158, Ctrl+Alt+Defeat bankroll: -1158
+2026-03-21 02:29:08,999 - match_74088 - INFO - Hand number: 300, sheep army bankroll: 1091, Ctrl+Alt+Defeat bankroll: -1091
+2026-03-21 02:29:10,844 - match_74088 - INFO - Hand number: 350, sheep army bankroll: 1016, Ctrl+Alt+Defeat bankroll: -1016
+2026-03-21 02:29:12,583 - match_74088 - INFO - Hand number: 400, sheep army bankroll: 941, Ctrl+Alt+Defeat bankroll: -941
+2026-03-21 02:29:14,234 - match_74088 - INFO - Hand number: 450, sheep army bankroll: 866, Ctrl+Alt+Defeat bankroll: -866
+2026-03-21 02:29:16,081 - match_74088 - INFO - Hand number: 500, sheep army bankroll: 791, Ctrl+Alt+Defeat bankroll: -791
+2026-03-21 02:29:18,244 - match_74088 - INFO - Hand number: 550, sheep army bankroll: 724, Ctrl+Alt+Defeat bankroll: -724
+2026-03-21 02:29:20,381 - match_74088 - INFO - Hand number: 600, sheep army bankroll: 653, Ctrl+Alt+Defeat bankroll: -653
+2026-03-21 02:29:22,232 - match_74088 - INFO - Hand number: 650, sheep army bankroll: 582, Ctrl+Alt+Defeat bankroll: -582
+2026-03-21 02:29:24,152 - match_74088 - INFO - Hand number: 700, sheep army bankroll: 507, Ctrl+Alt+Defeat bankroll: -507
+2026-03-21 02:29:25,709 - match_74088 - INFO - Hand number: 750, sheep army bankroll: 432, Ctrl+Alt+Defeat bankroll: -432
+2026-03-21 02:29:27,625 - match_74088 - INFO - Hand number: 800, sheep army bankroll: 357, Ctrl+Alt+Defeat bankroll: -357
+2026-03-21 02:29:29,721 - match_74088 - INFO - Hand number: 850, sheep army bankroll: 282, Ctrl+Alt+Defeat bankroll: -282
+2026-03-21 02:29:31,838 - match_74088 - INFO - Hand number: 900, sheep army bankroll: 207, Ctrl+Alt+Defeat bankroll: -207
+2026-03-21 02:29:33,765 - match_74088 - INFO - Hand number: 950, sheep army bankroll: 135, Ctrl+Alt+Defeat bankroll: -135
+2026-03-21 02:29:35,864 - match_74088 - INFO - All hands completed
+2026-03-21 02:29:35,864 - match_74088 - INFO - Final results - sheep army bankroll: 67, Ctrl+Alt+Defeat bankroll: -67
+2026-03-21 02:29:35,865 - match_74088 - INFO - Time used - sheep army: 548.95 seconds, Ctrl+Alt+Defeat: 23.15 seconds
+2026-03-21 02:29:35,865 - match_74088 - INFO - Time limit: 1500 seconds
+2026-03-21 02:29:35,865 - match_74088 - INFO - Terminating agents
