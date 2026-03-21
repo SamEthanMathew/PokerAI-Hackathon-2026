@@ -1,0 +1,29 @@
+2026-03-21 05:59:42,367 - match_76437 - INFO - Starting agents
+2026-03-21 05:59:42,371 - match_76437 - INFO - Sending match start notification
+2026-03-21 05:59:42,449 - match_76437 - INFO - Starting match
+2026-03-21 05:59:42,455 - match_76437 - INFO - Backing off for 1 seconds before retry 1
+2026-03-21 05:59:44,103 - match_76437 - INFO - Hand number: 0, WW bankroll: -100, Pulp Ficshun bankroll: 100
+2026-03-21 06:00:02,278 - match_76437 - INFO - Hand number: 50, WW bankroll: -112, Pulp Ficshun bankroll: 112
+2026-03-21 06:00:28,717 - match_76437 - INFO - Hand number: 100, WW bankroll: -146, Pulp Ficshun bankroll: 146
+2026-03-21 06:00:52,684 - match_76437 - INFO - Hand number: 150, WW bankroll: 364, Pulp Ficshun bankroll: -364
+2026-03-21 06:01:19,464 - match_76437 - INFO - Hand number: 200, WW bankroll: 87, Pulp Ficshun bankroll: -87
+2026-03-21 06:01:39,559 - match_76437 - INFO - Hand number: 250, WW bankroll: 35, Pulp Ficshun bankroll: -35
+2026-03-21 06:02:05,279 - match_76437 - INFO - Hand number: 300, WW bankroll: 398, Pulp Ficshun bankroll: -398
+2026-03-21 06:02:35,761 - match_76437 - INFO - Hand number: 350, WW bankroll: 473, Pulp Ficshun bankroll: -473
+2026-03-21 06:03:06,311 - match_76437 - INFO - Hand number: 400, WW bankroll: 500, Pulp Ficshun bankroll: -500
+2026-03-21 06:03:21,081 - match_76437 - INFO - Hand number: 450, WW bankroll: 874, Pulp Ficshun bankroll: -874
+2026-03-21 06:03:21,532 - match_76437 - INFO - Hand number: 500, WW bankroll: 799, Pulp Ficshun bankroll: -799
+2026-03-21 06:03:21,985 - match_76437 - INFO - Hand number: 550, WW bankroll: 724, Pulp Ficshun bankroll: -724
+2026-03-21 06:03:22,437 - match_76437 - INFO - Hand number: 600, WW bankroll: 649, Pulp Ficshun bankroll: -649
+2026-03-21 06:03:22,885 - match_76437 - INFO - Hand number: 650, WW bankroll: 577, Pulp Ficshun bankroll: -577
+2026-03-21 06:03:23,331 - match_76437 - INFO - Hand number: 700, WW bankroll: 502, Pulp Ficshun bankroll: -502
+2026-03-21 06:03:23,784 - match_76437 - INFO - Hand number: 750, WW bankroll: 427, Pulp Ficshun bankroll: -427
+2026-03-21 06:03:24,232 - match_76437 - INFO - Hand number: 800, WW bankroll: 352, Pulp Ficshun bankroll: -352
+2026-03-21 06:03:24,681 - match_76437 - INFO - Hand number: 850, WW bankroll: 277, Pulp Ficshun bankroll: -277
+2026-03-21 06:03:25,124 - match_76437 - INFO - Hand number: 900, WW bankroll: 202, Pulp Ficshun bankroll: -202
+2026-03-21 06:03:25,581 - match_76437 - INFO - Hand number: 950, WW bankroll: 127, Pulp Ficshun bankroll: -127
+2026-03-21 06:03:26,027 - match_76437 - INFO - All hands completed
+2026-03-21 06:03:26,028 - match_76437 - INFO - Final results - WW bankroll: 53, Pulp Ficshun bankroll: -53
+2026-03-21 06:03:26,028 - match_76437 - INFO - Time used - WW: 199.25 seconds, Pulp Ficshun: 13.15 seconds
+2026-03-21 06:03:26,028 - match_76437 - INFO - Time limit: 1500 seconds
+2026-03-21 06:03:26,028 - match_76437 - INFO - Terminating agents

@@ -1,0 +1,29 @@
+2026-03-21 06:04:42,118 - match_76493 - INFO - Starting agents
+2026-03-21 06:04:42,122 - match_76493 - INFO - Sending match start notification
+2026-03-21 06:04:42,182 - match_76493 - INFO - Starting match
+2026-03-21 06:04:42,189 - match_76493 - INFO - Backing off for 1 seconds before retry 1
+2026-03-21 06:04:43,197 - match_76493 - INFO - Hand number: 0, Pulp Ficshun bankroll: -1, Pazare bankroll: 1
+2026-03-21 06:05:04,069 - match_76493 - INFO - Hand number: 50, Pulp Ficshun bankroll: 218, Pazare bankroll: -218
+2026-03-21 06:05:16,110 - match_76493 - INFO - Hand number: 100, Pulp Ficshun bankroll: 568, Pazare bankroll: -568
+2026-03-21 06:05:32,402 - match_76493 - INFO - Hand number: 150, Pulp Ficshun bankroll: 944, Pazare bankroll: -944
+2026-03-21 06:05:43,868 - match_76493 - INFO - Hand number: 200, Pulp Ficshun bankroll: 796, Pazare bankroll: -796
+2026-03-21 06:05:56,640 - match_76493 - INFO - Hand number: 250, Pulp Ficshun bankroll: 754, Pazare bankroll: -754
+2026-03-21 06:06:12,265 - match_76493 - INFO - Hand number: 300, Pulp Ficshun bankroll: 742, Pazare bankroll: -742
+2026-03-21 06:06:22,821 - match_76493 - INFO - Hand number: 350, Pulp Ficshun bankroll: 706, Pazare bankroll: -706
+2026-03-21 06:06:32,370 - match_76493 - INFO - Hand number: 400, Pulp Ficshun bankroll: 792, Pazare bankroll: -792
+2026-03-21 06:06:41,985 - match_76493 - INFO - Hand number: 450, Pulp Ficshun bankroll: 722, Pazare bankroll: -722
+2026-03-21 06:06:46,664 - match_76493 - INFO - Hand number: 500, Pulp Ficshun bankroll: 786, Pazare bankroll: -786
+2026-03-21 06:06:47,165 - match_76493 - INFO - Hand number: 550, Pulp Ficshun bankroll: 711, Pazare bankroll: -711
+2026-03-21 06:06:47,672 - match_76493 - INFO - Hand number: 600, Pulp Ficshun bankroll: 636, Pazare bankroll: -636
+2026-03-21 06:06:48,167 - match_76493 - INFO - Hand number: 650, Pulp Ficshun bankroll: 561, Pazare bankroll: -561
+2026-03-21 06:06:48,661 - match_76493 - INFO - Hand number: 700, Pulp Ficshun bankroll: 486, Pazare bankroll: -486
+2026-03-21 06:06:49,148 - match_76493 - INFO - Hand number: 750, Pulp Ficshun bankroll: 411, Pazare bankroll: -411
+2026-03-21 06:06:49,641 - match_76493 - INFO - Hand number: 800, Pulp Ficshun bankroll: 336, Pazare bankroll: -336
+2026-03-21 06:06:50,118 - match_76493 - INFO - Hand number: 850, Pulp Ficshun bankroll: 261, Pazare bankroll: -261
+2026-03-21 06:06:50,588 - match_76493 - INFO - Hand number: 900, Pulp Ficshun bankroll: 186, Pazare bankroll: -186
+2026-03-21 06:06:51,059 - match_76493 - INFO - Hand number: 950, Pulp Ficshun bankroll: 111, Pazare bankroll: -111
+2026-03-21 06:06:51,526 - match_76493 - INFO - All hands completed
+2026-03-21 06:06:51,527 - match_76493 - INFO - Final results - Pulp Ficshun bankroll: 37, Pazare bankroll: -37
+2026-03-21 06:06:51,527 - match_76493 - INFO - Time used - Pulp Ficshun: 8.59 seconds, Pazare: 111.31 seconds
+2026-03-21 06:06:51,527 - match_76493 - INFO - Time limit: 1500 seconds
+2026-03-21 06:06:51,527 - match_76493 - INFO - Terminating agents

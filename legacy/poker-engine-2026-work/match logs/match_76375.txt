@@ -1,0 +1,30 @@
+2026-03-21 05:54:45,432 - match_76375 - INFO - Starting agents
+2026-03-21 05:54:45,437 - match_76375 - INFO - Sending match start notification
+2026-03-21 05:54:45,514 - match_76375 - INFO - Starting match
+2026-03-21 05:54:45,525 - match_76375 - INFO - Backing off for 1 seconds before retry 1
+2026-03-21 05:54:46,526 - match_76375 - INFO - Backing off for 2 seconds before retry 2
+2026-03-21 05:54:49,579 - match_76375 - INFO - Hand number: 0, super-quantum-frogtron-500M-params bankroll: 9, Pulp Ficshun bankroll: -9
+2026-03-21 05:55:07,471 - match_76375 - INFO - Hand number: 50, super-quantum-frogtron-500M-params bankroll: -446, Pulp Ficshun bankroll: 446
+2026-03-21 05:55:28,771 - match_76375 - INFO - Hand number: 100, super-quantum-frogtron-500M-params bankroll: -363, Pulp Ficshun bankroll: 363
+2026-03-21 05:55:52,287 - match_76375 - INFO - Hand number: 150, super-quantum-frogtron-500M-params bankroll: -253, Pulp Ficshun bankroll: 253
+2026-03-21 05:56:09,345 - match_76375 - INFO - Hand number: 200, super-quantum-frogtron-500M-params bankroll: -437, Pulp Ficshun bankroll: 437
+2026-03-21 05:56:25,430 - match_76375 - INFO - Hand number: 250, super-quantum-frogtron-500M-params bankroll: -283, Pulp Ficshun bankroll: 283
+2026-03-21 05:56:55,218 - match_76375 - INFO - Hand number: 300, super-quantum-frogtron-500M-params bankroll: -127, Pulp Ficshun bankroll: 127
+2026-03-21 05:57:21,574 - match_76375 - INFO - Hand number: 350, super-quantum-frogtron-500M-params bankroll: -8, Pulp Ficshun bankroll: 8
+2026-03-21 05:57:42,320 - match_76375 - INFO - Hand number: 400, super-quantum-frogtron-500M-params bankroll: 322, Pulp Ficshun bankroll: -322
+2026-03-21 05:58:12,309 - match_76375 - INFO - Hand number: 450, super-quantum-frogtron-500M-params bankroll: -199, Pulp Ficshun bankroll: 199
+2026-03-21 05:58:30,912 - match_76375 - INFO - Hand number: 500, super-quantum-frogtron-500M-params bankroll: -378, Pulp Ficshun bankroll: 378
+2026-03-21 05:58:52,095 - match_76375 - INFO - Hand number: 550, super-quantum-frogtron-500M-params bankroll: -96, Pulp Ficshun bankroll: 96
+2026-03-21 05:59:14,354 - match_76375 - INFO - Hand number: 600, super-quantum-frogtron-500M-params bankroll: 135, Pulp Ficshun bankroll: -135
+2026-03-21 05:59:36,018 - match_76375 - INFO - Hand number: 650, super-quantum-frogtron-500M-params bankroll: 209, Pulp Ficshun bankroll: -209
+2026-03-21 05:59:56,153 - match_76375 - INFO - Hand number: 700, super-quantum-frogtron-500M-params bankroll: 86, Pulp Ficshun bankroll: -86
+2026-03-21 06:00:15,675 - match_76375 - INFO - Hand number: 750, super-quantum-frogtron-500M-params bankroll: 430, Pulp Ficshun bankroll: -430
+2026-03-21 06:00:17,685 - match_76375 - INFO - Hand number: 800, super-quantum-frogtron-500M-params bankroll: 359, Pulp Ficshun bankroll: -359
+2026-03-21 06:00:19,763 - match_76375 - INFO - Hand number: 850, super-quantum-frogtron-500M-params bankroll: 290, Pulp Ficshun bankroll: -290
+2026-03-21 06:00:21,791 - match_76375 - INFO - Hand number: 900, super-quantum-frogtron-500M-params bankroll: 218, Pulp Ficshun bankroll: -218
+2026-03-21 06:00:23,451 - match_76375 - INFO - Hand number: 950, super-quantum-frogtron-500M-params bankroll: 143, Pulp Ficshun bankroll: -143
+2026-03-21 06:00:25,505 - match_76375 - INFO - All hands completed
+2026-03-21 06:00:25,505 - match_76375 - INFO - Final results - super-quantum-frogtron-500M-params bankroll: 73, Pulp Ficshun bankroll: -73
+2026-03-21 06:00:25,505 - match_76375 - INFO - Time used - super-quantum-frogtron-500M-params: 291.67 seconds, Pulp Ficshun: 29.15 seconds
+2026-03-21 06:00:25,505 - match_76375 - INFO - Time limit: 1500 seconds
+2026-03-21 06:00:25,506 - match_76375 - INFO - Terminating agents
