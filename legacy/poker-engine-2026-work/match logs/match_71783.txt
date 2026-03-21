@@ -1,0 +1,29 @@
+2026-03-20 22:39:43,479 - match_71783 - INFO - Starting agents
+2026-03-20 22:39:43,485 - match_71783 - INFO - Sending match start notification
+2026-03-20 22:39:43,569 - match_71783 - INFO - Starting match
+2026-03-20 22:39:43,579 - match_71783 - INFO - Backing off for 1 seconds before retry 1
+2026-03-20 22:39:44,641 - match_71783 - INFO - Hand number: 0, Ctrl+Alt+Defeat bankroll: 2, frank bankroll: -2
+2026-03-20 22:39:58,137 - match_71783 - INFO - Hand number: 50, Ctrl+Alt+Defeat bankroll: 111, frank bankroll: -111
+2026-03-20 22:40:14,190 - match_71783 - INFO - Hand number: 100, Ctrl+Alt+Defeat bankroll: -239, frank bankroll: 239
+2026-03-20 22:40:30,372 - match_71783 - INFO - Hand number: 150, Ctrl+Alt+Defeat bankroll: -464, frank bankroll: 464
+2026-03-20 22:40:44,043 - match_71783 - INFO - Hand number: 200, Ctrl+Alt+Defeat bankroll: -255, frank bankroll: 255
+2026-03-20 22:40:57,489 - match_71783 - INFO - Hand number: 250, Ctrl+Alt+Defeat bankroll: -521, frank bankroll: 521
+2026-03-20 22:41:13,640 - match_71783 - INFO - Hand number: 300, Ctrl+Alt+Defeat bankroll: -768, frank bankroll: 768
+2026-03-20 22:41:29,612 - match_71783 - INFO - Hand number: 350, Ctrl+Alt+Defeat bankroll: -430, frank bankroll: 430
+2026-03-20 22:41:44,802 - match_71783 - INFO - Hand number: 400, Ctrl+Alt+Defeat bankroll: -209, frank bankroll: 209
+2026-03-20 22:41:59,804 - match_71783 - INFO - Hand number: 450, Ctrl+Alt+Defeat bankroll: -389, frank bankroll: 389
+2026-03-20 22:42:16,512 - match_71783 - INFO - Hand number: 500, Ctrl+Alt+Defeat bankroll: -532, frank bankroll: 532
+2026-03-20 22:42:24,137 - match_71783 - INFO - Hand number: 550, Ctrl+Alt+Defeat bankroll: -723, frank bankroll: 723
+2026-03-20 22:42:25,017 - match_71783 - INFO - Hand number: 600, Ctrl+Alt+Defeat bankroll: -648, frank bankroll: 648
+2026-03-20 22:42:25,883 - match_71783 - INFO - Hand number: 650, Ctrl+Alt+Defeat bankroll: -573, frank bankroll: 573
+2026-03-20 22:42:26,783 - match_71783 - INFO - Hand number: 700, Ctrl+Alt+Defeat bankroll: -498, frank bankroll: 498
+2026-03-20 22:42:27,684 - match_71783 - INFO - Hand number: 750, Ctrl+Alt+Defeat bankroll: -423, frank bankroll: 423
+2026-03-20 22:42:28,563 - match_71783 - INFO - Hand number: 800, Ctrl+Alt+Defeat bankroll: -348, frank bankroll: 348
+2026-03-20 22:42:29,441 - match_71783 - INFO - Hand number: 850, Ctrl+Alt+Defeat bankroll: -273, frank bankroll: 273
+2026-03-20 22:42:30,288 - match_71783 - INFO - Hand number: 900, Ctrl+Alt+Defeat bankroll: -198, frank bankroll: 198
+2026-03-20 22:42:31,191 - match_71783 - INFO - Hand number: 950, Ctrl+Alt+Defeat bankroll: -123, frank bankroll: 123
+2026-03-20 22:42:32,028 - match_71783 - INFO - All hands completed
+2026-03-20 22:42:32,028 - match_71783 - INFO - Final results - Ctrl+Alt+Defeat bankroll: -50, frank bankroll: 50
+2026-03-20 22:42:32,029 - match_71783 - INFO - Time used - Ctrl+Alt+Defeat: 29.14 seconds, frank: 120.91 seconds
+2026-03-20 22:42:32,029 - match_71783 - INFO - Time limit: 1500 seconds
+2026-03-20 22:42:32,029 - match_71783 - INFO - Terminating agents

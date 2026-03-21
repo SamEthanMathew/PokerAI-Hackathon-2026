@@ -1,0 +1,29 @@
+2026-03-20 22:35:05,727 - match_71761 - INFO - Starting agents
+2026-03-20 22:35:05,732 - match_71761 - INFO - Sending match start notification
+2026-03-20 22:35:05,806 - match_71761 - INFO - Starting match
+2026-03-20 22:35:05,814 - match_71761 - INFO - Backing off for 1 seconds before retry 1
+2026-03-20 22:35:06,831 - match_71761 - INFO - Hand number: 0, Ctrl+Alt+Defeat bankroll: 2, AA998 bankroll: -2
+2026-03-20 22:35:13,198 - match_71761 - INFO - Hand number: 50, Ctrl+Alt+Defeat bankroll: -29, AA998 bankroll: 29
+2026-03-20 22:35:18,631 - match_71761 - INFO - Hand number: 100, Ctrl+Alt+Defeat bankroll: -196, AA998 bankroll: 196
+2026-03-20 22:35:23,906 - match_71761 - INFO - Hand number: 150, Ctrl+Alt+Defeat bankroll: -413, AA998 bankroll: 413
+2026-03-20 22:35:30,345 - match_71761 - INFO - Hand number: 200, Ctrl+Alt+Defeat bankroll: -397, AA998 bankroll: 397
+2026-03-20 22:35:35,739 - match_71761 - INFO - Hand number: 250, Ctrl+Alt+Defeat bankroll: -613, AA998 bankroll: 613
+2026-03-20 22:35:42,299 - match_71761 - INFO - Hand number: 300, Ctrl+Alt+Defeat bankroll: -654, AA998 bankroll: 654
+2026-03-20 22:35:48,920 - match_71761 - INFO - Hand number: 350, Ctrl+Alt+Defeat bankroll: -983, AA998 bankroll: 983
+2026-03-20 22:35:49,585 - match_71761 - INFO - Hand number: 400, Ctrl+Alt+Defeat bankroll: -908, AA998 bankroll: 908
+2026-03-20 22:35:50,261 - match_71761 - INFO - Hand number: 450, Ctrl+Alt+Defeat bankroll: -833, AA998 bankroll: 833
+2026-03-20 22:35:50,947 - match_71761 - INFO - Hand number: 500, Ctrl+Alt+Defeat bankroll: -758, AA998 bankroll: 758
+2026-03-20 22:35:51,626 - match_71761 - INFO - Hand number: 550, Ctrl+Alt+Defeat bankroll: -683, AA998 bankroll: 683
+2026-03-20 22:35:52,307 - match_71761 - INFO - Hand number: 600, Ctrl+Alt+Defeat bankroll: -608, AA998 bankroll: 608
+2026-03-20 22:35:52,975 - match_71761 - INFO - Hand number: 650, Ctrl+Alt+Defeat bankroll: -533, AA998 bankroll: 533
+2026-03-20 22:35:53,630 - match_71761 - INFO - Hand number: 700, Ctrl+Alt+Defeat bankroll: -458, AA998 bankroll: 458
+2026-03-20 22:35:54,296 - match_71761 - INFO - Hand number: 750, Ctrl+Alt+Defeat bankroll: -383, AA998 bankroll: 383
+2026-03-20 22:35:54,961 - match_71761 - INFO - Hand number: 800, Ctrl+Alt+Defeat bankroll: -308, AA998 bankroll: 308
+2026-03-20 22:35:55,646 - match_71761 - INFO - Hand number: 850, Ctrl+Alt+Defeat bankroll: -233, AA998 bankroll: 233
+2026-03-20 22:35:56,305 - match_71761 - INFO - Hand number: 900, Ctrl+Alt+Defeat bankroll: -158, AA998 bankroll: 158
+2026-03-20 22:35:56,996 - match_71761 - INFO - Hand number: 950, Ctrl+Alt+Defeat bankroll: -83, AA998 bankroll: 83
+2026-03-20 22:35:57,644 - match_71761 - INFO - All hands completed
+2026-03-20 22:35:57,644 - match_71761 - INFO - Final results - Ctrl+Alt+Defeat bankroll: -10, AA998 bankroll: 10
+2026-03-20 22:35:57,644 - match_71761 - INFO - Time used - Ctrl+Alt+Defeat: 20.09 seconds, AA998: 18.73 seconds
+2026-03-20 22:35:57,644 - match_71761 - INFO - Time limit: 1500 seconds
+2026-03-20 22:35:57,644 - match_71761 - INFO - Terminating agents

@@ -1,0 +1,29 @@
+2026-03-20 22:49:38,358 - match_71875 - INFO - Starting agents
+2026-03-20 22:49:38,362 - match_71875 - INFO - Sending match start notification
+2026-03-20 22:49:38,421 - match_71875 - INFO - Starting match
+2026-03-20 22:49:38,427 - match_71875 - INFO - Backing off for 1 seconds before retry 1
+2026-03-20 22:49:39,671 - match_71875 - INFO - Hand number: 0, Stat crux dum volvitur orbis bankroll: -31, Ctrl+Alt+Defeat bankroll: 31
+2026-03-20 22:49:48,870 - match_71875 - INFO - Hand number: 50, Stat crux dum volvitur orbis bankroll: -631, Ctrl+Alt+Defeat bankroll: 631
+2026-03-20 22:49:58,530 - match_71875 - INFO - Hand number: 100, Stat crux dum volvitur orbis bankroll: -126, Ctrl+Alt+Defeat bankroll: 126
+2026-03-20 22:50:10,091 - match_71875 - INFO - Hand number: 150, Stat crux dum volvitur orbis bankroll: -64, Ctrl+Alt+Defeat bankroll: 64
+2026-03-20 22:50:19,907 - match_71875 - INFO - Hand number: 200, Stat crux dum volvitur orbis bankroll: -282, Ctrl+Alt+Defeat bankroll: 282
+2026-03-20 22:50:30,794 - match_71875 - INFO - Hand number: 250, Stat crux dum volvitur orbis bankroll: 1100, Ctrl+Alt+Defeat bankroll: -1100
+2026-03-20 22:50:31,717 - match_71875 - INFO - Hand number: 300, Stat crux dum volvitur orbis bankroll: 1116, Ctrl+Alt+Defeat bankroll: -1116
+2026-03-20 22:50:32,194 - match_71875 - INFO - Hand number: 350, Stat crux dum volvitur orbis bankroll: 1041, Ctrl+Alt+Defeat bankroll: -1041
+2026-03-20 22:50:32,678 - match_71875 - INFO - Hand number: 400, Stat crux dum volvitur orbis bankroll: 966, Ctrl+Alt+Defeat bankroll: -966
+2026-03-20 22:50:33,147 - match_71875 - INFO - Hand number: 450, Stat crux dum volvitur orbis bankroll: 891, Ctrl+Alt+Defeat bankroll: -891
+2026-03-20 22:50:33,630 - match_71875 - INFO - Hand number: 500, Stat crux dum volvitur orbis bankroll: 816, Ctrl+Alt+Defeat bankroll: -816
+2026-03-20 22:50:34,115 - match_71875 - INFO - Hand number: 550, Stat crux dum volvitur orbis bankroll: 741, Ctrl+Alt+Defeat bankroll: -741
+2026-03-20 22:50:34,584 - match_71875 - INFO - Hand number: 600, Stat crux dum volvitur orbis bankroll: 666, Ctrl+Alt+Defeat bankroll: -666
+2026-03-20 22:50:35,045 - match_71875 - INFO - Hand number: 650, Stat crux dum volvitur orbis bankroll: 591, Ctrl+Alt+Defeat bankroll: -591
+2026-03-20 22:50:35,529 - match_71875 - INFO - Hand number: 700, Stat crux dum volvitur orbis bankroll: 516, Ctrl+Alt+Defeat bankroll: -516
+2026-03-20 22:50:36,006 - match_71875 - INFO - Hand number: 750, Stat crux dum volvitur orbis bankroll: 441, Ctrl+Alt+Defeat bankroll: -441
+2026-03-20 22:50:36,487 - match_71875 - INFO - Hand number: 800, Stat crux dum volvitur orbis bankroll: 366, Ctrl+Alt+Defeat bankroll: -366
+2026-03-20 22:50:36,967 - match_71875 - INFO - Hand number: 850, Stat crux dum volvitur orbis bankroll: 291, Ctrl+Alt+Defeat bankroll: -291
+2026-03-20 22:50:37,475 - match_71875 - INFO - Hand number: 900, Stat crux dum volvitur orbis bankroll: 216, Ctrl+Alt+Defeat bankroll: -216
+2026-03-20 22:50:37,986 - match_71875 - INFO - Hand number: 950, Stat crux dum volvitur orbis bankroll: 141, Ctrl+Alt+Defeat bankroll: -141
+2026-03-20 22:50:38,461 - match_71875 - INFO - All hands completed
+2026-03-20 22:50:38,461 - match_71875 - INFO - Final results - Stat crux dum volvitur orbis bankroll: 67, Ctrl+Alt+Defeat bankroll: -67
+2026-03-20 22:50:38,461 - match_71875 - INFO - Time used - Stat crux dum volvitur orbis: 36.94 seconds, Ctrl+Alt+Defeat: 13.55 seconds
+2026-03-20 22:50:38,461 - match_71875 - INFO - Time limit: 1500 seconds
+2026-03-20 22:50:38,461 - match_71875 - INFO - Terminating agents

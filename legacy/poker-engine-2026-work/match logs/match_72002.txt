@@ -1,0 +1,32 @@
+2026-03-20 22:59:42,604 - match_72002 - INFO - Starting agents
+2026-03-20 22:59:42,609 - match_72002 - INFO - Sending match start notification
+2026-03-20 22:59:42,674 - match_72002 - INFO - Starting match
+2026-03-20 22:59:42,681 - match_72002 - INFO - Backing off for 1 seconds before retry 1
+2026-03-20 22:59:43,682 - match_72002 - INFO - Backing off for 2 seconds before retry 2
+2026-03-20 22:59:45,683 - match_72002 - INFO - Backing off for 4 seconds before retry 3
+2026-03-20 22:59:49,684 - match_72002 - INFO - Backing off for 8 seconds before retry 4
+2026-03-20 22:59:57,750 - match_72002 - INFO - Hand number: 0, Bot Lane bankroll: -2, Ctrl+Alt+Defeat bankroll: 2
+2026-03-20 23:00:10,704 - match_72002 - INFO - Hand number: 50, Bot Lane bankroll: -167, Ctrl+Alt+Defeat bankroll: 167
+2026-03-20 23:00:25,836 - match_72002 - INFO - Hand number: 100, Bot Lane bankroll: 93, Ctrl+Alt+Defeat bankroll: -93
+2026-03-20 23:00:38,623 - match_72002 - INFO - Hand number: 150, Bot Lane bankroll: 212, Ctrl+Alt+Defeat bankroll: -212
+2026-03-20 23:00:52,353 - match_72002 - INFO - Hand number: 200, Bot Lane bankroll: -7, Ctrl+Alt+Defeat bankroll: 7
+2026-03-20 23:01:04,923 - match_72002 - INFO - Hand number: 250, Bot Lane bankroll: 445, Ctrl+Alt+Defeat bankroll: -445
+2026-03-20 23:01:18,068 - match_72002 - INFO - Hand number: 300, Bot Lane bankroll: -259, Ctrl+Alt+Defeat bankroll: 259
+2026-03-20 23:01:32,327 - match_72002 - INFO - Hand number: 350, Bot Lane bankroll: -150, Ctrl+Alt+Defeat bankroll: 150
+2026-03-20 23:01:44,283 - match_72002 - INFO - Hand number: 400, Bot Lane bankroll: -80, Ctrl+Alt+Defeat bankroll: 80
+2026-03-20 23:01:58,634 - match_72002 - INFO - Hand number: 450, Bot Lane bankroll: -90, Ctrl+Alt+Defeat bankroll: 90
+2026-03-20 23:02:11,589 - match_72002 - INFO - Hand number: 500, Bot Lane bankroll: 241, Ctrl+Alt+Defeat bankroll: -241
+2026-03-20 23:02:24,965 - match_72002 - INFO - Hand number: 550, Bot Lane bankroll: 388, Ctrl+Alt+Defeat bankroll: -388
+2026-03-20 23:02:38,756 - match_72002 - INFO - Hand number: 600, Bot Lane bankroll: 351, Ctrl+Alt+Defeat bankroll: -351
+2026-03-20 23:02:52,925 - match_72002 - INFO - Hand number: 650, Bot Lane bankroll: 173, Ctrl+Alt+Defeat bankroll: -173
+2026-03-20 23:03:03,723 - match_72002 - INFO - Hand number: 700, Bot Lane bankroll: 138, Ctrl+Alt+Defeat bankroll: -138
+2026-03-20 23:03:14,202 - match_72002 - INFO - Hand number: 750, Bot Lane bankroll: 46, Ctrl+Alt+Defeat bankroll: -46
+2026-03-20 23:03:28,334 - match_72002 - INFO - Hand number: 800, Bot Lane bankroll: 86, Ctrl+Alt+Defeat bankroll: -86
+2026-03-20 23:03:41,493 - match_72002 - INFO - Hand number: 850, Bot Lane bankroll: 310, Ctrl+Alt+Defeat bankroll: -310
+2026-03-20 23:03:55,117 - match_72002 - INFO - Hand number: 900, Bot Lane bankroll: 69, Ctrl+Alt+Defeat bankroll: -69
+2026-03-20 23:04:06,414 - match_72002 - INFO - Hand number: 950, Bot Lane bankroll: 148, Ctrl+Alt+Defeat bankroll: -148
+2026-03-20 23:04:20,661 - match_72002 - INFO - All hands completed
+2026-03-20 23:04:20,662 - match_72002 - INFO - Final results - Bot Lane bankroll: 369, Ctrl+Alt+Defeat bankroll: -369
+2026-03-20 23:04:20,662 - match_72002 - INFO - Time used - Bot Lane: 228.73 seconds, Ctrl+Alt+Defeat: 33.19 seconds
+2026-03-20 23:04:20,662 - match_72002 - INFO - Time limit: 1500 seconds
+2026-03-20 23:04:20,662 - match_72002 - INFO - Terminating agents
