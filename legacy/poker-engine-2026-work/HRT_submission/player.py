@@ -3,7 +3,6 @@ import os
 import random
 import sys
 import time
-import math
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from itertools import combinations
@@ -165,37 +164,6 @@ def _has_any_premium(cards):
     return False
 
 
-TOP_5_PERCENT_PAIRS = {
-    frozenset([RANK_A, RANK_A]),
-    frozenset([RANK_9, RANK_9]),
-    frozenset([RANK_8, RANK_8]),
-}
-
-TOP_5_PERCENT_SUITED = {
-    frozenset([RANK_A, RANK_9]),
-    frozenset([RANK_A, RANK_8]),
-}
-
-
-def _is_top_5_percent_hand(c1, c2):
-    r1, r2 = _RANK[c1], _RANK[c2]
-    s1, s2 = _SUIT[c1], _SUIT[c2]
-    ranks = frozenset([r1, r2])
-    if r1 == r2 and ranks in TOP_5_PERCENT_PAIRS:
-        return True
-    if s1 == s2 and ranks in TOP_5_PERCENT_SUITED:
-        return True
-    return False
-
-
-def _has_top_5_percent(cards):
-    for i in range(len(cards)):
-        for j in range(i + 1, len(cards)):
-            if _is_top_5_percent_hand(cards[i], cards[j]):
-                return True
-    return False
-
-
 def _is_premium_pair(c1, c2):
     r1, r2 = _RANK[c1], _RANK[c2]
     return r1 == r2 and frozenset([r1, r1]) in PREMIUM_PAIRS
@@ -306,24 +274,6 @@ def _normalize_action(raw):
 
 
 # ── Hand classification and draw detection ───────────────────────────────────
-
-
-def _is_top_pair_or_better(my_cards, community):
-    if len(my_cards) < 2 or len(community) < 3:
-        return False
-    hand_cat = _hand_rank_category(my_cards, community)
-    if hand_cat in ("trips_plus", "two_pair"):
-        return True
-    if hand_cat == "one_pair":
-        my_ranks = [_RANK[c] for c in my_cards[:2]]
-        comm_ranks = [_RANK[c] for c in community]
-        max_comm = max(comm_ranks)
-        if my_ranks[0] == my_ranks[1]:
-            return my_ranks[0] >= max_comm
-        else:
-            return (my_ranks[0] == max_comm and my_ranks[0] in comm_ranks) or \
-                   (my_ranks[1] == max_comm and my_ranks[1] in comm_ranks)
-    return False
 
 
 def _hand_rank_category(my_cards, community):
@@ -1939,16 +1889,6 @@ class PlayerAgent(Agent):
         self._last_lead_ratio = float(lead_ratio)
         self._last_position = "SB" if observation.get("blind_position", 0) == 0 else "BB"
 
-        # ── Dynamic Bleed-Out ────────────────────────────────────────────────
-        in_dynamic_bleedout = False
-        surplus_for_hand = 0.0
-        if hands_left > 0:
-            ratio = 0.33 + (6.0 / math.sqrt(hands_left))
-            threshold_lead = ratio * hands_left
-            if self._running_pnl > threshold_lead:
-                in_dynamic_bleedout = True
-                surplus_for_hand = self._running_pnl - threshold_lead
-
         if is_new_hand and not self._in_hand:
             self._in_hand = True
             self._we_folded = False
@@ -2188,49 +2128,16 @@ class PlayerAgent(Agent):
             premium = _has_any_premium(my_cards)
             premium_pair = _has_premium_pair(my_cards)
             to_call = max(0, opp_bet - my_bet)
+            pressure = self._coeff(exploit_adj, "preflop_pressure_adj", 0)
+            early_eq_gate = EARLY_PREFLOP_MIN_EQUITY - 0.05 * pressure
+            normal_eq_gate = NORMAL_PREFLOP_MIN_EQUITY - 0.05 * pressure
+            # Comeback mode: lower equity gates so we play more hands and steal blinds
+            if in_comeback_mode:
+                gate_reduction = -0.17 if in_critical_mode else -0.10
+                early_eq_gate = _clamp(early_eq_gate + gate_reduction, 0.22, 0.48)
+                normal_eq_gate = _clamp(normal_eq_gate + gate_reduction, 0.20, 0.45)
 
-            if in_dynamic_bleedout:
-                has_top_5 = _has_top_5_percent(my_cards)
-                if self._last_position == "SB":
-                    if not has_top_5:
-                        if valid[FOLD]:
-                            result = (FOLD, 0, 0, 0)
-                        elif valid[CHECK]:
-                            result = (CHECK, 0, 0, 0)
-                        self._preflop_reason = "bleedout_sb_fold"
-                else:
-                    if to_call > 0 and not has_top_5:
-                        if valid[FOLD]:
-                            result = (FOLD, 0, 0, 0)
-                        elif valid[CHECK]:
-                            result = (CHECK, 0, 0, 0)
-                        self._preflop_reason = "bleedout_bb_fold"
-                    elif to_call > 0 and has_top_5:
-                        pfr = profile.get("preflop_raise_rate", 0.5)
-                        if pfr < 0.20 and opp_bet >= PREFLOP_COMMIT_THRESHOLD:
-                            has_aa_99 = False
-                            for c1, c2 in combinations(my_cards, 2):
-                                if _RANK[c1] == _RANK[c2] and _RANK[c1] in (RANK_A, RANK_9):
-                                    has_aa_99 = True
-                                    break
-                            if not has_aa_99:
-                                if valid[FOLD]:
-                                    result = (FOLD, 0, 0, 0)
-                                elif valid[CHECK]:
-                                    result = (CHECK, 0, 0, 0)
-                                self._preflop_reason = "bleedout_bb_veto"
-
-            if result is None:
-                pressure = self._coeff(exploit_adj, "preflop_pressure_adj", 0)
-                early_eq_gate = EARLY_PREFLOP_MIN_EQUITY - 0.05 * pressure
-                normal_eq_gate = NORMAL_PREFLOP_MIN_EQUITY - 0.05 * pressure
-                # Comeback mode: lower equity gates so we play more hands and steal blinds
-                if in_comeback_mode:
-                    gate_reduction = -0.17 if in_critical_mode else -0.10
-                    early_eq_gate = _clamp(early_eq_gate + gate_reduction, 0.22, 0.48)
-                    normal_eq_gate = _clamp(normal_eq_gate + gate_reduction, 0.20, 0.45)
-
-                if in_early_phase:
+            if in_early_phase:
                 preflop_eq = self._preflop_equity(my_cards) if len(my_cards) == 5 else 0.45
                 self._pflog_eq = preflop_eq
                 self._pflog_gate = early_eq_gate
@@ -2527,39 +2434,6 @@ class PlayerAgent(Agent):
                     and to_call > 0 and to_call <= pot_ref * 0.20
                     and valid[CALL]):
                 result = (CALL, 0, 0, 0)
-
-        # ── Dynamic Bleed-Out Execution & Risk Cap ───────────────────────────
-        if in_dynamic_bleedout and not valid[DISCARD]:
-            if street >= 1:
-                has_top_pair_plus = _is_top_pair_or_better(my_cards, community)
-                strong_draw = (flush_outs >= 4 or straight_outs >= 4)
-                if not has_top_pair_plus and not strong_draw:
-                    if valid[FOLD]:
-                        result = (FOLD, 0, 0, 0)
-                    elif valid[CHECK]:
-                        result = (CHECK, 0, 0, 0)
-                
-                # No bluffs: downgrade RAISE to CALL unless trips_plus
-                if result[0] == RAISE and hand_cat != "trips_plus":
-                    if valid[CALL] and opp_bet > my_bet:
-                        result = (CALL, 0, 0, 0)
-                    elif valid[CHECK]:
-                        result = (CHECK, 0, 0, 0)
-                    else:
-                        result = (FOLD, 0, 0, 0)
-            
-            # Global Risk Cap: Check if the action commits more than the surplus
-            cost = 0
-            if result[0] == RAISE:
-                cost = max(0, result[1] - my_bet)
-            elif result[0] == CALL:
-                cost = max(0, opp_bet - my_bet)
-            
-            if cost > surplus_for_hand:
-                if valid[FOLD]:
-                    result = (FOLD, 0, 0, 0)
-                elif valid[CHECK]:
-                    result = (CHECK, 0, 0, 0)
 
         if forced_lock_action is not None:
             result = forced_lock_action
