@@ -1,0 +1,31 @@
+2026-03-21 17:33:19,532 - match_83840 - INFO - Starting agents
+2026-03-21 17:33:19,538 - match_83840 - INFO - Sending match start notification
+2026-03-21 17:33:19,614 - match_83840 - INFO - Starting match
+2026-03-21 17:33:19,623 - match_83840 - INFO - Backing off for 1 seconds before retry 1
+2026-03-21 17:33:20,629 - match_83840 - INFO - Backing off for 1 seconds before retry 1
+2026-03-21 17:33:21,631 - match_83840 - INFO - Backing off for 2 seconds before retry 2
+2026-03-21 17:33:23,644 - match_83840 - INFO - Hand number: 0, Pulp Ficshun bankroll: 2, ALL IN bankroll: -2
+2026-03-21 17:33:45,778 - match_83840 - INFO - Hand number: 50, Pulp Ficshun bankroll: -190, ALL IN bankroll: 190
+2026-03-21 17:34:08,381 - match_83840 - INFO - Hand number: 100, Pulp Ficshun bankroll: -511, ALL IN bankroll: 511
+2026-03-21 17:34:22,595 - match_83840 - INFO - Hand number: 150, Pulp Ficshun bankroll: -509, ALL IN bankroll: 509
+2026-03-21 17:34:43,962 - match_83840 - INFO - Hand number: 200, Pulp Ficshun bankroll: -539, ALL IN bankroll: 539
+2026-03-21 17:34:57,281 - match_83840 - INFO - Hand number: 250, Pulp Ficshun bankroll: -809, ALL IN bankroll: 809
+2026-03-21 17:35:22,346 - match_83840 - INFO - Hand number: 300, Pulp Ficshun bankroll: -868, ALL IN bankroll: 868
+2026-03-21 17:35:35,413 - match_83840 - INFO - Hand number: 350, Pulp Ficshun bankroll: -1033, ALL IN bankroll: 1033
+2026-03-21 17:35:36,685 - match_83840 - INFO - Hand number: 400, Pulp Ficshun bankroll: -966, ALL IN bankroll: 966
+2026-03-21 17:35:38,095 - match_83840 - INFO - Hand number: 450, Pulp Ficshun bankroll: -899, ALL IN bankroll: 899
+2026-03-21 17:35:39,552 - match_83840 - INFO - Hand number: 500, Pulp Ficshun bankroll: -824, ALL IN bankroll: 824
+2026-03-21 17:35:41,070 - match_83840 - INFO - Hand number: 550, Pulp Ficshun bankroll: -753, ALL IN bankroll: 753
+2026-03-21 17:35:42,457 - match_83840 - INFO - Hand number: 600, Pulp Ficshun bankroll: -682, ALL IN bankroll: 682
+2026-03-21 17:35:43,709 - match_83840 - INFO - Hand number: 650, Pulp Ficshun bankroll: -607, ALL IN bankroll: 607
+2026-03-21 17:35:45,168 - match_83840 - INFO - Hand number: 700, Pulp Ficshun bankroll: -544, ALL IN bankroll: 544
+2026-03-21 17:35:46,659 - match_83840 - INFO - Hand number: 750, Pulp Ficshun bankroll: -473, ALL IN bankroll: 473
+2026-03-21 17:35:48,139 - match_83840 - INFO - Hand number: 800, Pulp Ficshun bankroll: -398, ALL IN bankroll: 398
+2026-03-21 17:35:49,379 - match_83840 - INFO - Hand number: 850, Pulp Ficshun bankroll: -330, ALL IN bankroll: 330
+2026-03-21 17:35:50,661 - match_83840 - INFO - Hand number: 900, Pulp Ficshun bankroll: -255, ALL IN bankroll: 255
+2026-03-21 17:35:51,940 - match_83840 - INFO - Hand number: 950, Pulp Ficshun bankroll: -184, ALL IN bankroll: 184
+2026-03-21 17:35:53,304 - match_83840 - INFO - All hands completed
+2026-03-21 17:35:53,304 - match_83840 - INFO - Final results - Pulp Ficshun bankroll: -115, ALL IN bankroll: 115
+2026-03-21 17:35:53,304 - match_83840 - INFO - Time used - Pulp Ficshun: 16.91 seconds, ALL IN: 117.55 seconds
+2026-03-21 17:35:53,304 - match_83840 - INFO - Time limit: 1500 seconds
+2026-03-21 17:35:53,305 - match_83840 - INFO - Terminating agents

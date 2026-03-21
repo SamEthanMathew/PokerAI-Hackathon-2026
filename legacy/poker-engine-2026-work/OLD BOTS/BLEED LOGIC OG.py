@@ -1662,15 +1662,7 @@ class PlayerAgent(Agent):
 
         reject_nothing = aggr_signal >= 2.0
         reject_one_pair = aggr_signal >= 3.2
-        reject_two_pair = aggr_signal >= 4.2
-        
-        max_retries = 0
-        if reject_two_pair:
-            max_retries = 30
-        elif reject_one_pair:
-            max_retries = 20
-        elif reject_nothing:
-            max_retries = 10
+        max_retries = 3 if reject_nothing else 0
 
         community_l = list(community)
         my_keep = list(my2)
@@ -1693,7 +1685,7 @@ class PlayerAgent(Agent):
             if max_retries > 0 and len(community) >= 3:
                 for _retry in range(max_retries):
                     cat = _hand_rank_category(list(opp), community)
-                    if cat == "nothing" or (reject_one_pair and cat == "one_pair") or (reject_two_pair and cat in ("one_pair", "two_pair")):
+                    if cat == "nothing" or (reject_one_pair and cat == "one_pair"):
                         sample = random.sample(remaining, sample_size)
                         opp = sample[:2]
                         runout = sample[2:]
@@ -1950,15 +1942,12 @@ class PlayerAgent(Agent):
         # ── Dynamic Bleed-Out ────────────────────────────────────────────────
         in_dynamic_bleedout = False
         surplus_for_hand = 0.0
-        alpha = 0.0
         if hands_left > 0:
             ratio = 0.33 + (6.0 / math.sqrt(hands_left))
             threshold_lead = ratio * hands_left
             if self._running_pnl > threshold_lead:
                 in_dynamic_bleedout = True
                 surplus_for_hand = self._running_pnl - threshold_lead
-                max_burn = 1.5 * max(1, hands_left)
-                alpha = min(1.0, max(0.0, surplus_for_hand / max_burn))
 
         if is_new_hand and not self._in_hand:
             self._in_hand = True
@@ -2200,25 +2189,48 @@ class PlayerAgent(Agent):
             premium_pair = _has_premium_pair(my_cards)
             to_call = max(0, opp_bet - my_bet)
 
-            pressure = self._coeff(exploit_adj, "preflop_pressure_adj", 0)
-            early_eq_gate = EARLY_PREFLOP_MIN_EQUITY - 0.05 * pressure
-            normal_eq_gate = NORMAL_PREFLOP_MIN_EQUITY - 0.05 * pressure
-            
-            # Comeback mode: lower equity gates so we play more hands and steal blinds
-            if in_comeback_mode:
-                gate_reduction = -0.17 if in_critical_mode else -0.10
-                early_eq_gate = _clamp(early_eq_gate + gate_reduction, 0.22, 0.48)
-                normal_eq_gate = _clamp(normal_eq_gate + gate_reduction, 0.20, 0.45)
-                
-            opp_vpip = profile.get("opp_preflop_raise_rate", 0.5)
-            alpha_penalty = 0.25 * alpha
-            bully_discount = 0.5 * max(0.0, opp_vpip - 0.5)
-            net_penalty = max(0.0, alpha_penalty - bully_discount)
-            
-            early_eq_gate = _clamp(early_eq_gate + net_penalty, 0.22, 0.80)
-            normal_eq_gate = _clamp(normal_eq_gate + net_penalty, 0.20, 0.78)
+            if in_dynamic_bleedout:
+                has_top_5 = _has_top_5_percent(my_cards)
+                if self._last_position == "SB":
+                    if not has_top_5:
+                        if valid[FOLD]:
+                            result = (FOLD, 0, 0, 0)
+                        elif valid[CHECK]:
+                            result = (CHECK, 0, 0, 0)
+                        self._preflop_reason = "bleedout_sb_fold"
+                else:
+                    if to_call > 0 and not has_top_5:
+                        if valid[FOLD]:
+                            result = (FOLD, 0, 0, 0)
+                        elif valid[CHECK]:
+                            result = (CHECK, 0, 0, 0)
+                        self._preflop_reason = "bleedout_bb_fold"
+                    elif to_call > 0 and has_top_5:
+                        pfr = profile.get("preflop_raise_rate", 0.5)
+                        if pfr < 0.20 and opp_bet >= PREFLOP_COMMIT_THRESHOLD:
+                            has_aa_99 = False
+                            for c1, c2 in combinations(my_cards, 2):
+                                if _RANK[c1] == _RANK[c2] and _RANK[c1] in (RANK_A, RANK_9):
+                                    has_aa_99 = True
+                                    break
+                            if not has_aa_99:
+                                if valid[FOLD]:
+                                    result = (FOLD, 0, 0, 0)
+                                elif valid[CHECK]:
+                                    result = (CHECK, 0, 0, 0)
+                                self._preflop_reason = "bleedout_bb_veto"
 
-            if in_early_phase:
+            if result is None:
+                pressure = self._coeff(exploit_adj, "preflop_pressure_adj", 0)
+                early_eq_gate = EARLY_PREFLOP_MIN_EQUITY - 0.05 * pressure
+                normal_eq_gate = NORMAL_PREFLOP_MIN_EQUITY - 0.05 * pressure
+                # Comeback mode: lower equity gates so we play more hands and steal blinds
+                if in_comeback_mode:
+                    gate_reduction = -0.17 if in_critical_mode else -0.10
+                    early_eq_gate = _clamp(early_eq_gate + gate_reduction, 0.22, 0.48)
+                    normal_eq_gate = _clamp(normal_eq_gate + gate_reduction, 0.20, 0.45)
+
+                if in_early_phase:
                 preflop_eq = self._preflop_equity(my_cards) if len(my_cards) == 5 else 0.45
                 self._pflog_eq = preflop_eq
                 self._pflog_gate = early_eq_gate
@@ -2328,27 +2340,6 @@ class PlayerAgent(Agent):
             use_profile_signal = (not self._SHADOW_ONLY) and self._LIVE_STAGE >= 3
             signal_passive = passive_sticky_signal if use_profile_signal else baseline_passive_signal
             signal_aggr = aggr_value_signal if use_profile_signal else baseline_aggr_signal
-            
-            # Add current action aggression
-            if opp_bet > my_bet:
-                to_call = opp_bet - my_bet
-                pot_before_call = pot_size - to_call
-                bet_fraction = to_call / max(1.0, float(pot_before_call))
-                
-                action_aggr = 0.0
-                if bet_fraction >= 0.75:
-                    action_aggr = 2.5
-                elif bet_fraction >= 0.4:
-                    action_aggr = 1.5
-                else:
-                    action_aggr = 0.5
-                    
-                # Extra respect for big river bets
-                if street == 3 and bet_fraction > 0.6:
-                    action_aggr += 1.0
-                    
-                signal_aggr = max(signal_aggr, 1.0 + action_aggr)
-
             eq_sims = 100 if sim_mode == "emergency" else (200 if sim_mode == "conservative" else 500)
             equity = self._compute_equity_ranged(
                 my_cards, community, dead, opp_discards, signal_passive, signal_aggr, num_sims=eq_sims)
@@ -2564,16 +2555,7 @@ class PlayerAgent(Agent):
             elif result[0] == CALL:
                 cost = max(0, opp_bet - my_bet)
             
-            opp_honesty = (profile.get("river_bet_strength_large", 0.6) + profile.get("river_raise_strength", 0.6)) / 2.0
-            opp_bluff_rate = max(0.0, 1.0 - opp_honesty)
-            risk_factor = 0.2 + (0.8 * opp_bluff_rate)
-            adjusted_risk_cap = surplus_for_hand * risk_factor
-
-            river_jam_override_active = False
-            if street == 3 and equity > strong_gate and _is_top_pair_or_better(my_cards, community):
-                river_jam_override_active = True
-                
-            if cost > adjusted_risk_cap and not river_jam_override_active:
+            if cost > surplus_for_hand:
                 if valid[FOLD]:
                     result = (FOLD, 0, 0, 0)
                 elif valid[CHECK]:
@@ -2631,13 +2613,6 @@ class PlayerAgent(Agent):
                     protecting_lead=protecting_lead,
                     pressure_adj=float(self._coeff(exploit_adj, "preflop_pressure_adj", 0)),
                     preflop_defense_adj=float(self._coeff(exploit_adj, "preflop_defense_adj", 0)),
-                    bleedout_state={
-                        "alpha": float(alpha),
-                        "surplus": float(surplus_for_hand),
-                        "opp_vpip": float(profile.get("opp_preflop_raise_rate", 0.5)),
-                        "alpha_penalty": float(0.25 * alpha) if in_dynamic_bleedout else 0.0,
-                        "bully_discount": float(0.5 * max(0.0, profile.get("opp_preflop_raise_rate", 0.5) - 0.5)) if in_dynamic_bleedout else 0.0
-                    } if in_dynamic_bleedout else None,
                 )
             elif street >= 1:
                 active_exploits = {k: round(float(v), 4) for k, v in exploit_adj.items() if abs(v) > 0.001}
@@ -2683,15 +2658,6 @@ class PlayerAgent(Agent):
                     urgency=round(float(urgency), 3),
                     comeback_mode=in_comeback_mode,
                     protecting_lead=protecting_lead,
-                    bleedout_state={
-                        "alpha": float(alpha),
-                        "opp_bluff_rate": float(opp_bluff_rate) if 'opp_bluff_rate' in locals() else 0.0,
-                        "risk_factor": float(risk_factor) if 'risk_factor' in locals() else 1.0,
-                        "raw_surplus": float(surplus_for_hand),
-                        "adjusted_risk_cap": float(adjusted_risk_cap) if 'adjusted_risk_cap' in locals() else 0.0,
-                        "action_cost": float(cost) if 'cost' in locals() else 0.0,
-                        "river_jam_override_active": bool(river_jam_override_active) if 'river_jam_override_active' in locals() else False
-                    } if in_dynamic_bleedout else None,
                 )
 
         # ── Track our action ─────────────────────────────────────────────────

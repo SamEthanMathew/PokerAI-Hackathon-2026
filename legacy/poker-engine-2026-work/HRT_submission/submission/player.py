@@ -3,6 +3,7 @@ import os
 import random
 import sys
 import time
+import math
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from itertools import combinations
@@ -164,6 +165,37 @@ def _has_any_premium(cards):
     return False
 
 
+TOP_5_PERCENT_PAIRS = {
+    frozenset([RANK_A, RANK_A]),
+    frozenset([RANK_9, RANK_9]),
+    frozenset([RANK_8, RANK_8]),
+}
+
+TOP_5_PERCENT_SUITED = {
+    frozenset([RANK_A, RANK_9]),
+    frozenset([RANK_A, RANK_8]),
+}
+
+
+def _is_top_5_percent_hand(c1, c2):
+    r1, r2 = _RANK[c1], _RANK[c2]
+    s1, s2 = _SUIT[c1], _SUIT[c2]
+    ranks = frozenset([r1, r2])
+    if r1 == r2 and ranks in TOP_5_PERCENT_PAIRS:
+        return True
+    if s1 == s2 and ranks in TOP_5_PERCENT_SUITED:
+        return True
+    return False
+
+
+def _has_top_5_percent(cards):
+    for i in range(len(cards)):
+        for j in range(i + 1, len(cards)):
+            if _is_top_5_percent_hand(cards[i], cards[j]):
+                return True
+    return False
+
+
 def _is_premium_pair(c1, c2):
     r1, r2 = _RANK[c1], _RANK[c2]
     return r1 == r2 and frozenset([r1, r1]) in PREMIUM_PAIRS
@@ -274,6 +306,24 @@ def _normalize_action(raw):
 
 
 # ── Hand classification and draw detection ───────────────────────────────────
+
+
+def _is_top_pair_or_better(my_cards, community):
+    if len(my_cards) < 2 or len(community) < 3:
+        return False
+    hand_cat = _hand_rank_category(my_cards, community)
+    if hand_cat in ("trips_plus", "two_pair"):
+        return True
+    if hand_cat == "one_pair":
+        my_ranks = [_RANK[c] for c in my_cards[:2]]
+        comm_ranks = [_RANK[c] for c in community]
+        max_comm = max(comm_ranks)
+        if my_ranks[0] == my_ranks[1]:
+            return my_ranks[0] >= max_comm
+        else:
+            return (my_ranks[0] == max_comm and my_ranks[0] in comm_ranks) or \
+                   (my_ranks[1] == max_comm and my_ranks[1] in comm_ranks)
+    return False
 
 
 def _hand_rank_category(my_cards, community):
@@ -1872,22 +1922,36 @@ class PlayerAgent(Agent):
         in_early_phase = self._hands_completed < EARLY_PHASE_HANDS
 
         # ── Urgency / lead-protection signals ────────────────────────────────
+        hands_remaining = max(0, TOTAL_HANDS - self._hands_completed)
+        sb_left = (hands_remaining + 1) // 2
+        bb_left = hands_remaining // 2
+        max_bleed = sb_left * 1 + bb_left * 2
+        distance_to_lock = max(0.0, max_bleed - self._running_pnl)
+
         # urgency: how close the opponent is to locking the match (0=neutral, 1=locked)
-        if self._running_pnl < 0 and hands_left > 0:
-            urgency = _clamp(-self._running_pnl / (hands_left * 1.5), 0.0, 1.2)
+        if self._running_pnl < 0 and max_bleed > 0:
+            urgency = _clamp(-self._running_pnl / max_bleed, 0.0, 1.2)
         else:
             urgency = 0.0
         in_comeback_mode = urgency > 0.65
         in_critical_mode = urgency > 0.85
         # lead_ratio: how close WE are to locking the match (>1.0 = already locked)
-        if self._running_pnl > 0 and hands_left > 0:
-            lead_ratio = self._running_pnl / (hands_left * 1.5)
+        if self._running_pnl > 0 and max_bleed > 0:
+            lead_ratio = self._running_pnl / max_bleed
         else:
             lead_ratio = 0.0
         protecting_lead = lead_ratio > 0.55
         self._last_urgency = float(urgency)
         self._last_lead_ratio = float(lead_ratio)
         self._last_position = "SB" if observation.get("blind_position", 0) == 0 else "BB"
+
+        # ── Dynamic Bleed-Out ────────────────────────────────────────────────
+        in_dynamic_bleedout = False
+        if hands_remaining > 0:
+            ratio = 0.33 + (6.0 / math.sqrt(hands_remaining))
+            threshold_lead = ratio * hands_remaining
+            if self._running_pnl > threshold_lead:
+                in_dynamic_bleedout = True
 
         if is_new_hand and not self._in_hand:
             self._in_hand = True
@@ -1932,11 +1996,6 @@ class PlayerAgent(Agent):
 
         # ── Bleed-out lock ───────────────────────────────────────────────────
         if not valid[DISCARD]:
-            hands_remaining = max(0, TOTAL_HANDS - self._hands_completed)
-            sb_left = (hands_remaining + 1) // 2
-            bb_left = hands_remaining // 2
-            max_bleed = sb_left * 1 + bb_left * 2
-
             if self._running_pnl > max_bleed:
                 if valid[FOLD]:
                     forced_lock_action = (FOLD, 0, 0, 0)
@@ -2128,16 +2187,24 @@ class PlayerAgent(Agent):
             premium = _has_any_premium(my_cards)
             premium_pair = _has_premium_pair(my_cards)
             to_call = max(0, opp_bet - my_bet)
-            pressure = self._coeff(exploit_adj, "preflop_pressure_adj", 0)
-            early_eq_gate = EARLY_PREFLOP_MIN_EQUITY - 0.05 * pressure
-            normal_eq_gate = NORMAL_PREFLOP_MIN_EQUITY - 0.05 * pressure
-            # Comeback mode: lower equity gates so we play more hands and steal blinds
-            if in_comeback_mode:
-                gate_reduction = -0.17 if in_critical_mode else -0.10
-                early_eq_gate = _clamp(early_eq_gate + gate_reduction, 0.22, 0.48)
-                normal_eq_gate = _clamp(normal_eq_gate + gate_reduction, 0.20, 0.45)
 
-            if in_early_phase:
+            if result is None:
+                pressure = self._coeff(exploit_adj, "preflop_pressure_adj", 0)
+                early_eq_gate = EARLY_PREFLOP_MIN_EQUITY - 0.05 * pressure
+                normal_eq_gate = NORMAL_PREFLOP_MIN_EQUITY - 0.05 * pressure
+
+                # Smooth tightening for dynamic bleed-out
+                if in_dynamic_bleedout:
+                    tighten_amt = _clamp((lead_ratio - 0.5) * 0.12, 0.0, 0.06)
+                    early_eq_gate += tighten_amt
+                    normal_eq_gate += tighten_amt
+                # Comeback mode: lower equity gates so we play more hands and steal blinds
+                if in_comeback_mode:
+                    gate_reduction = -0.17 if in_critical_mode else -0.10
+                    early_eq_gate = _clamp(early_eq_gate + gate_reduction, 0.22, 0.48)
+                    normal_eq_gate = _clamp(normal_eq_gate + gate_reduction, 0.20, 0.45)
+
+                if in_early_phase:
                 preflop_eq = self._preflop_equity(my_cards) if len(my_cards) == 5 else 0.45
                 self._pflog_eq = preflop_eq
                 self._pflog_gate = early_eq_gate
@@ -2434,6 +2501,40 @@ class PlayerAgent(Agent):
                     and to_call > 0 and to_call <= pot_ref * 0.20
                     and valid[CALL]):
                 result = (CALL, 0, 0, 0)
+
+        # ── Dynamic Bleed-Out Execution & Risk Cap ───────────────────────────
+        if in_dynamic_bleedout and not valid[DISCARD]:
+            if street >= 1:
+                # No bluffs: downgrade RAISE to CALL unless trips_plus
+                if result[0] == RAISE and hand_cat != "trips_plus":
+                    if valid[CALL] and opp_bet > my_bet:
+                        result = (CALL, 0, 0, 0)
+                    elif valid[CHECK]:
+                        result = (CHECK, 0, 0, 0)
+                    else:
+                        result = (FOLD, 0, 0, 0)
+            
+            # Global Risk Cap: Check if the action commits more than we can afford without losing the lock
+            cost = 0
+            if result[0] == RAISE:
+                cost = max(0, result[1] - my_bet)
+            elif result[0] == CALL:
+                cost = max(0, opp_bet - my_bet)
+            
+            # If we have a truly premium hand, ignore the risk cap to prevent exploitation
+            bypass_risk_cap = False
+            if street == 0 and _has_top_5_percent(my_cards):
+                bypass_risk_cap = True
+            elif street > 0 and (equity > 0.85 or hand_cat in ("trips_plus", "two_pair")):
+                bypass_risk_cap = True
+
+            if cost > 0 and distance_to_lock < 150 and not bypass_risk_cap:
+                risk_cap = max(15, int(distance_to_lock * 1.5))
+                if cost > risk_cap:
+                    if valid[FOLD]:
+                        result = (FOLD, 0, 0, 0)
+                    elif valid[CHECK]:
+                        result = (CHECK, 0, 0, 0)
 
         if forced_lock_action is not None:
             result = forced_lock_action

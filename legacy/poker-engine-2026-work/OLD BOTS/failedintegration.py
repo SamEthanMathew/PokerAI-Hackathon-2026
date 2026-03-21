@@ -34,9 +34,9 @@ RANK_8 = 6
 SLOW_PLAY_CHANCE = 0.20
 STANDARD_OPEN = _PROFILE.get("standard_open", 8)
 
-MONSTER_THRESHOLD = 0.82
-STRONG_THRESHOLD = 0.65
-GOOD_THRESHOLD = 0.48
+MONSTER_THRESHOLD = 0.85
+STRONG_THRESHOLD = 0.72
+GOOD_THRESHOLD = 0.55
 PREFLOP_COMMIT_THRESHOLD = 15
 TOTAL_HANDS = _PROFILE.get("total_hands", 1000)
 
@@ -67,11 +67,15 @@ _SUIT = [i // NUM_RANKS for i in range(DECK_SIZE)]
 # Preflop equity LUT (C(27,5) = 80,730 entries; both players keep best 2 from 5, optimal opponent)
 _PY_TO_CPP = [(i % 9) * 3 + (i // 9) for i in range(DECK_SIZE)]
 _PREFLOP_LUT: dict = {}
+_FAST_NATIVE_PREFLOP_LUT: dict = {}
 _preflop_lut_path = os.path.join(os.path.dirname(__file__), "preflop_equities_50k.json")
 if os.path.isfile(_preflop_lut_path):
     try:
         with open(_preflop_lut_path, encoding="utf-8") as _f:
             _PREFLOP_LUT = json.load(_f)
+        for c in combinations(range(DECK_SIZE), 5):
+            key = str(sorted(_PY_TO_CPP[x] for x in c))
+            _FAST_NATIVE_PREFLOP_LUT[frozenset(c)] = _PREFLOP_LUT.get(key, 0.45)
     except (json.JSONDecodeError, OSError):
         pass
 
@@ -109,24 +113,10 @@ PREMIUM_PAIRS = frozenset([
     frozenset([RANK_8, RANK_8]),
 ])
 
-PREMIUM_ANY_SUIT = frozenset([
-    frozenset([RANK_A, RANK_9]),
-    frozenset([RANK_A, RANK_8]),
-])
-
-PREMIUM_SUITED_ONLY = frozenset([
-    frozenset([RANK_9, RANK_8]),
-    frozenset([RANK_8, 5]),
-    frozenset([5, 4]),
-    frozenset([5, RANK_9]),
-])
-
 # ── Card helpers ─────────────────────────────────────────────────────────────
-
 
 def _clamp(val, lo, hi):
     return max(lo, min(hi, val))
-
 
 def _max_connectivity(ranks):
     unique = sorted(set(ranks))
@@ -142,28 +132,6 @@ def _max_connectivity(ranks):
     if RANK_A in unique and 0 in unique:
         best = max(best, 2)
     return best
-
-
-def _is_premium(c1, c2):
-    r1, r2 = _RANK[c1], _RANK[c2]
-    s1, s2 = _SUIT[c1], _SUIT[c2]
-    ranks = frozenset([r1, r2])
-    if r1 == r2 and frozenset([r1, r1]) in PREMIUM_PAIRS:
-        return True
-    if ranks in PREMIUM_ANY_SUIT:
-        return True
-    if s1 == s2 and ranks in PREMIUM_SUITED_ONLY:
-        return True
-    return False
-
-
-def _has_any_premium(cards):
-    for i in range(len(cards)):
-        for j in range(i + 1, len(cards)):
-            if _is_premium(cards[i], cards[j]):
-                return True
-    return False
-
 
 TOP_5_PERCENT_PAIRS = {
     frozenset([RANK_A, RANK_A]),
@@ -328,7 +296,7 @@ def _is_top_pair_or_better(my_cards, community):
 
 def _hand_rank_category(my_cards, community):
     if len(my_cards) < 2 or len(community) < 3:
-        return "nothing"
+        return "high_card"
     rc = [0] * NUM_RANKS
     sc = [0, 0, 0]
     for c in my_cards[:2]:
@@ -365,7 +333,7 @@ def _hand_rank_category(my_cards, community):
         return "two_pair"
     if pairs == 1:
         return "one_pair"
-    return "nothing"
+    return "high_card"
 
 
 def _count_flush_outs(my_cards, community, opp_discards, my_discards):
@@ -546,14 +514,16 @@ def _opp_keep_weight_lut(opp_hand, community, opp_discards, model_weights,
     for rank_idx, (kset, _) in enumerate(keeps_and_scores):
         if kset == opp_set:
             if rank_idx == 0:
-                return 1.0
+                return 1.0    # Best discard option
             elif rank_idx == 1:
-                return 0.06
+                return 0.30   # 2nd best (Respects high variance/mistakes)
             elif rank_idx == 2:
-                return 0.01
+                return 0.10   # 3rd best
+            elif rank_idx <= 4:
+                return 0.03   # 4th and 5th best
             else:
-                return 0.002
-    return 0.002
+                return 0.01   # Baseline floor for unexpected/bizarre discards
+    return 0.01
 
 
 def _exact_discard_equity_lut(my_keep, community, dead_cards):
@@ -617,7 +587,7 @@ def _exact_discard_equity_weighted_lut(my_keep, community, dead_cards,
     return wins / total_weight if total_weight > 0 else 0.5
 
 
-def _compute_discard_equity_mc_optimal(my_keep, community, dead_cards, num_sims=600):
+def _compute_discard_equity_mc_optimal(my_keep, community, dead_cards, num_sims=600, valid_opp_hands=None):
     """MC equity where opponent draws 5 cards and keeps their best 2-card combination.
 
     This correctly models the discard game: both players start with 5 cards and
@@ -636,9 +606,15 @@ def _compute_discard_equity_mc_optimal(my_keep, community, dead_cards, num_sims=
     total = 0
     _opp_indices = list(combinations(range(5), 2))  # pre-compute C(5,2)=10 pairs
     for _ in range(num_sims):
-        sample = random.sample(remaining, sample_size)
-        opp5 = sample[:5]
-        board_5 = community_l + sample[5:]
+        if valid_opp_hands is not None:
+            opp5 = random.choice(valid_opp_hands)
+            rem_for_board = [c for c in remaining if c not in opp5]
+            runout = random.sample(rem_for_board, board_needed)
+            board_5 = community_l + runout
+        else:
+            sample = random.sample(remaining, sample_size)
+            opp5 = sample[:5]
+            board_5 = community_l + sample[5:]
         # opponent picks their best (lowest rank = strongest) 2-card keep
         best_opp_rank = None
         for oi, oj in _opp_indices:
@@ -1439,7 +1415,7 @@ class PlayerAgent(Agent):
             return 0.75
         if hand_cat == "one_pair":
             return 0.50
-        if hand_cat == "nothing":
+        if hand_cat == "high_card":
             return 0.00
         return 0.25
 
@@ -1660,17 +1636,9 @@ class PlayerAgent(Agent):
                 bsc[s] += 1
             flop_cache = (fr, fs, bsc)
 
-        reject_nothing = aggr_signal >= 2.0
+        reject_high_card = aggr_signal >= 2.0
         reject_one_pair = aggr_signal >= 3.2
-        reject_two_pair = aggr_signal >= 4.2
-        
-        max_retries = 0
-        if reject_two_pair:
-            max_retries = 30
-        elif reject_one_pair:
-            max_retries = 20
-        elif reject_nothing:
-            max_retries = 10
+        max_retries = 3 if reject_high_card else 0
 
         community_l = list(community)
         my_keep = list(my2)
@@ -1693,7 +1661,7 @@ class PlayerAgent(Agent):
             if max_retries > 0 and len(community) >= 3:
                 for _retry in range(max_retries):
                     cat = _hand_rank_category(list(opp), community)
-                    if cat == "nothing" or (reject_one_pair and cat == "one_pair") or (reject_two_pair and cat in ("one_pair", "two_pair")):
+                    if cat == "high_card" or (reject_one_pair and cat == "one_pair"):
                         sample = random.sample(remaining, sample_size)
                         opp = sample[:2]
                         runout = sample[2:]
@@ -1708,7 +1676,7 @@ class PlayerAgent(Agent):
                     continue
                 if passive_signal > 2.0:
                     cat = _hand_rank_category(list(opp), community)
-                    if cat in ("nothing",):
+                    if cat in ("high_card",):
                         w *= 0.75
 
             board_5 = community_l + runout
@@ -1750,7 +1718,7 @@ class PlayerAgent(Agent):
         outs = max(flush_outs, straight_outs)
         if street == 1 and has_draw and outs > 0:
             equity += min(0.10, outs * 0.025)
-        elif street == 3 and has_draw and hand_cat in ("nothing", "one_pair"):
+        elif street == 3 and has_draw and hand_cat in ("high_card", "one_pair"):
             equity -= 0.10
 
         if my_cards and community:
@@ -1762,15 +1730,35 @@ class PlayerAgent(Agent):
         return _clamp(equity, 0.0, 0.98)
 
     @staticmethod
-    def _cat_to_strength(hand_cat, has_draw, my_cards=None, community=None):
+    @staticmethod
+    def _cat_to_strength(hand_cat, has_draw, adj_equity=None, my_cards=None, community=None):
+        if adj_equity is None:
+            adj_equity = 0.50 
+
+        if adj_equity >= 0.85:
+            return "monster"
+
         if hand_cat == "trips_plus":
-            return "monster"
-        if hand_cat == "two_pair":
-            return "monster"
-        if hand_cat == "one_pair" and has_draw:
-            return "strong"
-        if hand_cat == "one_pair":
+            if adj_equity >= 0.65:
+                return "monster"
+            if adj_equity >= 0.50:
+                return "strong"
             return "medium"
+
+        if hand_cat == "two_pair":
+            if adj_equity >= 0.70:
+                return "monster"
+            if adj_equity >= 0.55:
+                return "strong"
+            return "medium"
+
+        if hand_cat == "one_pair":
+            if has_draw and adj_equity >= 0.60:
+                return "strong"
+            if adj_equity >= 0.45:
+                return "medium"
+            return "weak"
+
         if has_draw:
             return "draw"
         return "weak"
@@ -1778,7 +1766,7 @@ class PlayerAgent(Agent):
     def _semi_bluff_check(self, my_cards, community, opp_discards, my_discards,
                           pot_size, to_call, street, valid, min_raise, max_raise,
                           exploit_adj, has_draw=None, flush_outs_v=None, straight_outs_v=None,
-                          rand_ctx=None):
+                          rand_ctx=None, adj_equity=None):
         if street not in (1, 2):
             return False, None
         if not (valid[RAISE] and max_raise >= min_raise):
@@ -1798,6 +1786,10 @@ class PlayerAgent(Agent):
         outs = max(f_outs, s_outs)
         if outs < 2:
             return False, None
+            
+        if adj_equity is not None and adj_equity < 0.12:
+            return False, None
+            
         if to_call > pot_size * 0.40:
             return False, None
 
@@ -1950,15 +1942,12 @@ class PlayerAgent(Agent):
         # ── Dynamic Bleed-Out ────────────────────────────────────────────────
         in_dynamic_bleedout = False
         surplus_for_hand = 0.0
-        alpha = 0.0
         if hands_left > 0:
             ratio = 0.33 + (6.0 / math.sqrt(hands_left))
             threshold_lead = ratio * hands_left
             if self._running_pnl > threshold_lead:
                 in_dynamic_bleedout = True
                 surplus_for_hand = self._running_pnl - threshold_lead
-                max_burn = 1.5 * max(1, hands_left)
-                alpha = min(1.0, max(0.0, surplus_for_hand / max_burn))
 
         if is_new_hand and not self._in_hand:
             self._in_hand = True
@@ -2101,6 +2090,14 @@ class PlayerAgent(Agent):
                 community_l = list(community)
                 board_needed = 5 - len(community)
 
+                valid_opp_hands = None
+                if opp_bet >= PREFLOP_COMMIT_THRESHOLD:
+                    base_opp_pool = [c for c in range(DECK_SIZE) if c not in dead_base | opp_disc_set]
+                    valid_opp_hands = [c for c in combinations(base_opp_pool, 5) 
+                                       if _FAST_NATIVE_PREFLOP_LUT.get(frozenset(c), 0.45) >= 0.50]
+                    if not valid_opp_hands:
+                        valid_opp_hands = list(combinations(base_opp_pool, 5))
+
                 if sim_mode == "emergency":
                     # Inline loop — avoid pool overhead in tight time budget
                     ss = 5 + board_needed
@@ -2116,11 +2113,18 @@ class PlayerAgent(Agent):
                             w = 0.0
                             t = 0
                             for _ in range(300):
-                                samp = random.sample(per_remaining, ss)
-                                board_5 = community_l + samp[5:]
+                                if valid_opp_hands is not None:
+                                    opp5 = random.choice(valid_opp_hands)
+                                    rem_for_board = [c for c in per_remaining if c not in opp5]
+                                    runout = random.sample(rem_for_board, board_needed)
+                                    board_5 = community_l + runout
+                                else:
+                                    samp = random.sample(per_remaining, ss)
+                                    opp5 = samp[:5]
+                                    board_5 = community_l + samp[5:]
                                 best_opp_rank = None
                                 for oi, oj in _opp_idx:
-                                    r = _lut_eval_7([samp[oi], samp[oj]] + board_5)
+                                    r = _lut_eval_7([opp5[oi], opp5[oj]] + board_5)
                                     if best_opp_rank is None or r < best_opp_rank:
                                         best_opp_rank = r
                                 mr = _lut_eval_7(list(keep) + board_5)
@@ -2139,7 +2143,7 @@ class PlayerAgent(Agent):
                     jobs_opt = []
                     for i, j, keep, toss in all_keeps:
                         dead = dead_base | set(toss) | opp_disc_set
-                        jobs_opt.append((keep, community, dead, 600))
+                        jobs_opt.append((keep, community, dead, 600, valid_opp_hands))
                     results_opt = _run_discard_equities_parallel(
                         _compute_discard_equity_mc_optimal, jobs_opt
                     )
@@ -2196,108 +2200,83 @@ class PlayerAgent(Agent):
         baseline_action_kind = "same"
 
         if street == 0:
-            premium = _has_any_premium(my_cards)
+            preflop_eq = self._preflop_equity(my_cards) if len(my_cards) == 5 else 0.45
+            premium = len(my_cards) == 5 and preflop_eq >= 0.56
             premium_pair = _has_premium_pair(my_cards)
             to_call = max(0, opp_bet - my_bet)
 
-            pressure = self._coeff(exploit_adj, "preflop_pressure_adj", 0)
-            early_eq_gate = EARLY_PREFLOP_MIN_EQUITY - 0.05 * pressure
-            normal_eq_gate = NORMAL_PREFLOP_MIN_EQUITY - 0.05 * pressure
-            
-            # Comeback mode: lower equity gates so we play more hands and steal blinds
-            if in_comeback_mode:
-                gate_reduction = -0.17 if in_critical_mode else -0.10
-                early_eq_gate = _clamp(early_eq_gate + gate_reduction, 0.22, 0.48)
-                normal_eq_gate = _clamp(normal_eq_gate + gate_reduction, 0.20, 0.45)
-                
-            opp_vpip = profile.get("opp_preflop_raise_rate", 0.5)
-            alpha_penalty = 0.25 * alpha
-            bully_discount = 0.5 * max(0.0, opp_vpip - 0.5)
-            net_penalty = max(0.0, alpha_penalty - bully_discount)
-            
-            early_eq_gate = _clamp(early_eq_gate + net_penalty, 0.22, 0.80)
-            normal_eq_gate = _clamp(normal_eq_gate + net_penalty, 0.20, 0.78)
-
-            if in_early_phase:
-                preflop_eq = self._preflop_equity(my_cards) if len(my_cards) == 5 else 0.45
-                self._pflog_eq = preflop_eq
-                self._pflog_gate = early_eq_gate
-                if premium:
-                    if premium_pair and opp_bet >= PREFLOP_COMMIT_THRESHOLD and valid[RAISE]:
-                        result = (RAISE, max_raise, 0, 0)
-                        self._preflop_reason = "premium_pair_allin"
-                    elif to_call > 0 and valid[RAISE] and random.random() < 0.70:
-                        amt = _clamp(int(to_call * 2.5 * random.uniform(0.9, 1.1)), min_raise, max_raise)
-                        result = (RAISE, amt, 0, 0)
-                        self._preflop_reason = "premium_3bet_reraise"
-                    else:
-                        noise = random.uniform(0.85, 1.15)
-                        open_mult = _clamp(1.0 + 0.35 * pressure, 0.80, 1.25)
-                        open_size = _clamp(int(max(10, STANDARD_OPEN) * EARLY_OPEN_MULTIPLIER * open_mult * noise), min_raise, max_raise)
-                        if valid[RAISE]:
-                            result = (RAISE, open_size, 0, 0)
-                            self._preflop_reason = "premium_early_open"
-                        elif valid[CALL]:
-                            result = (CALL, 0, 0, 0)
-                            self._preflop_reason = "premium_early_call"
-                        else:
+            if in_dynamic_bleedout:
+                has_top_5 = _has_top_5_percent(my_cards)
+                if self._last_position == "SB":
+                    if not has_top_5:
+                        if valid[FOLD]:
+                            result = (FOLD, 0, 0, 0)
+                        elif valid[CHECK]:
                             result = (CHECK, 0, 0, 0)
-                            self._preflop_reason = "premium_early_check"
-                elif preflop_eq >= early_eq_gate:
-                    if valid[RAISE] and random.random() < 0.65:
-                        amt = _clamp(int(9 * (1.0 + 0.25 * pressure) * random.uniform(0.9, 1.1)), min_raise, max_raise)
-                        result = (RAISE, amt, 0, 0)
-                        self._preflop_reason = "equity_raise"
-                    elif valid[CALL]:
-                        result = (CALL, 0, 0, 0)
-                        self._preflop_reason = "equity_call"
-                    elif valid[CHECK]:
-                        result = (CHECK, 0, 0, 0)
-                        self._preflop_reason = "equity_check"
-                if result is None:
-                    if valid[CHECK]:
-                        result = (CHECK, 0, 0, 0)
-                        self._preflop_reason = "check_no_equity"
-                    else:
-                        result = (FOLD, 0, 0, 0)
-                        self._preflop_reason = "fold_no_equity"
-
-            else:
-                if premium:
-                    if premium_pair and opp_bet >= PREFLOP_COMMIT_THRESHOLD and valid[RAISE]:
-                        result = (RAISE, max_raise, 0, 0)
-                        self._preflop_reason = "premium_pair_allin"
-                    elif premium_pair and random.random() < SLOW_PLAY_CHANCE:
-                        if valid[CALL]:
-                            result = (CALL, 0, 0, 0)
-                        else:
-                            result = (CHECK, 0, 0, 0)
-                        self._preflop_reason = "premium_slowplay"
-                    else:
-                        noise = random.uniform(0.85, 1.15)
-                        open_mult = _clamp(1.0 + 0.35 * pressure, 0.80, 1.25)
-                        open_size = _clamp(int(max(10, STANDARD_OPEN) * open_mult * noise), min_raise, max_raise)
-                        if valid[RAISE]:
-                            result = (RAISE, open_size, 0, 0)
-                            self._preflop_reason = "premium_standard_open"
-                        elif valid[CALL]:
-                            result = (CALL, 0, 0, 0)
-                            self._preflop_reason = "premium_call"
-                        else:
-                            result = (CHECK, 0, 0, 0)
-                            self._preflop_reason = "premium_check"
+                        self._preflop_reason = "bleedout_sb_fold"
                 else:
+                    if to_call > 0 and not has_top_5:
+                        if valid[FOLD]:
+                            result = (FOLD, 0, 0, 0)
+                        elif valid[CHECK]:
+                            result = (CHECK, 0, 0, 0)
+                        self._preflop_reason = "bleedout_bb_fold"
+                    elif to_call > 0 and has_top_5:
+                        pfr = profile.get("preflop_raise_rate", 0.5)
+                        if pfr < 0.20 and opp_bet >= PREFLOP_COMMIT_THRESHOLD:
+                            has_aa_99 = False
+                            for c1, c2 in combinations(my_cards, 2):
+                                if _RANK[c1] == _RANK[c2] and _RANK[c1] in (RANK_A, RANK_9):
+                                    has_aa_99 = True
+                                    break
+                            if not has_aa_99:
+                                if valid[FOLD]:
+                                    result = (FOLD, 0, 0, 0)
+                                elif valid[CHECK]:
+                                    result = (CHECK, 0, 0, 0)
+                                self._preflop_reason = "bleedout_bb_veto"
+
+            if result is None:
+                pressure = self._coeff(exploit_adj, "preflop_pressure_adj", 0)
+                early_eq_gate = EARLY_PREFLOP_MIN_EQUITY - 0.05 * pressure
+                normal_eq_gate = NORMAL_PREFLOP_MIN_EQUITY - 0.05 * pressure
+                # Comeback mode: lower equity gates so we play more hands and steal blinds
+                if in_comeback_mode:
+                    gate_reduction = -0.17 if in_critical_mode else -0.10
+                    early_eq_gate = _clamp(early_eq_gate + gate_reduction, 0.22, 0.48)
+                    normal_eq_gate = _clamp(normal_eq_gate + gate_reduction, 0.20, 0.45)
+
+                if in_early_phase:
                     preflop_eq = self._preflop_equity(my_cards) if len(my_cards) == 5 else 0.45
                     self._pflog_eq = preflop_eq
-                    self._pflog_gate = normal_eq_gate
-                    if preflop_eq >= normal_eq_gate:
-                        open_prob = _clamp(0.40 + 0.35 * pressure + (0.50 * urgency if in_comeback_mode else 0.0), 0.20, 0.98)
-                        self._pflog_open_prob = open_prob
-                        if to_call <= 0 and valid[RAISE] and random.random() < open_prob:
-                            amt = _clamp(int(8 * (1.0 + 0.25 * pressure) * random.uniform(0.9, 1.1)), min_raise, max_raise)
+                    self._pflog_gate = early_eq_gate
+                    if premium:
+                        if premium_pair and opp_bet >= PREFLOP_COMMIT_THRESHOLD and valid[RAISE]:
+                            result = (RAISE, max_raise, 0, 0)
+                            self._preflop_reason = "premium_pair_allin"
+                        elif to_call > 0 and valid[RAISE] and random.random() < 0.70:
+                            amt = _clamp(int(to_call * 2.5 * random.uniform(0.9, 1.1)), min_raise, max_raise)
+                            result = (RAISE, amt, 0, 0)
+                            self._preflop_reason = "premium_3bet_reraise"
+                        else:
+                            noise = random.uniform(0.85, 1.15)
+                            open_mult = _clamp(1.0 + 0.35 * pressure, 0.80, 1.25)
+                            open_size = _clamp(int(max(10, STANDARD_OPEN) * EARLY_OPEN_MULTIPLIER * open_mult * noise), min_raise, max_raise)
+                            if valid[RAISE]:
+                                result = (RAISE, open_size, 0, 0)
+                                self._preflop_reason = "premium_early_open"
+                            elif valid[CALL]:
+                                result = (CALL, 0, 0, 0)
+                                self._preflop_reason = "premium_early_call"
+                            else:
+                                result = (CHECK, 0, 0, 0)
+                                self._preflop_reason = "premium_early_check"
+                    elif preflop_eq >= early_eq_gate:
+                        if valid[RAISE] and random.random() < 0.65:
+                            amt = _clamp(int(9 * (1.0 + 0.25 * pressure) * random.uniform(0.9, 1.1)), min_raise, max_raise)
                             result = (RAISE, amt, 0, 0)
                             self._preflop_reason = "equity_raise"
-                        elif valid[CALL] and to_call <= (10 if in_critical_mode else 6 if in_comeback_mode else 4):
+                        elif valid[CALL]:
                             result = (CALL, 0, 0, 0)
                             self._preflop_reason = "equity_call"
                         elif valid[CHECK]:
@@ -2310,6 +2289,55 @@ class PlayerAgent(Agent):
                         else:
                             result = (FOLD, 0, 0, 0)
                             self._preflop_reason = "fold_no_equity"
+
+                else:
+                    if premium:
+                        if premium_pair and opp_bet >= PREFLOP_COMMIT_THRESHOLD and valid[RAISE]:
+                            result = (RAISE, max_raise, 0, 0)
+                            self._preflop_reason = "premium_pair_allin"
+                        elif premium_pair and random.random() < SLOW_PLAY_CHANCE:
+                            if valid[CALL]:
+                                result = (CALL, 0, 0, 0)
+                            else:
+                                result = (CHECK, 0, 0, 0)
+                            self._preflop_reason = "premium_slowplay"
+                        else:
+                            noise = random.uniform(0.85, 1.15)
+                            open_mult = _clamp(1.0 + 0.35 * pressure, 0.80, 1.25)
+                            open_size = _clamp(int(max(10, STANDARD_OPEN) * open_mult * noise), min_raise, max_raise)
+                            if valid[RAISE]:
+                                result = (RAISE, open_size, 0, 0)
+                                self._preflop_reason = "premium_standard_open"
+                            elif valid[CALL]:
+                                result = (CALL, 0, 0, 0)
+                                self._preflop_reason = "premium_call"
+                            else:
+                                result = (CHECK, 0, 0, 0)
+                                self._preflop_reason = "premium_check"
+                    else:
+                        preflop_eq = self._preflop_equity(my_cards) if len(my_cards) == 5 else 0.45
+                        self._pflog_eq = preflop_eq
+                        self._pflog_gate = normal_eq_gate
+                        if preflop_eq >= normal_eq_gate:
+                            open_prob = _clamp(0.40 + 0.35 * pressure + (0.50 * urgency if in_comeback_mode else 0.0), 0.20, 0.98)
+                            self._pflog_open_prob = open_prob
+                            if to_call <= 0 and valid[RAISE] and random.random() < open_prob:
+                                amt = _clamp(int(8 * (1.0 + 0.25 * pressure) * random.uniform(0.9, 1.1)), min_raise, max_raise)
+                                result = (RAISE, amt, 0, 0)
+                                self._preflop_reason = "equity_raise"
+                            elif valid[CALL] and to_call <= (10 if in_critical_mode else 6 if in_comeback_mode else 4):
+                                result = (CALL, 0, 0, 0)
+                                self._preflop_reason = "equity_call"
+                            elif valid[CHECK]:
+                                result = (CHECK, 0, 0, 0)
+                                self._preflop_reason = "equity_check"
+                        if result is None:
+                            if valid[CHECK]:
+                                result = (CHECK, 0, 0, 0)
+                                self._preflop_reason = "check_no_equity"
+                            else:
+                                result = (FOLD, 0, 0, 0)
+                                self._preflop_reason = "fold_no_equity"
         # ── Post-flop (streets 1-3) ──────────────────────────────────────────
         else:
             if len(my_cards) > 2:
@@ -2322,33 +2350,19 @@ class PlayerAgent(Agent):
             passive_sticky_signal = _clamp(
                 1.0 + 1.3 * profile.get("call_down_turn", 0.40) + 0.9 * profile.get("call_down_river", 0.38), 0.0, 3.0
             )
+            
+            current_aggr_boost = 0.0
+            if to_call >= pot_ref * 0.8:
+                current_aggr_boost = 2.0
+            elif to_call >= pot_ref * 0.4:
+                current_aggr_boost = 1.0
+                
             aggr_value_signal = _clamp(
-                1.0 + 1.2 * profile.get("raise_vs_bet_turn", 0.20) + 1.0 * profile.get("raise_vs_bet_river", 0.20), 0.0, 3.0
+                1.0 + 1.2 * profile.get("raise_vs_bet_turn", 0.20) + 1.0 * profile.get("raise_vs_bet_river", 0.20) + current_aggr_boost, 0.0, 4.0
             )
             use_profile_signal = (not self._SHADOW_ONLY) and self._LIVE_STAGE >= 3
             signal_passive = passive_sticky_signal if use_profile_signal else baseline_passive_signal
             signal_aggr = aggr_value_signal if use_profile_signal else baseline_aggr_signal
-            
-            # Add current action aggression
-            if opp_bet > my_bet:
-                to_call = opp_bet - my_bet
-                pot_before_call = pot_size - to_call
-                bet_fraction = to_call / max(1.0, float(pot_before_call))
-                
-                action_aggr = 0.0
-                if bet_fraction >= 0.75:
-                    action_aggr = 2.5
-                elif bet_fraction >= 0.4:
-                    action_aggr = 1.5
-                else:
-                    action_aggr = 0.5
-                    
-                # Extra respect for big river bets
-                if street == 3 and bet_fraction > 0.6:
-                    action_aggr += 1.0
-                    
-                signal_aggr = max(signal_aggr, 1.0 + action_aggr)
-
             eq_sims = 100 if sim_mode == "emergency" else (200 if sim_mode == "conservative" else 500)
             equity = self._compute_equity_ranged(
                 my_cards, community, dead, opp_discards, signal_passive, signal_aggr, num_sims=eq_sims)
@@ -2358,13 +2372,13 @@ class PlayerAgent(Agent):
             suit_count, flush_outs, _ = _count_flush_outs(my_cards, community, opp_discards, my_discards)
             run_count, straight_outs, _ = _count_straight_outs(my_cards, community, opp_discards, my_discards)
             has_draw = (suit_count >= 4 and flush_outs >= 2) or (run_count >= 4 and straight_outs >= 3)
-            strength = self._cat_to_strength(hand_cat, has_draw, my_cards, community)
+            
             equity_before_adjust = float(equity)
             outs = max(flush_outs, straight_outs)
             draw_adj = 0.0
             if street == 1 and has_draw and outs > 0:
                 draw_adj = min(0.10, outs * 0.025)
-            elif street == 3 and has_draw and hand_cat in ("nothing", "one_pair"):
+            elif street == 3 and has_draw and hand_cat in ("high_card", "one_pair"):
                 draw_adj = -0.10
             board_monotone_penalty = _board_monotone_penalty(my_cards, community)
             board_connected_penalty = _board_connected_penalty(my_cards, community)
@@ -2379,6 +2393,8 @@ class PlayerAgent(Agent):
                 texture_dampen_factor = 1.0
                 street_adjust_total = draw_adj + raw_texture_adj
             equity = _clamp(equity_before_adjust + street_adjust_total, 0.0, 0.98)
+
+            strength = self._cat_to_strength(hand_cat, has_draw, equity, my_cards, community)
 
             to_call = max(0, opp_bet - my_bet)
             pot_ref = max(pot_size, 1)
@@ -2402,12 +2418,19 @@ class PlayerAgent(Agent):
             hero_fold = self._coeff(exploit_adj, "hero_fold_adj", street)
             value_sizing = self._coeff(exploit_adj, "value_bet_size_adj", street)
             bluff_freq = self._coeff(exploit_adj, "bluff_freq_adj", street)
-            monster_gate = _clamp(MONSTER_THRESHOLD - 0.03 * value_sizing, 0.78, 0.86)
-            strong_gate = _clamp(STRONG_THRESHOLD - 0.03 * value_sizing, 0.58, 0.72)
-            good_gate = _clamp(GOOD_THRESHOLD - 0.03 * bluff_freq, 0.40, 0.54)
+            monster_gate = _clamp(MONSTER_THRESHOLD - 0.03 * value_sizing, 0.81, 0.89)
+            strong_gate = _clamp(STRONG_THRESHOLD - 0.03 * value_sizing, 0.65, 0.79)
+            good_gate = _clamp(GOOD_THRESHOLD - 0.03 * bluff_freq, 0.47, 0.61)
             urgency_call_adj = (-0.08 * urgency if in_comeback_mode else
                                 0.05 if protecting_lead else 0.0)
-            call_gate = _clamp(pot_odds + 0.10 * hero_fold - 0.10 * bluff_catch + urgency_call_adj, 0.0, 0.95)
+            
+            polarized_penalty = 0.0
+            if street == 3 and to_call > pot_ref * 1.2:
+                polarized_penalty = 0.15
+            elif street >= 2 and to_call > pot_ref * 0.7:
+                polarized_penalty = 0.08
+                
+            call_gate = _clamp(pot_odds + 0.10 * hero_fold - 0.10 * bluff_catch + urgency_call_adj + polarized_penalty, 0.0, 0.95)
             baseline_call_gate = pot_odds
             baseline_good = GOOD_THRESHOLD
             zero_adj = {k: 0.0 for k in self._exploit_state}
@@ -2418,7 +2441,7 @@ class PlayerAgent(Agent):
                     my_cards, community, opp_discards, my_discards,
                     pot_size, to_call, street, valid, min_raise, max_raise, zero_adj,
                     has_draw=has_draw, flush_outs_v=flush_outs, straight_outs_v=straight_outs,
-                    rand_ctx=rand_ctx)
+                    rand_ctx=rand_ctx, adj_equity=equity)
                 if b_fire:
                     baseline_result = b_sb
             if baseline_result is None:
@@ -2453,7 +2476,7 @@ class PlayerAgent(Agent):
                     my_cards, community, opp_discards, my_discards,
                     pot_size, to_call, street, valid, min_raise, max_raise, exploit_adj,
                     has_draw=has_draw, flush_outs_v=flush_outs, straight_outs_v=straight_outs,
-                    rand_ctx=rand_ctx)
+                    rand_ctx=rand_ctx, adj_equity=equity)
                 if fire:
                     result = sb_action
 
@@ -2527,15 +2550,27 @@ class PlayerAgent(Agent):
             if result[0] == FOLD and to_call <= 0 and valid[CHECK]:
                 result = (CHECK, 0, 0, 0)
 
-            if result[0] == FOLD and my_bet > 0 and pot_ref > 0 and my_bet >= pot_ref * 0.40:
-                if valid[CALL]:
-                    result = (CALL, 0, 0, 0)
-
             if (result[0] == FOLD and len(my_cards) == 2
                     and _is_premium_pair(my_cards[0], my_cards[1])
                     and to_call > 0 and to_call <= pot_ref * 0.20
                     and valid[CALL]):
                 result = (CALL, 0, 0, 0)
+
+            # Pot-Bloat Veto: downgrade RAISE to CALL/CHECK for one-pair hands in large pots
+            if street >= 1 and result[0] == RAISE and hand_cat == "one_pair" and pot_ref >= 40:
+                if to_call > 0 and valid[CALL]:
+                    result = (CALL, 0, 0, 0)
+                elif to_call <= 0 and valid[CHECK]:
+                    result = (CHECK, 0, 0, 0)
+                else:
+                    result = (FOLD, 0, 0, 0)
+
+            # Dead Hand Guard (Equity Floor): prevent calling if our hand is practically dead
+            if result[0] == CALL and to_call > pot_ref * 0.15 and equity < 0.15:
+                if valid[FOLD]:
+                    result = (FOLD, 0, 0, 0)
+                elif valid[CHECK]:
+                    result = (CHECK, 0, 0, 0)
 
         # ── Dynamic Bleed-Out Execution & Risk Cap ───────────────────────────
         if in_dynamic_bleedout and not valid[DISCARD]:
@@ -2564,16 +2599,7 @@ class PlayerAgent(Agent):
             elif result[0] == CALL:
                 cost = max(0, opp_bet - my_bet)
             
-            opp_honesty = (profile.get("river_bet_strength_large", 0.6) + profile.get("river_raise_strength", 0.6)) / 2.0
-            opp_bluff_rate = max(0.0, 1.0 - opp_honesty)
-            risk_factor = 0.2 + (0.8 * opp_bluff_rate)
-            adjusted_risk_cap = surplus_for_hand * risk_factor
-
-            river_jam_override_active = False
-            if street == 3 and equity > strong_gate and _is_top_pair_or_better(my_cards, community):
-                river_jam_override_active = True
-                
-            if cost > adjusted_risk_cap and not river_jam_override_active:
+            if cost > surplus_for_hand:
                 if valid[FOLD]:
                     result = (FOLD, 0, 0, 0)
                 elif valid[CHECK]:
@@ -2616,8 +2642,8 @@ class PlayerAgent(Agent):
                     position=self._last_position,
                     hole_cards=self._cards_to_str(my_cards),
                     is_early_phase=in_early_phase,
-                    is_premium=bool(_has_any_premium(my_cards)),
-                    is_premium_pair=bool(_has_premium_pair(my_cards)),
+                    is_premium=bool(premium),
+                    is_premium_pair=bool(premium_pair),
                     equity=self._pflog_eq,
                     eq_gate=self._pflog_gate,
                     open_prob=round(float(self._pflog_open_prob), 3) if self._pflog_open_prob is not None else None,
@@ -2631,13 +2657,6 @@ class PlayerAgent(Agent):
                     protecting_lead=protecting_lead,
                     pressure_adj=float(self._coeff(exploit_adj, "preflop_pressure_adj", 0)),
                     preflop_defense_adj=float(self._coeff(exploit_adj, "preflop_defense_adj", 0)),
-                    bleedout_state={
-                        "alpha": float(alpha),
-                        "surplus": float(surplus_for_hand),
-                        "opp_vpip": float(profile.get("opp_preflop_raise_rate", 0.5)),
-                        "alpha_penalty": float(0.25 * alpha) if in_dynamic_bleedout else 0.0,
-                        "bully_discount": float(0.5 * max(0.0, profile.get("opp_preflop_raise_rate", 0.5) - 0.5)) if in_dynamic_bleedout else 0.0
-                    } if in_dynamic_bleedout else None,
                 )
             elif street >= 1:
                 active_exploits = {k: round(float(v), 4) for k, v in exploit_adj.items() if abs(v) > 0.001}
@@ -2683,15 +2702,6 @@ class PlayerAgent(Agent):
                     urgency=round(float(urgency), 3),
                     comeback_mode=in_comeback_mode,
                     protecting_lead=protecting_lead,
-                    bleedout_state={
-                        "alpha": float(alpha),
-                        "opp_bluff_rate": float(opp_bluff_rate) if 'opp_bluff_rate' in locals() else 0.0,
-                        "risk_factor": float(risk_factor) if 'risk_factor' in locals() else 1.0,
-                        "raw_surplus": float(surplus_for_hand),
-                        "adjusted_risk_cap": float(adjusted_risk_cap) if 'adjusted_risk_cap' in locals() else 0.0,
-                        "action_cost": float(cost) if 'cost' in locals() else 0.0,
-                        "river_jam_override_active": bool(river_jam_override_active) if 'river_jam_override_active' in locals() else False
-                    } if in_dynamic_bleedout else None,
                 )
 
         # ── Track our action ─────────────────────────────────────────────────
