@@ -887,6 +887,13 @@ class PlayerAgent(Agent):
         self._last_after_shock = False
         self._we_folded = False
         self._event_store = []
+        
+        # Phoenix Protocol State
+        self._pnl_deltas = []
+        self._current_gear = "SNIPER"
+        self._hands_in_current_gear = 0
+        self._gear_entry_pnl = 0
+        
         self._line_state = {
             "we_checked_this_node": False,
             "we_bet_this_node": False,
@@ -1366,9 +1373,12 @@ class PlayerAgent(Agent):
 
         if terminated:
             hand_num = self._hands_completed
-            self._running_pnl += int(reward)
+            delta = int(reward)
+            self._running_pnl += delta
+            self._pnl_deltas.append(delta)
+            
             self._hands_completed += 1
-            self._last_after_shock = abs(int(reward)) >= 20
+            self._last_after_shock = abs(delta) >= 20
 
             self._learn_from_showdown(observation, info)
 
@@ -1900,6 +1910,41 @@ class PlayerAgent(Agent):
 
     # ── Main act() ───────────────────────────────────────────────────────────
 
+    def _calculate_pnl_slope(self):
+        """
+        Calculates the velocity of ruin based on the last 50 PnL deltas.
+        We cap the delta to +/- 15 to ignore massive variance spikes ("coolers")
+        and measure the core bleed rate instead.
+        """
+        recent_deltas = self._pnl_deltas[-50:]
+        n = len(recent_deltas)
+        if n < 2:
+            return 0.0
+            
+        # Cap deltas to ±15
+        capped_deltas = [max(-15, min(15, d)) for d in recent_deltas]
+        
+        # Calculate slope 'm' of cumulative capped PnL using least squares
+        # y = cumulative PnL of capped deltas
+        # x = hand index
+        y = []
+        cum = 0
+        for d in capped_deltas:
+            cum += d
+            y.append(cum)
+            
+        sum_x = sum(range(n))
+        sum_y = sum(y)
+        sum_xx = sum(x*x for x in range(n))
+        sum_xy = sum(x * y[x] for x in range(n))
+        
+        denominator = (n * sum_xx - sum_x * sum_x)
+        if denominator == 0:
+            return 0.0
+            
+        m = (n * sum_xy - sum_x * sum_y) / denominator
+        return m
+
     def act(self, observation, reward, terminated, truncated, info):
         my_cards = [c for c in observation["my_cards"] if c != -1]
         community = [c for c in observation["community_cards"] if c != -1]
@@ -1964,6 +2009,58 @@ class PlayerAgent(Agent):
             self._in_hand = True
             self._we_folded = False
             self._last_opp_kept_at_showdown = []
+            self._hands_in_current_gear += 1
+            
+            # ── Asymmetric Gear Shifter Logic (Phoenix Protocol) ─────────────
+            if hands_left > 0:
+                slope = self._calculate_pnl_slope()
+                projected_final = self._running_pnl + (slope * hands_left)
+                
+                # The Shootout (Two-Minute Warning)
+                if hands_left < 30 and self._running_pnl < 0:
+                    projected_final = -100.0
+                    
+                target_gear = "SNIPER"
+                # Assuming standard 400 starting stack, threshold is -100 (-0.25 * 400)
+                if projected_final < -100:
+                    target_gear = "CHAOS"
+                elif projected_final < 0:
+                    target_gear = "PRESSURE"
+                    
+                gear_priority = {"SNIPER": 0, "PRESSURE": 1, "CHAOS": 2}
+                target_prio = gear_priority[target_gear]
+                current_prio = gear_priority[self._current_gear]
+                
+                if target_prio > current_prio:
+                    # Up-shift: Instant. No delay.
+                    if self._current_gear != target_gear:
+                        self._log_event("gear_transition", 
+                            hand=self._hands_completed,
+                            old_gear=self._current_gear,
+                            new_gear=target_gear,
+                            reason="emergency_upshift",
+                            slope=round(float(slope), 3),
+                            projected_final=round(float(projected_final), 3)
+                        )
+                    self._current_gear = target_gear
+                    self._hands_in_current_gear = 0
+                    self._gear_entry_pnl = self._running_pnl
+                elif target_prio < current_prio:
+                    # Down-shift: Delayed (Hysteresis)
+                    if self._hands_in_current_gear >= 5 and self._running_pnl > self._gear_entry_pnl:
+                        if self._current_gear != target_gear:
+                            self._log_event("gear_transition", 
+                                hand=self._hands_completed,
+                                old_gear=self._current_gear,
+                                new_gear=target_gear,
+                                reason="delayed_downshift",
+                                slope=round(float(slope), 3),
+                                projected_final=round(float(projected_final), 3)
+                            )
+                        self._current_gear = target_gear
+                        self._hands_in_current_gear = 0
+                        self._gear_entry_pnl = self._running_pnl
+            
             self._log_event("hand_start",
                 hand=self._hands_completed,
                 position="SB" if observation.get("blind_position", 0) == 0 else "BB",
@@ -1977,6 +2074,9 @@ class PlayerAgent(Agent):
                 lead_ratio=round(float(lead_ratio), 3),
                 comeback_mode=in_comeback_mode,
                 protecting_lead=protecting_lead,
+                current_gear=self._current_gear,
+                pnl_slope=round(float(slope if hands_left > 0 else 0.0), 3),
+                projected_pnl=round(float(projected_final if hands_left > 0 else self._running_pnl), 3)
             )
         if budget_per_hand < 0.15:
             sim_mode = "emergency"
@@ -2204,21 +2304,40 @@ class PlayerAgent(Agent):
             early_eq_gate = EARLY_PREFLOP_MIN_EQUITY - 0.05 * pressure
             normal_eq_gate = NORMAL_PREFLOP_MIN_EQUITY - 0.05 * pressure
             
-            # Comeback mode: lower equity gates so we play more hands and steal blinds
-            if in_comeback_mode:
-                gate_reduction = -0.17 if in_critical_mode else -0.10
-                early_eq_gate = _clamp(early_eq_gate + gate_reduction, 0.22, 0.48)
-                normal_eq_gate = _clamp(normal_eq_gate + gate_reduction, 0.20, 0.45)
+            # ── Gear-Based Pre-Flop Logic (Phoenix Protocol) ─────────────
+            if self._current_gear == "SNIPER":
+                early_eq_gate = _clamp(early_eq_gate + 0.15, 0.50, 0.80)
+                normal_eq_gate = _clamp(normal_eq_gate + 0.15, 0.48, 0.78)
+            elif self._current_gear == "PRESSURE":
+                early_eq_gate = _clamp(early_eq_gate - 0.15, 0.22, 0.48)
+                normal_eq_gate = _clamp(normal_eq_gate - 0.15, 0.20, 0.45)
+            elif self._current_gear == "CHAOS":
+                # CHAOS overrides equity gates to be very loose
+                early_eq_gate = 0.25
+                normal_eq_gate = 0.25
                 
             opp_vpip = profile.get("opp_preflop_raise_rate", 0.5)
             alpha_penalty = 0.25 * alpha
             bully_discount = 0.5 * max(0.0, opp_vpip - 0.5)
             net_penalty = max(0.0, alpha_penalty - bully_discount)
             
-            early_eq_gate = _clamp(early_eq_gate + net_penalty, 0.22, 0.80)
-            normal_eq_gate = _clamp(normal_eq_gate + net_penalty, 0.20, 0.78)
+            # Skip net penalty application if we are in CHAOS or SNIPER so gears act purely
+            if self._current_gear not in ("CHAOS", "SNIPER"):
+                early_eq_gate = _clamp(early_eq_gate + net_penalty, 0.22, 0.80)
+                normal_eq_gate = _clamp(normal_eq_gate + net_penalty, 0.20, 0.78)
 
-            if in_early_phase:
+            result = None
+            if self._current_gear == "CHAOS" and valid[RAISE]:
+                has_ace = any(_RANK[c] == 8 for c in my_cards)
+                if opp_vpip < 0.45:
+                    chaos_shove = has_ace or premium
+                else:
+                    chaos_shove = has_ace or premium_pair
+                if chaos_shove:
+                    result = (RAISE, max_raise, 0, 0)
+                    self._preflop_reason = "chaos_shove"
+
+            if in_early_phase and result is None:
                 preflop_eq = self._preflop_equity(my_cards) if len(my_cards) == 5 else 0.45
                 self._pflog_eq = preflop_eq
                 self._pflog_gate = early_eq_gate
@@ -2262,7 +2381,7 @@ class PlayerAgent(Agent):
                         result = (FOLD, 0, 0, 0)
                         self._preflop_reason = "fold_no_equity"
 
-            else:
+            elif result is None:
                 if premium:
                     if premium_pair and opp_bet >= PREFLOP_COMMIT_THRESHOLD and valid[RAISE]:
                         result = (RAISE, max_raise, 0, 0)
@@ -2378,7 +2497,23 @@ class PlayerAgent(Agent):
             else:
                 texture_dampen_factor = 1.0
                 street_adjust_total = draw_adj + raw_texture_adj
+                
             equity = _clamp(equity_before_adjust + street_adjust_total, 0.0, 0.98)
+            
+            # ── Gear-Based Post-Flop Adjustments (Phoenix Protocol) ──────
+            if self._current_gear == "CHAOS":
+                chaos_boost = 0.10
+                if len(opp_discards) >= 2:
+                    opp_discarded_pair = any(_RANK[opp_discards[i]] == _RANK[opp_discards[j]] 
+                                             for i in range(len(opp_discards)) 
+                                             for j in range(i+1, len(opp_discards)))
+                    if opp_discarded_pair:
+                        # "Discard Trap" Inversion: Proceed with more confidence!
+                        # They are mathematically incapable of having a set with the discarded rank.
+                        chaos_boost += 0.15
+                equity = _clamp(equity + chaos_boost, 0.0, 0.98)
+            elif self._current_gear == "SNIPER":
+                equity = _clamp(equity - 0.05, 0.0, 0.98) # slightly tighter
 
             to_call = max(0, opp_bet - my_bet)
             pot_ref = max(pot_size, 1)
@@ -2458,7 +2593,9 @@ class PlayerAgent(Agent):
                     result = sb_action
 
             if result is None:
-                if equity > monster_gate:
+                if self._current_gear == "CHAOS" and equity > strong_gate and valid[RAISE]:
+                    result = (RAISE, max_raise, 0, 0)
+                elif equity > monster_gate:
                     if street == 1:
                         bet_frac = rand_ctx["monster_flop_frac"]
                     elif street == 2:
@@ -2664,6 +2801,7 @@ class PlayerAgent(Agent):
                         "connected": round(float(board_connected_penalty), 4),
                         "flush_inference": round(float(opp_flush_inference_penalty), 4),
                     },
+                    chaos_discard_trap_active=bool(locals().get("opp_discarded_pair", False)) if self._current_gear == "CHAOS" else False,
                     to_call=int(to_call),
                     pot=int(pot_ref),
                     pot_odds=round(float(pot_odds), 4),
