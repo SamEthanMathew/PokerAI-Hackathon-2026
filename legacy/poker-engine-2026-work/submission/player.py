@@ -4,8 +4,7 @@ import random
 import sys
 import time
 import math
-from concurrent.futures import ProcessPoolExecutor
-from concurrent.futures.process import BrokenProcessPool
+import struct
 from itertools import combinations
 
 import numpy as np
@@ -93,6 +92,98 @@ def _lut_eval_7(cards_7):
         _C[s[4]][5] + _C[s[5]][6] + _C[s[6]][7]])
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  BB Discard Table Loader
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _py_to_cpp(py_card):
+    rank = py_card % 9
+    suit = py_card // 9
+    return rank * 3 + suit
+
+def _cpp_to_py(cpp_card):
+    rank = cpp_card // 3
+    suit = cpp_card % 3
+    return suit * 9 + rank
+
+def _canonicalize_cpp(cards_cpp):
+    """Canonicalize 8 cards in C++ encoding space (must match C++ exactly)."""
+    hole_sorted = sorted(cards_cpp[:5])
+    flop_sorted = sorted(cards_cpp[5:8])
+    ordered = hole_sorted + flop_sorted
+
+    suit_map = [-1, -1, -1]
+    next_suit = 0
+    for c in ordered:
+        suit = c % 3
+        if suit_map[suit] == -1:
+            suit_map[suit] = next_suit
+            next_suit += 1
+
+    canon = []
+    for c in ordered:
+        rank = c // 3
+        suit = c % 3
+        canon.append(rank * 3 + suit_map[suit])
+
+    hole = sorted(canon[:5])
+    flop = sorted(canon[5:8])
+    return hole + flop
+
+def _canonicalize_py(hole_py, flop_py):
+    """Canonicalize (5-hole, 3-flop) from Python encoding. Returns tuple of 8 Python-encoded cards."""
+    cards_cpp = [_py_to_cpp(c) for c in hole_py] + [_py_to_cpp(c) for c in flop_py]
+    canon_cpp = _canonicalize_cpp(cards_cpp)
+    return tuple(_cpp_to_py(c) for c in canon_cpp)
+
+
+class BBTable:
+    """Fast BB discard table using sorted numpy arrays + binary search.
+
+    New format: 8 key bytes + 10 uint8 raw equities per entry.
+    Equity byte 0-255 maps linearly to [0.0, 1.0].
+    """
+
+    def __init__(self, path):
+        with open(path, "rb") as f:
+            n_entries = struct.unpack("<Q", f.read(8))[0]
+            data = f.read(n_entries * 18)
+        raw = np.frombuffer(data, dtype=np.uint8).reshape(n_entries, 18)
+        self._keys = np.zeros(n_entries, dtype=np.uint64)
+        for i in range(8):
+            self._keys += raw[:, i].astype(np.uint64) << np.uint64(i * 8)
+        self._equities = raw[:, 8:].copy()  # uint8[n, 10] raw equities
+        order = np.argsort(self._keys)
+        self._keys = self._keys[order]
+        self._equities = self._equities[order]
+
+    def lookup(self, canon_key_tuple):
+        """Look up 8-card canonical key. Returns uint8[10] equities or None."""
+        packed = np.uint64(0)
+        for i, c in enumerate(canon_key_tuple):
+            packed += np.uint64(c) << np.uint64(i * 8)
+        idx = np.searchsorted(self._keys, packed)
+        if idx < len(self._keys) and self._keys[idx] == packed:
+            return self._equities[idx]
+        return None
+
+def _load_bb_table():
+    """Load BB discard table. Returns BBTable or None."""
+    path = os.path.join(os.path.dirname(__file__), "data", "bb_discard_table.bin")
+    if not os.path.exists(path):
+        # Try local data path if submission67 data is missing
+        path = os.path.join(os.path.dirname(__file__), "..", "data", "bb_discard_table.bin")
+        if not os.path.exists(path):
+            # Try original location just in case
+            path = os.path.join(os.path.dirname(__file__), "..", "submission67", "data", "bb_discard_table.bin")
+            if not os.path.exists(path):
+                return None
+    try:
+        return BBTable(path)
+    except Exception as e:
+        print(f"Error loading bb table: {e}")
+        return None
+
 # ── Action constants ─────────────────────────────────────────────────────────
 
 FOLD = PokerEnv.ActionType.FOLD.value
@@ -100,6 +191,8 @@ RAISE = PokerEnv.ActionType.RAISE.value
 CHECK = PokerEnv.ActionType.CHECK.value
 CALL = PokerEnv.ActionType.CALL.value
 DISCARD = PokerEnv.ActionType.DISCARD.value
+
+_KEEP2 = [(0, 1), (0, 2), (0, 3), (0, 4), (1, 2), (1, 3), (1, 4), (2, 3), (2, 4), (3, 4)]
 
 # ── Premium hand definitions ────────────────────────────────────────────────
 
@@ -521,39 +614,115 @@ class _OppDiscardModel:
 # ── Module-level solver functions (for ProcessPoolExecutor pickling) ──────────
 
 
-def _opp_keep_weight_lut(opp_hand, community, opp_discards, model_weights,
-                         _flop_cache=None):
-    original5 = list(opp_hand) + list(opp_discards)
-    if len(original5) < 5:
+def _flush_nuttedness(my_cards, community):
+    """Returns a multiplier [0.05, 1.0] based on how high the flush draw is."""
+    comm_suits = [_SUIT[c] for c in community]
+    comm_ranks = [_RANK[c] for c in community]
+    
+    best_nut = 0.05
+    for suit_idx in range(3):
+        my_ranks_in_suit = [_RANK[c] for c in my_cards if _SUIT[c] == suit_idx]
+        if not my_ranks_in_suit: continue
+        
+        max_mine = max(my_ranks_in_suit)
+        on_board = set(comm_ranks[i] for i in range(len(community)) if comm_suits[i] == suit_idx)
+        
+        higher = sum(1 for r in range(max_mine + 1, NUM_RANKS) 
+                     if r not in on_board and r not in my_ranks_in_suit)
+                     
+        if higher == 0: best_nut = max(best_nut, 1.0)
+        elif higher == 1: best_nut = max(best_nut, 0.60)
+        elif higher == 2: best_nut = max(best_nut, 0.25)
+        
+    return best_nut
+    
+def _compute_draw_bonus(my_cards, community):
+    """Used for discard scoring. Returns 0.0 to 0.30."""
+    nut_factor = _flush_nuttedness(my_cards, community)
+    sc, f_outs, _ = _count_flush_outs(my_cards, community, [], [])
+    _, s_outs, _ = _count_straight_outs(my_cards, community, [], [])
+    
+    outs = max(f_outs, s_outs)
+    if outs < 2: return 0.0
+    return min(0.30, (outs * 0.025) * nut_factor)
+
+def _discard_quick_score(keep_cards, board):
+    # Base rank score (using _lut_eval_7 to get rank, invert it so higher is better)
+    # The pad [-1] ensures we have 7 cards for the LUT
+    pad_len = max(0, 5 - len(board))
+    eval_hand = list(keep_cards) + list(board) + [-1] * pad_len
+    rank = _lut_eval_7(eval_hand) 
+    score = (8000 - rank) / 100.0  # Normalize (0 to ~80)
+    
+    # Add draw bonus (Using our new Draw Nuttedness gradient)
+    score += _compute_draw_bonus(keep_cards, board) * 20.0
+    return score
+
+_RANK_DIST = (0.65, 0.15, 0.08, 0.05, 0.03, 0.015, 0.01, 0.005, 0.005, 0.005)
+
+def _opp_keep_weight_lut(opp_hand, community, opp_discards, model_weights=None, _flop_cache=None, bb_table=None):
+    original_five = list(opp_hand) + list(opp_discards)
+    if len(original_five) != 5 or len(community) < 3: 
         return 1.0
-    if _flop_cache is not None:
-        fr, fs, bsc = _flop_cache
-    else:
-        flop = community[:3]
-        fr = [_RANK[c] for c in flop]
-        fs = [_SUIT[c] for c in flop]
-        bsc = [0, 0, 0]
-        for s in fs:
-            bsc[s] += 1
-    keeps_and_scores = []
-    for i, j in combinations(range(len(original5)), 2):
-        cand = [original5[i], original5[j]]
-        feats = _OppDiscardModel._extract_features(cand, None, fr, fs, bsc)
-        sc = sum(w * f for w, f in zip(model_weights, feats))
-        keeps_and_scores.append((frozenset([original5[i], original5[j]]), sc))
-    keeps_and_scores.sort(key=lambda x: x[1], reverse=True)
-    opp_set = frozenset(opp_hand)
-    for rank_idx, (kset, _) in enumerate(keeps_and_scores):
-        if kset == opp_set:
-            if rank_idx == 0:
-                return 1.0
-            elif rank_idx == 1:
-                return 0.06
-            elif rank_idx == 2:
-                return 0.01
-            else:
-                return 0.002
-    return 0.002
+    
+    flop = community[:3]
+    keep_scores = []
+    
+    if bb_table is not None:
+        try:
+            canon_key = _canonicalize_py(original_five, flop)
+            eq_uint8 = bb_table.lookup(canon_key)
+            if eq_uint8 is not None:
+                # The table equities correspond to KEEP2 pairs on the CANONICALIZED hole cards
+                canon_hole = list(canon_key[:5])
+                cards_cpp = [_py_to_cpp(c) for c in original_five] + [_py_to_cpp(c) for c in flop]
+                ordered_cpp = sorted(cards_cpp[:5]) + sorted(cards_cpp[5:8])
+                suit_map = [-1, -1, -1]
+                next_suit = 0
+                for c in ordered_cpp:
+                    s = c % 3
+                    if suit_map[s] == -1:
+                        suit_map[s] = next_suit
+                        next_suit += 1
+                        
+                canon_to_orig = {}
+                for orig_idx, card_py in enumerate(original_five):
+                    card_cpp = _py_to_cpp(card_py)
+                    canon_cpp = (card_cpp // 3) * 3 + suit_map[card_cpp % 3]
+                    canon_py = _cpp_to_py(canon_cpp)
+                    canon_to_orig[canon_py] = orig_idx
+
+                KEEP2 = [(0, 1), (0, 2), (0, 3), (0, 4), (1, 2), (1, 3), (1, 4), (2, 3), (2, 4), (3, 4)]
+                
+                for idx, eq_val in enumerate(eq_uint8):
+                    canon_i, canon_j = KEEP2[idx]
+                    target_a = canon_hole[canon_i]
+                    target_b = canon_hole[canon_j]
+                    if target_a in canon_to_orig and target_b in canon_to_orig:
+                        orig_i = canon_to_orig[target_a]
+                        orig_j = canon_to_orig[target_b]
+                        i, j = min(orig_i, orig_j), max(orig_i, orig_j)
+                        float_eq = float(eq_val) / 255.0
+                        keep_scores.append((frozenset([original_five[i], original_five[j]]), float_eq))
+        except Exception as e:
+            # Fall back below
+            pass
+
+    if not keep_scores:
+        for kc in combinations(original_five, 2):
+            score = _discard_quick_score(kc, community)
+            keep_scores.append((frozenset(kc), score))
+    
+    keep_scores.sort(key=lambda x: x[1], reverse=True)
+    target = frozenset(opp_hand)
+    
+    for rank_pos, (keep_set, _) in enumerate(keep_scores):
+        if keep_set == target:
+            if rank_pos < len(_RANK_DIST):
+                return max(0.001, _RANK_DIST[rank_pos])
+            return 0.001
+            
+    return 0.001
 
 
 def _exact_discard_equity_lut(my_keep, community, dead_cards):
@@ -578,7 +747,7 @@ def _exact_discard_equity_lut(my_keep, community, dead_cards):
 
 
 def _exact_discard_equity_weighted_lut(my_keep, community, dead_cards,
-                                       opp_discards, model_weights):
+                                       opp_discards, model_weights, bb_table=None):
     remaining = [c for c in range(DECK_SIZE) if c not in dead_cards]
     board_needed = 5 - len(community)
     community_l = list(community)
@@ -591,11 +760,20 @@ def _exact_discard_equity_weighted_lut(my_keep, community, dead_cards,
     flop_cache = (fr, fs, bsc)
 
     opp_weights = {}
+    sum_weights = 0.0
     for opp in combinations(remaining, 2):
         w = _opp_keep_weight_lut(list(opp), community, opp_discards,
-                                 model_weights, flop_cache)
-        if w >= 0.01:
-            opp_weights[opp] = w
+                                 model_weights, flop_cache, bb_table=bb_table)
+        opp_weights[opp] = w
+        sum_weights += w
+        
+    if sum_weights > 0:
+        for opp in opp_weights:
+            opp_weights[opp] /= sum_weights
+    else:
+        # Fallback if sum_weights is 0 (should not happen with weight floor)
+        for opp in opp_weights:
+            opp_weights[opp] = 1.0 / len(opp_weights)
 
     wins = 0.0
     total_weight = 0.0
@@ -652,98 +830,6 @@ def _compute_discard_equity_mc_optimal(my_keep, community, dead_cards, num_sims=
             wins += 0.5
         total += 1
     return wins / total if total > 0 else 0.5
-
-
-_NUM_CPUS = min(4, os.cpu_count() or 1)
-# Lazy pool only in the API process (spawn workers re-importing this module
-# would create nested pools if we built the executor at import time).
-# On Linux/macOS use fork: workers share read-only eval LUT via CoW instead of
-# each loading eval_table.npy (spawn OOMs small containers). Windows uses spawn.
-# Set OMICRON_USE_DISCARD_POOL=0 to force in-process solver only.
-_DISCARD_POOL_ENABLED = os.getenv("OMICRON_USE_DISCARD_POOL", "1").strip().lower() not in (
-    "0",
-    "false",
-    "no",
-    "off",
-)
-_POOL = None
-_SERVER_SOCK_FD: int = -1  # set in run() so worker initializer can close it
-
-
-def _discard_pool_init() -> None:
-    """Worker initializer: close the inherited server socket fd.
-
-    On Linux, fork-based workers inherit every open fd from the parent,
-    including the bound server socket.  Closing it here ensures workers
-    never keep the port bound after the parent process exits.
-    """
-    if _SERVER_SOCK_FD >= 0:
-        import os as _os
-        try:
-            _os.close(_SERVER_SOCK_FD)
-        except OSError:
-            pass
-
-
-def _discard_mp_context():
-    import multiprocessing as _mp
-
-    if sys.platform == "win32":
-        return _mp.get_context("spawn")
-    try:
-        return _mp.get_context("fork")
-    except ValueError:
-        return _mp.get_context("spawn")
-
-
-def _discard_pool_reset() -> None:
-    global _POOL
-    p = _POOL
-    _POOL = None
-    if p is None:
-        return
-    try:
-        p.shutdown(wait=False, cancel_futures=True)
-    except (BrokenProcessPool, OSError, RuntimeError):
-        pass
-
-
-def _discard_pool() -> ProcessPoolExecutor | None:
-    global _POOL
-    if not _DISCARD_POOL_ENABLED:
-        return None
-    if _POOL is None:
-        import multiprocessing as _mp
-
-        _POOL = ProcessPoolExecutor(
-            max_workers=_NUM_CPUS,
-            mp_context=_discard_mp_context(),
-            initializer=_discard_pool_init,
-        )
-    return _POOL
-
-
-_FALLBACK_SENTINEL: dict = {"occurred": False, "reason": ""}
-
-
-def _run_discard_equities_parallel(fn, jobs: list[tuple]):
-    """Run ``fn(*args)`` for each job; use process pool if enabled.
-
-    On BrokenProcessPool (OOM, worker crash), reset the pool and finish in the
-    main process so :meth:`act` never raises — avoids None actions from the
-    harness wrapper.
-    """
-    pool = _discard_pool()
-    if pool is None:
-        return [fn(*a) for a in jobs]
-    try:
-        futs = [pool.submit(fn, *a) for a in jobs]
-        return [f.result() for f in futs]
-    except BrokenProcessPool:
-        _FALLBACK_SENTINEL["occurred"] = True
-        _FALLBACK_SENTINEL["reason"] = "BrokenProcessPool"
-        _discard_pool_reset()
-        return [fn(*a) for a in jobs]
 
 
 # ── PlayerAgent ──────────────────────────────────────────────────────────────
@@ -869,6 +955,11 @@ class PlayerAgent(Agent):
 
     def __init__(self, stream: bool = True):
         super().__init__(stream)
+        
+        # ── Load precomputed data ────────────────────────────────────────
+        self._bb_table = _load_bb_table()
+        self._full_deck = set(range(DECK_SIZE))
+        
         self.action_types = PokerEnv.ActionType
         self.evaluator = _base_eval
         self._running_pnl = 0
@@ -1648,16 +1739,12 @@ class PlayerAgent(Agent):
         return self._compute_equity(my_cards, community, opp_discards, my_discards,
                                     num_sims=num_sims, opp_optimal=True)
 
-    # ── Range-weighted MC Equity (for postflop decisions) ────────────────────
+    # ── Range-weighted Exact Enumeration Equity (for postflop decisions) ────────────
 
     def _compute_equity_ranged(self, my2, community, dead, opp_discards,
-                               passive_signal, aggr_signal, num_sims=500):
+                               passive_signal, aggr_signal):
         remaining = [i for i in range(DECK_SIZE) if i not in dead]
         board_needed = 5 - len(community)
-        sample_size = 2 + board_needed
-        if sample_size > len(remaining):
-            return 0.5
-
         have_discards = len(opp_discards) >= 3
         flop = community[:3] if len(community) >= 3 else []
 
@@ -1674,61 +1761,56 @@ class PlayerAgent(Agent):
         reject_one_pair = aggr_signal >= 3.2
         reject_two_pair = aggr_signal >= 4.2
         
-        max_retries = 0
-        if reject_two_pair:
-            max_retries = 30
-        elif reject_one_pair:
-            max_retries = 20
-        elif reject_nothing:
-            max_retries = 10
-
         community_l = list(community)
         my_keep = list(my2)
 
-        opp_weight_map = {}
-        if have_discards and flop_cache:
-            for pair in combinations(remaining, 2):
+        opp_combos = []
+        for pair in combinations(remaining, 2):
+            w = 1.0
+            if have_discards and flop_cache:
                 w = self._opp_keep_weight(list(pair), community, opp_discards, flop_cache)
-                if w >= 0.01:
-                    opp_weight_map[pair] = w
+            
+            # Apply passive/aggr signal adjustments to the weight
+            if w >= 0.001:
+                cat = _hand_rank_category(list(pair), community)
+                if reject_nothing and cat == "nothing":
+                    w *= 0.1
+                elif reject_one_pair and cat == "one_pair":
+                    w *= 0.1
+                elif reject_two_pair and cat in ("one_pair", "two_pair"):
+                    w *= 0.1
+                elif passive_signal > 2.0 and cat == "nothing":
+                    w *= 0.75
+                
+                opp_combos.append((pair, w))
+
+        if not opp_combos:
+            return 0.5
+            
+        # Sort by weight descending for early breaking
+        opp_combos.sort(key=lambda x: x[1], reverse=True)
 
         wins = 0.0
         total_weight = 0.0
+        start_time = time.time()
 
-        for _ in range(num_sims):
-            sample = random.sample(remaining, sample_size)
-            opp = sample[:2]
-            runout = sample[2:]
-
-            if max_retries > 0 and len(community) >= 3:
-                for _retry in range(max_retries):
-                    cat = _hand_rank_category(list(opp), community)
-                    if cat == "nothing" or (reject_one_pair and cat == "one_pair") or (reject_two_pair and cat in ("one_pair", "two_pair")):
-                        sample = random.sample(remaining, sample_size)
-                        opp = sample[:2]
-                        runout = sample[2:]
-                    else:
-                        break
-
-            w = 1.0
-            if have_discards and flop_cache:
-                key = (opp[0], opp[1]) if opp[0] < opp[1] else (opp[1], opp[0])
-                w = opp_weight_map.get(key, 0.0)
-                if w < 0.01:
-                    continue
-                if passive_signal > 2.0:
-                    cat = _hand_rank_category(list(opp), community)
-                    if cat in ("nothing",):
-                        w *= 0.75
-
-            board_5 = community_l + runout
-            my_rank = _lut_eval_7(my_keep + board_5)
-            opp_rank = _lut_eval_7(opp + board_5)
-            if my_rank < opp_rank:
-                wins += w
-            elif my_rank == opp_rank:
-                wins += 0.5 * w
-            total_weight += w
+        for opp, weight in opp_combos:
+            if time.time() - start_time > 0.040:  # 40ms safety valve
+                break
+                
+            opp_l = list(opp)
+            runout_pool = [c for c in remaining if c not in opp_l]
+            
+            for runout in combinations(runout_pool, board_needed):
+                board_5 = community_l + list(runout)
+                my_rank = _lut_eval_7(my_keep + board_5)
+                opp_rank = _lut_eval_7(opp_l + board_5)
+                
+                if my_rank < opp_rank:
+                    wins += weight
+                elif my_rank == opp_rank:
+                    wins += 0.5 * weight
+                total_weight += weight
 
         return wins / total_weight if total_weight > 0 else 0.5
 
@@ -1758,17 +1840,28 @@ class PlayerAgent(Agent):
                        hand_cat="unknown", my_cards=None, community=None,
                        opp_discards=None):
         outs = max(flush_outs, straight_outs)
-        if street == 1 and has_draw and outs > 0:
-            equity += min(0.10, outs * 0.025)
-        elif street == 3 and has_draw and hand_cat in ("nothing", "one_pair"):
+        
+        if street == 1 and has_draw and (outs > 0):
+            # Calculate base bonus
+            base_bonus = min(0.10, outs * 0.025)
+            # Scale by nuttedness (custom gradient)
+            nut_factor = _flush_nuttedness(my_cards, community) if my_cards else 0.5
+            
+            # If it is a straight draw, we give a default 0.6 nut factor for now
+            if straight_outs > flush_outs:
+                nut_factor = max(nut_factor, 0.6) 
+                
+            # Multiply our flat bonus by the nuttedness gradient
+            equity += (base_bonus * nut_factor)
+            
+        elif street == 3 and has_draw and (hand_cat in ('nothing', 'one_pair')):
             equity -= 0.10
-
+            
         if my_cards and community:
             equity += _board_monotone_penalty(my_cards, community)
             equity += _board_connected_penalty(my_cards, community)
         if community and opp_discards:
             equity += _opp_flush_inference(community, opp_discards)
-
         return _clamp(equity, 0.0, 0.98)
 
     @staticmethod
@@ -1912,38 +2005,62 @@ class PlayerAgent(Agent):
 
     def _calculate_pnl_slope(self):
         """
-        Calculates the velocity of ruin based on the last 50 PnL deltas.
-        We cap the delta to +/- 15 to ignore massive variance spikes ("coolers")
-        and measure the core bleed rate instead.
+        Calculates the velocity of ruin using EMA of deltas instead of linear regression.
+        Formula: EMA_new = (Current_Hand_Result * alpha) + (EMA_old * (1 - alpha))
         """
-        recent_deltas = self._pnl_deltas[-50:]
-        n = len(recent_deltas)
-        if n < 2:
-            return 0.0
+        alpha = 0.15
+        ema = 0.0
+        for delta in self._pnl_deltas:
+            # Cap deltas at +/- 15 to ignore massive variance spikes ("coolers")
+            capped_delta = max(-15, min(15, delta))
+            if ema == 0.0:
+                ema = capped_delta
+            else:
+                ema = (capped_delta * alpha) + (ema * (1 - alpha))
+        return ema
+
+    def _determine_gear(self, hands_left, ema_slope, total_hands):
+        if self._running_pnl >= 0:
+            return "STANDARD"
+
+        # Dynamic Slope Cap: Strict early to ignore coolers, relaxed late to catch death spirals
+        if hands_left > 70:
+            cap = 1.5
+        elif hands_left < 30:
+            cap = 5.0
+        else:
+            # Linear interpolation between 70 and 30 hands left
+            cap = 1.5 + (5.0 - 1.5) * ((70 - hands_left) / 40.0)
             
-        # Cap deltas to ±15
-        capped_deltas = [max(-15, min(15, d)) for d in recent_deltas]
+        capped_slope = max(-cap, min(cap, ema_slope))
+
+        # Time-weight the projection: Don't panic early in the match
+        # We estimate total hands dynamically. If winning, we evaluate when we might hit the 1.5 loss threshold.
+        total_hands_est = self._hands_completed + hands_left
+        time_weight = (hands_left / max(1, total_hands_est)) ** 1.5
         
-        # Calculate slope 'm' of cumulative capped PnL using least squares
-        # y = cumulative PnL of capped deltas
-        # x = hand index
-        y = []
-        cum = 0
-        for d in capped_deltas:
-            cum += d
-            y.append(cum)
-            
-        sum_x = sum(range(n))
-        sum_y = sum(y)
-        sum_xx = sum(x*x for x in range(n))
-        sum_xy = sum(x * y[x] for x in range(n))
+        if self._running_pnl > 0 and ema_slope < 0:
+            # If we are winning but bleeding, find intercept of hard bleed
+            projected_final = self._running_pnl + (capped_slope * hands_left * time_weight)
+        else:
+            projected_final = self._running_pnl + (capped_slope * hands_left * time_weight)
         
-        denominator = (n * sum_xx - sum_x * sum_x)
-        if denominator == 0:
-            return 0.0
+        # Evaluate Target Gear
+        target_gear = "SNIPER"
+        # Severity Threshold for Two-Minute Warning
+        if hands_left < 30 and self._running_pnl < -20:
+            target_gear = "CHAOS"
+        elif projected_final < -100 or self._running_pnl < -100:
+            target_gear = "CHAOS"
+        elif projected_final < -30 or self._running_pnl < -30:
+            target_gear = "PRESSURE"
             
-        m = (n * sum_xy - sum_x * sum_y) / denominator
-        return m
+        # Hysteresis: Require a 15-BB recovery buffer before down-shifting
+        if target_gear == "PRESSURE" and getattr(self, '_current_gear', 'STANDARD') == "CHAOS":
+            if self._running_pnl < getattr(self, '_gear_entry_pnl', 0) + 15:
+                return "CHAOS" # Stay in CHAOS until we recover 15 BBs
+                
+        return target_gear
 
     def act(self, observation, reward, terminated, truncated, info):
         my_cards = [c for c in observation["my_cards"] if c != -1]
@@ -2014,52 +2131,27 @@ class PlayerAgent(Agent):
             # ── Asymmetric Gear Shifter Logic (Phoenix Protocol) ─────────────
             if hands_left > 0:
                 slope = self._calculate_pnl_slope()
-                projected_final = self._running_pnl + (slope * hands_left)
+                target_gear = self._determine_gear(hands_left, slope, TOTAL_HANDS) 
                 
-                # The Shootout (Two-Minute Warning)
-                if hands_left < 30 and self._running_pnl < 0:
-                    projected_final = -100.0
-                    
-                target_gear = "SNIPER"
-                # Assuming standard 400 starting stack, threshold is -100 (-0.25 * 400)
-                if projected_final < -100:
-                    target_gear = "CHAOS"
-                elif projected_final < 0:
-                    target_gear = "PRESSURE"
-                    
-                gear_priority = {"SNIPER": 0, "PRESSURE": 1, "CHAOS": 2}
-                target_prio = gear_priority[target_gear]
-                current_prio = gear_priority[self._current_gear]
+                gear_priority = {"STANDARD": -1, "SNIPER": 0, "PRESSURE": 1, "CHAOS": 2}
                 
-                if target_prio > current_prio:
-                    # Up-shift: Instant. No delay.
+                # Shift logic
+                is_up_shift = gear_priority.get(target_gear, -1) > gear_priority.get(self._current_gear, -1)
+                can_down_shift = (self._hands_in_current_gear >= 5 and self._running_pnl > self._gear_entry_pnl)
+                
+                if is_up_shift or can_down_shift:
                     if self._current_gear != target_gear:
                         self._log_event("gear_transition", 
                             hand=self._hands_completed,
                             old_gear=self._current_gear,
                             new_gear=target_gear,
-                            reason="emergency_upshift",
-                            slope=round(float(slope), 3),
-                            projected_final=round(float(projected_final), 3)
+                            reason="emergency_upshift" if is_up_shift else "delayed_downshift",
+                            slope=round(float(slope), 3)
                         )
                     self._current_gear = target_gear
-                    self._hands_in_current_gear = 0
+                    # CRITICAL for Hysteresis & cooldowns
                     self._gear_entry_pnl = self._running_pnl
-                elif target_prio < current_prio:
-                    # Down-shift: Delayed (Hysteresis)
-                    if self._hands_in_current_gear >= 5 and self._running_pnl > self._gear_entry_pnl:
-                        if self._current_gear != target_gear:
-                            self._log_event("gear_transition", 
-                                hand=self._hands_completed,
-                                old_gear=self._current_gear,
-                                new_gear=target_gear,
-                                reason="delayed_downshift",
-                                slope=round(float(slope), 3),
-                                projected_final=round(float(projected_final), 3)
-                            )
-                        self._current_gear = target_gear
-                        self._hands_in_current_gear = 0
-                        self._gear_entry_pnl = self._running_pnl
+                    self._hands_in_current_gear = 0
             
             self._log_event("hand_start",
                 hand=self._hands_completed,
@@ -2140,131 +2232,100 @@ class PlayerAgent(Agent):
             combo_equities: dict = {}  # (i,j) -> float equity for logging
 
             if have_opp_discards:
-                if sim_mode == "emergency":
-                    # SB path: we know opponent's 3 discards so their kept hand is
-                    # among the remaining cards. Sample 2 random cards as opponent.
-                    # (Non-emergency path uses the full weighted exact solver.)
-                    opp_disc_set = set(opp_discards)
-                    community_l = list(community)
-                    board_needed = 5 - len(community)
-                    ss = 2 + board_needed
-                    best_eq = -1.0
-                    best_ij = (0, 1)
-                    for i, j, keep, toss in all_keeps:
-                        per_dead = dead_base | set(toss) | opp_disc_set
-                        per_remaining = [c for c in range(DECK_SIZE) if c not in per_dead]
-                        if ss > len(per_remaining):
-                            eq = 0.5
-                        else:
-                            w = 0
-                            t = 0
-                            for _ in range(200):
-                                samp = random.sample(per_remaining, ss)
-                                board_5 = community_l + samp[2:]
-                                mr = _lut_eval_7(list(keep) + board_5)
-                                orr = _lut_eval_7(samp[:2] + board_5)
-                                if mr < orr:
-                                    w += 1
-                                elif mr == orr:
-                                    w += 0.5
-                                t += 1
-                            eq = w / t if t else 0.5
-                        combo_equities[(i, j)] = float(eq)
-                        if eq > best_eq:
-                            best_eq = eq
-                            best_ij = (i, j)
-                else:
-                    weights = list(self._opp_model.weights)
-                    jobs_w = []
-                    for i, j, keep, toss in all_keeps:
-                        dead = dead_base | set(toss) | set(opp_discards)
-                        jobs_w.append(
-                            (keep, community, dead, opp_discards, weights)
-                        )
-                    results_w = _run_discard_equities_parallel(
-                        _exact_discard_equity_weighted_lut, jobs_w
-                    )
-                    best_eq = -1.0
-                    best_ij = (0, 1)
-                    for (i, j, keep, toss), eq in zip(all_keeps, results_w):
-                        eqf = float(eq)
-                        combo_equities[(i, j)] = eqf
-                        if eqf > best_eq:
-                            best_eq = eqf
-                            best_ij = (i, j)
+                weights = list(self._opp_model.weights)
+                best_eq = -1.0
+                best_ij = (0, 1)
+                for i, j, keep, toss in all_keeps:
+                    dead = dead_base | set(toss) | set(opp_discards)
+                    eqf = float(_exact_discard_equity_weighted_lut(
+                        keep, community, dead, opp_discards, weights, bb_table=getattr(self, "_bb_table", None)
+                    ))
+                    combo_equities[(i, j)] = eqf
+                    if eqf > best_eq:
+                        best_eq = eqf
+                        best_ij = (i, j)
             else:
-                # No opp discards known (simultaneous discard phase).
-                # Use optimal-opponent MC: opponent draws 5 cards, keeps their best 2.
-                # This replaces the old 2-stage MC-screen + exact-combinatorial pipeline
-                # which incorrectly modeled opponent as having 2 random cards.
-                opp_disc_set = set(opp_discards)  # empty set at discard time
-                community_l = list(community)
-                board_needed = 5 - len(community)
+                # No opp discards known (we are BB). Use O(1) table lookup or exact fallback.
+                bb_table_success = False
+                best_eq = 0.0
+                best_ij = (0, 1)
 
-                if sim_mode == "emergency":
-                    # Inline loop — avoid pool overhead in tight time budget
-                    ss = 5 + board_needed
-                    _opp_idx = list(combinations(range(5), 2))
-                    best_eq = -1.0
-                    best_ij = (0, 1)
+                if getattr(self, "_bb_table", None):
+                    try:
+                        canon_key = _canonicalize_py(my_cards, community[:3])
+                        eq_uint8 = self._bb_table.lookup(canon_key)
+                        if eq_uint8 is not None:
+                            bb_table_success = True
+                            
+                            # The table equities are stored in a fixed order corresponding to keeping
+                            # the i-th and j-th card from the CANONICALIZED hole cards.
+                            # We must map the argmax back to our original Python hole card indices.
+                            # (Matching submission67 logic)
+                            canon_hole = list(canon_key[:5])
+                            cards_cpp = [_py_to_cpp(c) for c in my_cards] + [_py_to_cpp(c) for c in community[:3]]
+                            ordered_cpp = sorted(cards_cpp[:5]) + sorted(cards_cpp[5:8])
+                            suit_map = [-1, -1, -1]
+                            next_suit = 0
+                            for c in ordered_cpp:
+                                s = c % 3
+                                if suit_map[s] == -1:
+                                    suit_map[s] = next_suit
+                                    next_suit += 1
+                                    
+                            canon_to_orig = {}
+                            for orig_idx, card_py in enumerate(my_cards):
+                                card_cpp = _py_to_cpp(card_py)
+                                canon_cpp = (card_cpp // 3) * 3 + suit_map[card_cpp % 3]
+                                canon_py = _cpp_to_py(canon_cpp)
+                                canon_to_orig[canon_py] = orig_idx
+
+                            # The fixed C(5,2)=10 keep pairs used during table generation
+                            for idx, eq_val in enumerate(eq_uint8):
+                                canon_i, canon_j = _KEEP2[idx]
+                                target_a = canon_hole[canon_i]
+                                target_b = canon_hole[canon_j]
+                                if target_a in canon_to_orig and target_b in canon_to_orig:
+                                    orig_i = canon_to_orig[target_a]
+                                    orig_j = canon_to_orig[target_b]
+                                    i, j = min(orig_i, orig_j), max(orig_i, orig_j)
+                                    # eq_val is uint8 [0..255] mapping to [0.0..1.0]
+                                    float_eq = float(eq_val) / 255.0
+                                    combo_equities[(i, j)] = float_eq
+                                    if float_eq > best_eq:
+                                        best_eq = float_eq
+                                        best_ij = (i, j)
+                                        
+                            # CROSS-CHECK (first 100 hands)
+                            if self._hands_completed < 100:
+                                mc_best_eq = -1.0
+                                mc_best_ij = (0, 1)
+                                for i, j, keep, toss in all_keeps:
+                                    dead = dead_base | set(toss)
+                                    eq = float(_compute_discard_equity_mc_optimal(keep, community, dead, num_sims=300))
+                                    if eq > mc_best_eq:
+                                        mc_best_eq = eq
+                                        mc_best_ij = (i, j)
+                                if mc_best_ij != best_ij and abs(best_eq - mc_best_eq) > 0.05:
+                                    self.logger.warning(f"BBTable mismatch! Table chose {best_ij} eq={best_eq:.3f}, MC chose {mc_best_ij} eq={mc_best_eq:.3f}")
+                    except Exception as e:
+                        self.logger.error(f"BBTable lookup failed: {e}")
+                        bb_table_success = False
+                
+                if not bb_table_success:
+                    # Robust Fallback: greedy evaluation
+                    from treys import Evaluator
+                    evaluator = Evaluator()
+                    best_rank = 999999
                     for i, j, keep, toss in all_keeps:
-                        per_dead = dead_base | set(toss) | opp_disc_set
-                        per_remaining = [c for c in range(DECK_SIZE) if c not in per_dead]
-                        if ss > len(per_remaining):
-                            eq = 0.5
-                        else:
-                            w = 0.0
-                            t = 0
-                            for _ in range(300):
-                                samp = random.sample(per_remaining, ss)
-                                board_5 = community_l + samp[5:]
-                                best_opp_rank = None
-                                for oi, oj in _opp_idx:
-                                    r = _lut_eval_7([samp[oi], samp[oj]] + board_5)
-                                    if best_opp_rank is None or r < best_opp_rank:
-                                        best_opp_rank = r
-                                mr = _lut_eval_7(list(keep) + board_5)
-                                if mr < best_opp_rank:
-                                    w += 1.0
-                                elif mr == best_opp_rank:
-                                    w += 0.5
-                                t += 1
-                            eq = w / t if t else 0.5
-                        combo_equities[(i, j)] = float(eq)
-                        if eq > best_eq:
-                            best_eq = eq
-                            best_ij = (i, j)
-                else:
-                    # Conservative or full: dispatch to process pool (parallelizes 10 keeps)
-                    jobs_opt = []
-                    for i, j, keep, toss in all_keeps:
-                        dead = dead_base | set(toss) | opp_disc_set
-                        jobs_opt.append((keep, community, dead, 600))
-                    results_opt = _run_discard_equities_parallel(
-                        _compute_discard_equity_mc_optimal, jobs_opt
-                    )
-                    best_eq = -1.0
-                    best_ij = (0, 1)
-                    for (i, j, keep, toss), eq in zip(all_keeps, results_opt):
-                        eqf = float(eq)
-                        combo_equities[(i, j)] = eqf
-                        if eqf > best_eq:
-                            best_eq = eqf
+                        rank = _lut_eval_7(list(keep) + list(community[:3]))
+                        combo_equities[(i, j)] = 1.0 / float(max(1, rank)) # Arbitrary score for logging
+                        if rank < best_rank:
+                            best_rank = rank
                             best_ij = (i, j)
 
             k1, k2 = best_ij
             sorted_combos = sorted(combo_equities.items(), key=lambda x: x[1], reverse=True)
             equity_margin = (sorted_combos[0][1] - sorted_combos[1][1]) if len(sorted_combos) >= 2 else 0.0
-
-            if _FALLBACK_SENTINEL["occurred"]:
-                self._log_event("discard_pool_fallback",
-                    hand=self._hands_completed,
-                    reason=_FALLBACK_SENTINEL["reason"],
-                    fallback_mode=sim_mode,
-                    have_opp_discards=bool(opp_discards),
-                )
-                _FALLBACK_SENTINEL["occurred"] = False
-                _FALLBACK_SENTINEL["reason"] = ""
 
             self._log_event("discard_decision",
                 hand=self._hands_completed,
@@ -2300,6 +2361,14 @@ class PlayerAgent(Agent):
             premium_pair = _has_premium_pair(my_cards)
             to_call = max(0, opp_bet - my_bet)
 
+            # Shover Detection and Tracking
+            if opp_bet >= 50:
+                self._shove_ema = (0.85 * getattr(self, '_shove_ema', 0.0)) + (0.15 * 1.0)
+            elif self._in_hand:
+                self._shove_ema = (0.85 * getattr(self, '_shove_ema', 0.0)) + (0.15 * 0.0)
+
+            is_shover = getattr(self, '_shove_ema', 0.0) > 0.12 and self._hands_completed >= 10
+
             pressure = self._coeff(exploit_adj, "preflop_pressure_adj", 0)
             early_eq_gate = EARLY_PREFLOP_MIN_EQUITY - 0.05 * pressure
             normal_eq_gate = NORMAL_PREFLOP_MIN_EQUITY - 0.05 * pressure
@@ -2308,6 +2377,9 @@ class PlayerAgent(Agent):
             if self._current_gear == "SNIPER":
                 early_eq_gate = _clamp(early_eq_gate + 0.15, 0.50, 0.80)
                 normal_eq_gate = _clamp(normal_eq_gate + 0.15, 0.48, 0.78)
+            elif self._current_gear == "STANDARD":
+                # STANDARD uses the calculated baseline gates with no modifiers
+                pass
             elif self._current_gear == "PRESSURE":
                 early_eq_gate = _clamp(early_eq_gate - 0.15, 0.22, 0.48)
                 normal_eq_gate = _clamp(normal_eq_gate - 0.15, 0.20, 0.45)
@@ -2325,6 +2397,10 @@ class PlayerAgent(Agent):
             if self._current_gear not in ("CHAOS", "SNIPER"):
                 early_eq_gate = _clamp(early_eq_gate + net_penalty, 0.22, 0.80)
                 normal_eq_gate = _clamp(normal_eq_gate + net_penalty, 0.20, 0.78)
+
+            if is_shover and to_call >= 40:
+                early_eq_gate -= 0.18 # Relax calling requirements to trap the shover
+                normal_eq_gate -= 0.18
 
             preflop_eq = self._preflop_equity(my_cards) if len(my_cards) == 5 else 0.45
             self._pflog_eq = preflop_eq
@@ -2431,10 +2507,41 @@ class PlayerAgent(Agent):
                         else:
                             result = (FOLD, 0, 0, 0)
                             self._preflop_reason = "fold_no_equity"
+
+            # Tighten Re-Raises based on Bet Depth
+            if result and result[0] == RAISE:
+                num_raises = to_call // max(2, min_raise)  # Rough proxy for raise depth (3-bet, 4-bet)
+                
+                # Dynamically adjust threshold based on opponent's raise rate instead of a strict 0.88
+                opp_raise_rate = profile.get('raise_rate_overall', 0.18)
+                dynamic_raise_threshold = 0.92 - (opp_raise_rate * 0.20) # Loosen against manic raisers, tighten against nits
+
+                if num_raises >= 2:
+                    # We are facing a 3-bet or 4-bet
+                    if not (premium_pair or preflop_eq > dynamic_raise_threshold):
+                        # Downgrade RAISE to CALL or FOLD
+                        if valid[CALL] and preflop_eq > normal_eq_gate:
+                            result = (CALL, 0, 0, 0)
+                            self._preflop_reason += "_tightened_to_call"
+                        else:
+                            result = (FOLD, 0, 0, 0)
+                            self._preflop_reason += "_tightened_to_fold"
+
         # ── Post-flop (streets 1-3) ──────────────────────────────────────────
         else:
             if len(my_cards) > 2:
                 my_cards = my_cards[:2]
+
+            # ── In _process_opponent_action or start of postflop (Street 1) ──
+            if street == 1 and not self._line_state.get('discard_trap_calculated', False):
+                self._line_state['discard_trap_calculated'] = True
+                self._line_state['opp_discarded_pair'] = False
+                if len(opp_discards) >= 2:
+                    self._line_state['opp_discarded_pair'] = any(
+                        _RANK[opp_discards[i]] == _RANK[opp_discards[j]] 
+                        for i in range(len(opp_discards)) 
+                        for j in range(i+1, len(opp_discards))
+                    )
 
             dead = set(my_cards) | set(community) | set(opp_discards) | set(my_discards)
 
@@ -2470,9 +2577,8 @@ class PlayerAgent(Agent):
                     
                 signal_aggr = max(signal_aggr, 1.0 + action_aggr)
 
-            eq_sims = 100 if sim_mode == "emergency" else (200 if sim_mode == "conservative" else 500)
             equity = self._compute_equity_ranged(
-                my_cards, community, dead, opp_discards, signal_passive, signal_aggr, num_sims=eq_sims)
+                my_cards, community, dead, opp_discards, signal_passive, signal_aggr)
 
             hand_cat = _hand_rank_category(my_cards, community)
             # OPT7: compute outs once, derive has_draw without re-calling
@@ -2505,14 +2611,10 @@ class PlayerAgent(Agent):
             # ── Gear-Based Post-Flop Adjustments (Phoenix Protocol) ──────
             if self._current_gear == "CHAOS":
                 chaos_boost = 0.10
-                if len(opp_discards) >= 2:
-                    opp_discarded_pair = any(_RANK[opp_discards[i]] == _RANK[opp_discards[j]] 
-                                             for i in range(len(opp_discards)) 
-                                             for j in range(i+1, len(opp_discards)))
-                    if opp_discarded_pair:
-                        # "Discard Trap" Inversion: Proceed with more confidence!
-                        # They are mathematically incapable of having a set with the discarded rank.
-                        chaos_boost += 0.15
+                if self._line_state.get('opp_discarded_pair', False):
+                    # "Discard Trap" Inversion: Proceed with more confidence!
+                    # They are mathematically incapable of having a set with the discarded rank.
+                    chaos_boost += 0.15
                 equity = _clamp(equity + chaos_boost, 0.0, 0.98)
             elif self._current_gear == "SNIPER":
                 equity = _clamp(equity - 0.05, 0.0, 0.98) # slightly tighter
@@ -2545,6 +2647,28 @@ class PlayerAgent(Agent):
             urgency_call_adj = (-0.08 * urgency if in_comeback_mode else
                                 0.05 if protecting_lead else 0.0)
             call_gate = _clamp(pot_odds + 0.10 * hero_fold - 0.10 * bluff_catch + urgency_call_adj, 0.0, 0.95)
+
+            # Apply MDF Gate for Large Bets
+            pot_before = max(2 * my_bet, 1)
+            if to_call > 1.2 * pot_before:
+                mdf = pot_before / float(pot_before + to_call)
+                # Calculate the equity threshold required to defend the top MDF% of hands.
+                # We use a conservative proxy: 1.0 - (mdf * 0.8)
+                mdf_equity_threshold = max(0.40, 1.0 - (mdf * 0.8))
+                
+                # If opponent rarely bluffs (Nit), we relax the MDF enforcement
+                # We calculate a combined aggregate proxy using turn/river/flop strengths
+                profile = self._build_opponent_profile()
+                opp_bluff_rate = 1.0 - ((
+                    profile.get('river_bet_strength_large', 0.5) + 
+                    profile.get('river_raise_strength', 0.5) +
+                    profile.get('turn_barrel_strength', 0.5)
+                ) / 3.0)
+                if opp_bluff_rate < 0.25:
+                    mdf_equity_threshold += 0.15  # Don't blindly call nits
+                    
+                call_gate = min(call_gate, mdf_equity_threshold)
+
             baseline_call_gate = pot_odds
             baseline_good = GOOD_THRESHOLD
             zero_adj = {k: 0.0 for k in self._exploit_state}
