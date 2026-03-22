@@ -2326,20 +2326,24 @@ class PlayerAgent(Agent):
                 early_eq_gate = _clamp(early_eq_gate + net_penalty, 0.22, 0.80)
                 normal_eq_gate = _clamp(normal_eq_gate + net_penalty, 0.20, 0.78)
 
+            preflop_eq = self._preflop_equity(my_cards) if len(my_cards) == 5 else 0.45
+            self._pflog_eq = preflop_eq
+
             result = None
             if self._current_gear == "CHAOS" and valid[RAISE]:
                 has_ace = any(_RANK[c] == 8 for c in my_cards)
                 if opp_vpip < 0.45:
-                    chaos_shove = has_ace or premium
+                    chaos_shove = has_ace or preflop_eq >= 0.46
+                    if chaos_shove:
+                        result = (RAISE, max_raise, 0, 0)
+                        self._preflop_reason = "chaos_shove_bluff"
                 else:
-                    chaos_shove = has_ace or premium_pair
-                if chaos_shove:
-                    result = (RAISE, max_raise, 0, 0)
-                    self._preflop_reason = "chaos_shove"
+                    chaos_shove = premium_pair or (has_ace and preflop_eq >= 0.48)
+                    if chaos_shove:
+                        result = (RAISE, max_raise, 0, 0)
+                        self._preflop_reason = "chaos_shove_value"
 
             if in_early_phase and result is None:
-                preflop_eq = self._preflop_equity(my_cards) if len(my_cards) == 5 else 0.45
-                self._pflog_eq = preflop_eq
                 self._pflog_gate = early_eq_gate
                 if premium:
                     if premium_pair and opp_bet >= PREFLOP_COMMIT_THRESHOLD and valid[RAISE]:
@@ -2406,8 +2410,6 @@ class PlayerAgent(Agent):
                             result = (CHECK, 0, 0, 0)
                             self._preflop_reason = "premium_check"
                 else:
-                    preflop_eq = self._preflop_equity(my_cards) if len(my_cards) == 5 else 0.45
-                    self._pflog_eq = preflop_eq
                     self._pflog_gate = normal_eq_gate
                     if preflop_eq >= normal_eq_gate:
                         open_prob = _clamp(0.40 + 0.35 * pressure + (0.50 * urgency if in_comeback_mode else 0.0), 0.20, 0.98)
