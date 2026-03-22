@@ -2770,6 +2770,12 @@ class PlayerAgent(Agent):
                     protecting_lead=protecting_lead,
                     pressure_adj=float(self._coeff(exploit_adj, "preflop_pressure_adj", 0)),
                     preflop_defense_adj=float(self._coeff(exploit_adj, "preflop_defense_adj", 0)),
+                    phoenix_state={
+                        "current_gear": self._current_gear,
+                        "hands_in_gear": int(self._hands_in_current_gear),
+                        "projected_pnl": float(locals().get("projected_final", 0.0)),
+                        "slope": float(locals().get("slope", 0.0))
+                    },
                     bleedout_state={
                         "alpha": float(alpha),
                         "surplus": float(surplus_for_hand),
@@ -2823,6 +2829,12 @@ class PlayerAgent(Agent):
                     urgency=round(float(urgency), 3),
                     comeback_mode=in_comeback_mode,
                     protecting_lead=protecting_lead,
+                    phoenix_state={
+                        "current_gear": self._current_gear,
+                        "hands_in_gear": int(self._hands_in_current_gear),
+                        "projected_pnl": float(locals().get("projected_final", 0.0)),
+                        "slope": float(locals().get("slope", 0.0))
+                    },
                     bleedout_state={
                         "alpha": float(alpha),
                         "opp_bluff_rate": float(opp_bluff_rate) if 'opp_bluff_rate' in locals() else 0.0,
