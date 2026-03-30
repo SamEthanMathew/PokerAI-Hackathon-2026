@@ -6,7 +6,7 @@ so STREET0 logs can be segregated by entry (grep STREET0 | entry=player.py).
 import os
 import sys
 
-# Ensure "other bots" is on path so "genesis" and "support" are findable
+# Ensure archive/other-bots (this dir) is on path so "genesis" and "support" are findable
 _other_bots_root = os.path.abspath(os.path.dirname(__file__))
 if _other_bots_root not in sys.path:
     sys.path.insert(0, _other_bots_root)

@@ -29,9 +29,9 @@ from pathlib import Path
 from typing import Any
 
 # ── Path setup: make repo root importable ────────────────────────────────────
-_HERE = Path(__file__).resolve().parent          # poker-bot-trainer/training/
-_TRAINER_ROOT = _HERE.parent                      # poker-bot-trainer/
-_REPO_ROOT = _TRAINER_ROOT.parent                 # poker-engine-2026/
+_HERE = Path(__file__).resolve().parent          # apps/poker-bot-trainer/training/
+_TRAINER_ROOT = _HERE.parent                      # apps/poker-bot-trainer/
+_REPO_ROOT = _TRAINER_ROOT.parent.parent          # poker-engine-2026/
 
 for p in [str(_REPO_ROOT), str(_TRAINER_ROOT)]:
     if p not in sys.path:

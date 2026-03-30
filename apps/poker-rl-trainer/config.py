@@ -6,6 +6,7 @@ from typing import Dict
 import os
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.normpath(os.path.join(_HERE, "../.."))
 
 
 @dataclass
@@ -70,11 +71,11 @@ class TrainingConfig:
     value_extraction_bonus: float = 0.10
     big_pot_threshold: int = 20
 
-    # ── Paths (relative to this file's directory) ──────────────────────────
+    # ── Paths (repo root = parents[2] from apps/poker-rl-trainer/) ─────────
     data_path: str = os.path.join(
-        _HERE, "../poker-bot-trainer/training/data/accumulated_session.json"
+        _REPO_ROOT, "apps/poker-bot-trainer/training/data/accumulated_session.json"
     )
-    other_bots_dir: str = os.path.join(_HERE, "../other bots")
+    other_bots_dir: str = os.path.join(_REPO_ROOT, "archive/other-bots")
     genesis_knowledge_path: str = os.path.join(_HERE, "genesis_knowledge.json")
     tables_dir: str = os.path.join(_HERE, "tables")
     checkpoints_dir: str = os.path.join(_HERE, "checkpoints")

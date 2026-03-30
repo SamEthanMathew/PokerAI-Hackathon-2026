@@ -99,7 +99,7 @@ class PlayerAgent(Agent):
         if opp_last_action:
             if "raise" in opp_last_action.lower():... (30 KB left)
 
-brian lam player.py
+archive/scratch/brian_lam_player.py
 80 KB
 R — 1:27 AM
 # OMICRoN V1: Fork of ALPHANiTV8 — exact subgame solver for discard + adaptive

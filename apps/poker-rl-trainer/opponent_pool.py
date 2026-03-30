@@ -1,7 +1,7 @@
 """
 Opponent pool for RL training.
 
-Loads all bots from the `other bots/` directory as in-process instances.
+Loads all bots from `archive/other-bots/` as in-process instances.
 No HTTP overhead — act() and observe() are called directly.
 
 Each rollout batch picks one opponent at random.
@@ -14,8 +14,8 @@ import sys
 from typing import List, Optional, Tuple
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_REPO_ROOT = os.path.normpath(os.path.join(_HERE, ".."))
-_OTHER_BOTS_DIR = os.path.join(_REPO_ROOT, "other bots")
+_REPO_ROOT = os.path.normpath(os.path.join(_HERE, "../.."))
+_OTHER_BOTS_DIR = os.path.join(_REPO_ROOT, "archive/other-bots")
 
 
 class InProcessOpponent:
@@ -154,7 +154,7 @@ def load_opponent_pool(other_bots_dir: str = _OTHER_BOTS_DIR) -> List[InProcessO
     if not pool:
         raise RuntimeError(
             f"No opponent bots could be loaded from {other_bots_dir}. "
-            "Check that the other bots/ directory is correct and bots are importable."
+            "Check that archive/other-bots/ exists and bots are importable."
         )
 
     print(f"  [opponent_pool] Total opponents loaded: {len(pool)}")

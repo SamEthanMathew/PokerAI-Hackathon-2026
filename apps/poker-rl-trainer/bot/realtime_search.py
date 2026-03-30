@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 # Repo root for gym_env
 _BOT_DIR = os.path.dirname(os.path.abspath(__file__))
-_REPO_ROOT = os.path.normpath(os.path.join(_BOT_DIR, "../.."))
+_REPO_ROOT = os.path.normpath(os.path.join(_BOT_DIR, "../../.."))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 

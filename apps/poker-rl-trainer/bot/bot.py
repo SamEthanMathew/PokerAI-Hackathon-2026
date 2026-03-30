@@ -32,7 +32,7 @@ import torch
 
 # ── Path setup ────────────────────────────────────────────────────────────────
 _BOT_DIR  = os.path.dirname(os.path.abspath(__file__))
-_REPO_ROOT = os.path.normpath(os.path.join(_BOT_DIR, "../.."))
+_REPO_ROOT = os.path.normpath(os.path.join(_BOT_DIR, "../../.."))
 
 # Add bot/ to path so model.py and features.py are importable
 if _BOT_DIR not in sys.path:

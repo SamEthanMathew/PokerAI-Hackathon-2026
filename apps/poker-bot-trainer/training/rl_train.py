@@ -39,7 +39,7 @@ from torch.distributions import Categorical
 # ── Path setup (mirrors selfplay.py) ─────────────────────────────────────────
 _HERE = Path(__file__).resolve().parent
 _TRAINER_ROOT = _HERE.parent
-_REPO_ROOT = _TRAINER_ROOT.parent
+_REPO_ROOT = _TRAINER_ROOT.parent.parent
 for p in [str(_REPO_ROOT), str(_TRAINER_ROOT)]:
     if p not in sys.path:
         sys.path.insert(0, p)

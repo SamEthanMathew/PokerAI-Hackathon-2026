@@ -4,18 +4,25 @@ Monte Carlo Odds Analyzer for the 27-card poker variant.
 Standalone CLI tool that computes win/tie/loss equity at every street
 of a hand (pre-flop, flop discard, post-discard, turn, river).
 
-Usage:
-    python monte_carlo.py --random --visualize
-    python monte_carlo.py --random --sims 20000 --visualize
-    python monte_carlo.py --my-cards "Ah 9d 5s 3h 2d" --visualize
-    python monte_carlo.py --my-cards "Ah 9d 5s 3h 2d" --board "9s 8h 2h 6d As" --visualize
+Usage (from repo root):
+    python tools/monte_carlo.py --random --visualize
+    python tools/monte_carlo.py --random --sims 20000 --visualize
+    python tools/monte_carlo.py --my-cards "Ah 9d 5s 3h 2d" --visualize
+    python tools/monte_carlo.py --my-cards "Ah 9d 5s 3h 2d" --board "9s 8h 2h 6d As" --visualize
 """
 
 import argparse
 import json
 import os
 import random
+import sys
 from itertools import combinations
+from pathlib import Path
+
+_TOOLS_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _TOOLS_DIR.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 import matplotlib
 matplotlib.use("Agg")
@@ -26,8 +33,9 @@ from treys import Card
 
 from gym_env import WrappedEval
 
-BATCH_JSON_PATH = "monte_carlo_batch.json"
-BATCH_CHART_PATH = "monte_carlo_batch.png"
+BATCH_JSON_PATH = str(_TOOLS_DIR / "monte_carlo_batch.json")
+BATCH_CHART_PATH = str(_TOOLS_DIR / "monte_carlo_batch.png")
+ANALYSIS_CHART_PATH = str(_TOOLS_DIR / "monte_carlo_analysis.png")
 
 RANKS = "23456789A"
 SUITS = "dhs"
@@ -554,7 +562,7 @@ def visualize_results(results: dict):
     _plot_street_stacked(fig.add_subplot(gs[2, 0]), results)
     _plot_river_summary(fig.add_subplot(gs[2, 1]), results)
 
-    out_path = "monte_carlo_analysis.png"
+    out_path = ANALYSIS_CHART_PATH
     plt.savefig(out_path, dpi=160, facecolor=fig.get_facecolor(), bbox_inches="tight")
     plt.close()
     print(f"\nChart saved to {out_path}")
@@ -754,7 +762,7 @@ def main():
     )
     parser.add_argument(
         "--visualize-batch", action="store_true",
-        help="Load saved batch data from monte_carlo_batch.json and regenerate chart.",
+        help="Load saved batch data from tools/monte_carlo_batch.json and regenerate chart.",
     )
     args = parser.parse_args()
 
@@ -826,10 +834,10 @@ def main():
 
     parser.print_help()
     print("\nExamples:")
-    print('  python monte_carlo.py --random --visualize')
-    print('  python monte_carlo.py --rounds 2000              # 2000 hands, aggregate odds')
-    print('  python monte_carlo.py --rounds 2000 --batch-sims 500  # faster, fewer sims/hand')
-    print('  python monte_carlo.py --my-cards "Ah 9d 5s 3h 2d" --visualize')
+    print('  python tools/monte_carlo.py --random --visualize')
+    print('  python tools/monte_carlo.py --rounds 2000              # 2000 hands, aggregate odds')
+    print('  python tools/monte_carlo.py --rounds 2000 --batch-sims 500  # faster, fewer sims/hand')
+    print('  python tools/monte_carlo.py --my-cards "Ah 9d 5s 3h 2d" --visualize')
 
 
 if __name__ == "__main__":

@@ -39,18 +39,26 @@ Python **3.12+** is required (`pyproject.toml`).
 
 | Area | Purpose |
 |------|---------|
-| `submission/player.py` | Primary tournament agent (OMICRON V2). |
-| `submission/` | Alternate and historical bots (`OMICRoN_V1.py`, genesis modules, etc.). |
-| `submissions/` | Additional packaged bot variants. |
-| `agents/` | Engine agents, RL/probability helpers, **Libratus** (`libratus_agent.py`, `libratus/`). |
-| `legacy/poker-engine-2026-work/` | Full snapshot of the second team repo (`poker-engine-2026-work`), including Phoenix / bleed / `submission_v15`, `HRT_submission`, tools, and validation. |
-| `genesis/` | Genesis-line experiments preserved from earlier branches. |
-| `poker-bot-trainer/` | Next.js trainer UI and training scripts (from genesis line). |
-| `tests/`, `scripts/` | Tests and utilities. |
+| **Core (repo root)** | `run.py`, `match.py`, `gym_env.py`, `agent_test.py`, `agent_config.json` — engine and quick runs. |
+| `submission/` | Tournament entry (`player.py` = OMICRON V2) plus alternate bots (`OMICRoN_V1.py`, genesis modules, etc.). |
+| `agents/` | Built-in agents, RL/probability helpers, **Libratus** (`libratus_agent.py`, `libratus/`). |
+| `tests/`, `scripts/`, `docs/` | Tests, tooling scripts, documentation. |
+| `genesis/` | Genesis-line experiment code preserved from earlier work. |
+| `legacy/poker-engine-2026-work/` | Full snapshot of the second team repo (Phoenix / bleed / `submission_v15`, HRT, validation, etc.). |
+| `apps/poker-bot-trainer/` | Next.js trainer UI + Python training scripts (`training/`). |
+| `apps/poker-rl-trainer/` | RL training pipeline; reads human session data from `apps/poker-bot-trainer/…` and loads opponents from `archive/other-bots/`. |
+| `archive/` | Historical bots, scratch notes, and experiments — **not** the default submission path. See `archive/README.md`. |
+| `tools/` | Standalone utilities: `monte_carlo.py` (equity / batch charts), `visualizer_streamlit.py` (Streamlit log viewer). |
+| `visualizer/` | Separate analysis app (`app.py`, parsers). |
+| `visualizer.py` (root) | Thin shim: runs `streamlit run tools/visualizer_streamlit.py`. |
 
-**Consolidation:** All team work lives on **`main`**. Former feature branches (`genesis-v1`, `ML/RL`, `libratus-agent`, `monte-carlo-analysis`, `omimax`, `genesis`, and the separate `poker-engine-2026-work` repo under `legacy/…`, including **sigedit**) were merged here; those remote branches are removed from GitHub to avoid drift.
+**Packaged bot variants** that lived under a top-level `submissions/` folder in older checkouts now live under **`legacy/poker-engine-2026-work/`** (and similar paths inside `archive/` where copied). Search the tree if you are looking for a specific bot file.
 
-**`.claude/`:** Local assistant/IDE config is not tracked (see `.gitignore`) and was removed from Git history in a one-time cleanup—do not commit `.claude` directories.
+**Consolidation:** All team work lives on **`main`**. Former GitHub feature branches were merged then removed so `main` does not drift from stale branch tips.
+
+**`.claude/`:** Not tracked (see `.gitignore`); removed from Git history in a one-time cleanup.
+
+**Credits:** See [CONTRIBUTORS.md](CONTRIBUTORS.md).
 
 ## Running tests
 
@@ -74,12 +82,18 @@ pytest --cov=gym_env --cov-report=term-missing --cov-report=html --cov-branch
 
 Configure opponents in `agent_config.json` (module paths for each bot).
 
-## Human vs Bot (CLI)
+## Optional tools
 
-From the project root:
+- **Monte Carlo CLI** (outputs under `tools/`):
 
-```bash
-python -m human_vs_bot.run
-```
+  ```bash
+  python tools/monte_carlo.py --random --visualize
+  ```
 
-Session logs go under `human_vs_bot/logs/`.
+- **Streamlit log viewer** (expects `logs/engine_log.txt`):
+
+  ```bash
+  streamlit run tools/visualizer_streamlit.py
+  ```
+
+  Or: `python visualizer.py` from the repo root (shim).

@@ -1,6 +1,6 @@
 # Other Bots — Bot Types Overview
 
-Quick reference for all files in `other bots/`: which are **playable bots** vs **support modules**, and what each bot does.
+Quick reference for all files in `archive/other-bots/`: which are **playable bots** vs **support modules**, and what each bot does.
 
 ---
 
@@ -36,7 +36,7 @@ Used by one or more bots; no `PlayerAgent` / `GenesisAgent` entry point. All liv
 | **support/discard_engine.py** | Post-flop discard: 6-step pipeline (made hand, boat potential, flush/straight draws, dead outs, heuristics). Shared by METAV4, ALPHANiTV5, LambdaV2. |
 | **support/libratus_tables.py** | Lookup tables: `POLICY`, `KEEP_EQUITY`, `POSTERIOR`, `MATCHUPS`. Used by LambdaV2. |
 
-**Running:** Put the `other bots` directory on `PYTHONPATH` when running these bots (e.g. `PYTHONPATH="other bots:$PYTHONPATH"` from project root). Genesis, player.py, and submission/lambdaV2.py also add `other bots` to `sys.path` when loaded so `support` is found.
+**Running:** Put `archive/other-bots` on `PYTHONPATH` when running these bots (e.g. `PYTHONPATH="archive/other-bots:$PYTHONPATH"` from repo root). Genesis, `player.py`, and `submission/lambdaV2.py` also add this directory to `sys.path` when loaded so `support` is found.
 
 ---
 

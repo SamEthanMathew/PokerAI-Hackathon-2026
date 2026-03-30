@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 Cross-check tests for poker-rl-trainer and bot. Run from repo root:
-    python poker-rl-trainer/run_cross_check_tests.py
+    python apps/poker-rl-trainer/run_cross_check_tests.py
 
-Or from poker-rl-trainer:
+Or from apps/poker-rl-trainer:
     python run_cross_check_tests.py
 """
 import os

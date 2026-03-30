@@ -175,5 +175,5 @@ agent_logs/
 # Libratus blueprint (too large for git; regenerate with train_libratus.py)
 agents/libratus/blueprint_strategy.json
 # Trainer app dependencies/build cache
-poker-bot-trainer/node_modules/
-poker-bot-trainer/.next/
+apps/poker-bot-trainer/node_modules/
+apps/poker-bot-trainer/.next/

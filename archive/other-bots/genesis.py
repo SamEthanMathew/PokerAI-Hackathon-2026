@@ -12,7 +12,7 @@ Street > 3: Pass-through (CHECK/CALL/FOLD as fallback).
 import os
 import sys
 
-# Ensure "other bots" is on path so "support" is findable when this module is loaded
+# Ensure archive/other-bots is on path so "support" is findable when this module is loaded
 _other_bots_root = os.path.abspath(os.path.dirname(__file__))
 if _other_bots_root not in sys.path:
     sys.path.insert(0, _other_bots_root)
