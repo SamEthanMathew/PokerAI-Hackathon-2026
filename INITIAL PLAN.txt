@@ -1,0 +1,900 @@
+# Phase 2: Make the Bot Significantly Better (SAM USE THIS IN THE FUTURE, AI IGNORE THIS)
+# Run this AFTER the base RL training system is working
+
+---
+
+## Context
+
+The base system is built and training. The bot can play, it beats the heuristic opponents, the co-evolutionary pipeline works. Now we need to go from "competent" to "dominant." This prompt covers every optimization that separates a good bot from a winning bot in this specific tournament.
+
+The tournament uses a 27-card deck (3 suits × 9 ranks: 2-9,A), 5 hole cards dealt then discard to 2 on the flop (discards revealed), 1000 hands per match, 100-chip stacks resetting each hand, 4 vCPU ARM64 with 1500 seconds total time budget.
+
+---
+
+## Optimization 1: Exhaustive Precomputation (The Biggest Free Win)
+
+The 27-card deck is tiny. Exploit this ruthlessly. Precompute everything offline on the Jetson and ship lookup tables with the bot. These tables turn complex calculations into microsecond lookups during play.
+
+### 1A: Full Hand Equity Table
+
+There are only C(27,2) = 351 possible 2-card holdings. For each holding against each possible opponent holding on each possible board, compute exact equity.
+
+```python
+# precompute/equity_tables.py
+
+"""
+Precompute exact equity for every possible situation.
+
+Table 1: PREFLOP EQUITY (no board)
+  - 351 hands × 351 opponent hands = 123,201 matchups
+  - For each: simulate all possible 5-card boards, compute win %
+  - Store as: equity_preflop[my_hand_key][opp_hand_key] = float
+
+Table 2: POSTFLOP EQUITY (with board)
+  - Given: my 2 cards + N community cards + known removed cards (discards)
+  - Enumerate all possible remaining boards + opponent hands
+  - This is the CARD-REMOVAL-ADJUSTED equity, not naive equity
+  - With 6 discards known (22% of deck removed), the remaining
+    possibilities are dramatically reduced
+
+Table 3: HAND STRENGTH DISTRIBUTION
+  - For each 2-card holding + each board texture:
+    probability of each hand category (flush, straight, etc.)
+  - Use for opponent range estimation
+
+Storage estimate:
+  - Table 1: 351 × 351 × 4 bytes = ~480KB
+  - Table 2: indexed by (my_hand, board_hash, removed_cards_hash)
+    Requires careful hashing but fits in ~200MB
+  - Table 3: 351 × 8 categories × ~1000 board textures = ~2.7MB
+  
+Total: well under 1GB submission limit, well under 8GB RAM limit.
+"""
+
+import numpy as np
+from itertools import combinations
+from collections import defaultdict
+
+DECK_SIZE = 27
+RANKS = "23456789A"
+SUITS = "dhs"
+
+def card_to_int(rank_idx, suit_idx):
+    return suit_idx * 9 + rank_idx
+
+def int_to_card(card_int):
+    return card_int % 9, card_int // 9
+
+ALL_CARDS = list(range(27))
+
+def precompute_preflop_equity():
+    """
+    For every possible 2-card hand vs every other 2-card hand,
+    compute exact win probability by enumerating all possible boards.
+    
+    With only 27 cards this is feasible:
+    - Choose my 2 cards: 351 combos
+    - Choose opp 2 cards from remaining 25: C(25,2) = 300
+    - For each pair, enumerate all 5-card boards from remaining 23: C(23,5) = 33,649
+    - Total evaluations per my_hand: 300 × 33,649 ≈ 10M
+    - Total across all hands: 351 × 10M ≈ 3.5B
+    
+    This is a LOT but parallelizable on GPU. Run overnight on Jetson.
+    Alternative: Monte Carlo sample 100K boards per matchup for ~95% accuracy.
+    """
+    all_hands = list(combinations(ALL_CARDS, 2))  # 351 hands
+    equity_table = {}
+    
+    for my_hand in all_hands:
+        my_key = hand_key(my_hand)
+        equity_table[my_key] = {}
+        remaining = [c for c in ALL_CARDS if c not in my_hand]
+        
+        for opp_hand in combinations(remaining, 2):
+            opp_key = hand_key(opp_hand)
+            board_cards = [c for c in remaining if c not in opp_hand]
+            
+            wins = 0
+            total = 0
+            for board in combinations(board_cards, 5):
+                my_rank = evaluate_hand(my_hand, board)
+                opp_rank = evaluate_hand(opp_hand, board)
+                if my_rank < opp_rank:  # lower rank = better
+                    wins += 1
+                elif my_rank == opp_rank:
+                    wins += 0.5
+                total += 1
+            
+            equity_table[my_key][opp_key] = wins / total
+    
+    return equity_table
+
+
+def precompute_discard_table():
+    """
+    For every possible 5-card starting hand × every possible 3-card flop,
+    compute which 2-card keep combination has the highest equity.
+    
+    5-card hands from 27: C(27,5) = 80,730
+    For each, C(5,2) = 10 possible keeps
+    For each keep, need equity against random opponent on this flop
+    
+    This table tells the bot the OPTIMAL discard in every situation.
+    During play, the bot can use this as a feature ("how far from optimal
+    is my planned discard?") or as a hard override for the discard decision.
+    """
+    pass  # Implementation similar to equity table
+
+
+def precompute_opponent_range_table():
+    """
+    Given 3 revealed opponent discards, compute probability distribution
+    over all possible 2-card hands opponent could hold.
+    
+    Key insight: opponent had 5 cards, kept 2, discarded 3.
+    We see the 3 discards. So we know 3 of their original 5 cards.
+    The 2 they kept must come from cards that were in their original 5
+    but NOT in the 3 discards.
+    
+    However, we don't know their original 5 — we only know 3 of them.
+    The 2 kept cards could be ANY 2 cards from the remaining deck
+    (excluding known cards: our hand, community cards, their discards).
+    
+    But we can WEIGHT by likelihood: rational players keep strong combos.
+    If they discarded an Ace, they probably had a reason (kept a pair,
+    kept suited connectors that beat A-x).
+    
+    Table: for each set of 3 discards × each board state:
+      - probability distribution over possible opponent 2-card holdings
+      - weighted by "would a rational player keep this over any combo
+        involving the discards?"
+    """
+    pass
+```
+
+### 1B: Ship Tables With the Bot
+
+```python
+# bot/bot.py — load tables in __init__
+
+class Bot:
+    def __init__(self):
+        # Load precomputed tables (loaded once, used every hand)
+        self.equity_table = np.load('tables/equity_preflop.npy', allow_pickle=True).item()
+        self.discard_table = np.load('tables/optimal_discards.npy', allow_pickle=True).item()
+        self.range_table = np.load('tables/opponent_ranges.npy', allow_pickle=True).item()
+        
+        # Load neural net
+        self.model = load_model('poker_final.pt')
+        
+        # These lookups are instant — no computation during play
+```
+
+---
+
+## Optimization 2: Real-Time Monte Carlo for Critical Decisions
+
+The neural net makes fast decisions (~2ms). But for BIG decisions (large pots, all-in situations), spend extra time running Monte Carlo simulations to verify or override the neural net's choice.
+
+```python
+# bot/realtime_search.py
+
+"""
+Time budget: 1500 seconds / 1000 hands = 1.5s average per hand.
+Most hands are simple (fold preflop, small pots) and take <5ms.
+This leaves a TIME BANK of surplus seconds for critical decisions.
+
+Strategy:
+  - Track remaining time budget
+  - For small pots (<10 chips): use neural net only (2ms)
+  - For medium pots (10-30 chips): run 1000 MC simulations (50ms)
+  - For large pots (30+ chips) or all-in: run 10,000 MC sims (200ms)
+  - Never exceed 500ms on any single decision
+  - Reserve 100 seconds as safety buffer
+"""
+
+import time
+import random
+
+class RealtimeSearch:
+    def __init__(self, equity_table, range_table, evaluator):
+        self.equity_table = equity_table
+        self.range_table = range_table
+        self.evaluator = evaluator
+        self.time_budget = 1500.0  # seconds
+        self.time_used = 0.0
+        self.safety_buffer = 100.0  # reserve 100s
+        self.hands_remaining = 1000
+    
+    def should_search(self, pot_size, my_stack):
+        """Decide whether to spend time on MC search."""
+        available = self.time_budget - self.time_used - self.safety_buffer
+        avg_remaining = available / max(self.hands_remaining, 1)
+        
+        # Always search on all-in decisions
+        if my_stack <= pot_size:
+            return True, min(10000, int(avg_remaining * 50000))
+        
+        # Search on large pots
+        if pot_size > 30:
+            return True, min(5000, int(avg_remaining * 25000))
+        
+        # Search on medium pots if we have time
+        if pot_size > 10 and avg_remaining > 0.05:
+            return True, 1000
+        
+        return False, 0
+    
+    def monte_carlo_equity(self, my_cards, community, known_removed, 
+                           opp_range, num_sims):
+        """
+        Run Monte Carlo simulations to estimate equity.
+        
+        This is CARD-REMOVAL-AWARE: we only sample from cards that
+        haven't been seen (not in my_cards, community, or known_removed).
+        
+        opp_range: probability distribution over opponent's possible holdings,
+                   derived from their revealed discards.
+        """
+        start = time.time()
+        remaining_deck = [c for c in range(27) 
+                         if c not in my_cards 
+                         and c not in community 
+                         and c not in known_removed]
+        
+        wins = 0
+        total = 0
+        
+        for _ in range(num_sims):
+            # Sample opponent hand from range
+            opp_hand = self._sample_opponent_hand(remaining_deck, opp_range)
+            if opp_hand is None:
+                continue
+            
+            # Sample remaining community cards
+            deck_minus_opp = [c for c in remaining_deck if c not in opp_hand]
+            cards_needed = 5 - len(community)
+            if cards_needed > 0:
+                board_completion = random.sample(deck_minus_opp, cards_needed)
+                full_board = list(community) + board_completion
+            else:
+                full_board = list(community)
+            
+            # Evaluate
+            my_rank = self.evaluator.evaluate(my_cards, full_board)
+            opp_rank = self.evaluator.evaluate(opp_hand, full_board)
+            
+            if my_rank < opp_rank:
+                wins += 1
+            elif my_rank == opp_rank:
+                wins += 0.5
+            total += 1
+        
+        elapsed = time.time() - start
+        self.time_used += elapsed
+        
+        return wins / max(total, 1)
+    
+    def _sample_opponent_hand(self, remaining, opp_range):
+        """Sample from opponent range distribution."""
+        if opp_range:
+            # Weighted sample based on range probabilities
+            hands = list(opp_range.keys())
+            probs = list(opp_range.values())
+            prob_sum = sum(probs)
+            if prob_sum > 0:
+                probs = [p / prob_sum for p in probs]
+                idx = random.choices(range(len(hands)), weights=probs, k=1)[0]
+                return hands[idx]
+        
+        # Uniform random from remaining cards
+        if len(remaining) >= 2:
+            return tuple(random.sample(remaining, 2))
+        return None
+    
+    def override_neural_net(self, nn_action, nn_confidence, mc_equity, pot_size):
+        """
+        Compare neural net's suggestion with MC equity.
+        Override if there's a significant disagreement on big pots.
+        
+        This catches cases where the NN has a blind spot that training missed.
+        """
+        # If NN says fold but MC says we have >40% equity in a big pot
+        if nn_action == 'fold' and mc_equity > 0.40 and pot_size > 15:
+            return 'call'  # Override: don't fold with decent equity
+        
+        # If NN says raise but MC says we have <25% equity
+        if nn_action == 'raise' and mc_equity < 0.25 and pot_size > 20:
+            return 'fold'  # Override: don't bluff into a big pot with no equity
+        
+        # If NN says call but MC says we have >70% equity in big pot
+        if nn_action == 'call' and mc_equity > 0.70 and pot_size > 20:
+            return 'raise'  # Override: raise for value
+        
+        return nn_action  # Trust the NN for everything else
+```
+
+---
+
+## Optimization 3: Adaptive Opponent Exploitation (The 1000-Hand Edge)
+
+You play 1000 hands against each opponent. By hand 100, you should know their tendencies. By hand 300, you should be exploiting them hard. Most bots play the same strategy all 1000 hands. An adaptive bot prints money in the late game.
+
+```python
+# bot/opponent_model.py
+
+"""
+Track opponent statistics with exponential moving averages.
+Detect exploitable patterns. Adjust strategy dynamically.
+
+The key insight: you don't need to play GTO (game-theory optimal)
+against weak opponents. You need to play EXPLOITATIVELY.
+If they fold too much, bluff more. If they call too much, value bet more.
+If they never raise, you can safely call down with medium hands.
+
+CRITICAL: Use two separate models:
+  1. Long-term EMA (alpha=0.02): stable estimate of overall style
+  2. Short-term EMA (alpha=0.10): detects recent adjustments
+
+If short-term diverges from long-term, the opponent is adapting to you.
+When you detect adaptation, fall back toward GTO to avoid being counter-exploited.
+"""
+
+class OpponentModel:
+    def __init__(self):
+        # Long-term stats (alpha=0.02, ~50 hand memory)
+        self.long = StatTracker(alpha=0.02)
+        # Short-term stats (alpha=0.10, ~10 hand memory)
+        self.short = StatTracker(alpha=0.10)
+        # Total hands observed
+        self.hands_observed = 0
+        # Confidence: how much to trust the model
+        self.confidence = 0.0
+    
+    def update(self, hand_data):
+        """Call after every hand with full hand data."""
+        self.hands_observed += 1
+        self.confidence = min(1.0, self.hands_observed / 100)
+        
+        self.long.update(hand_data)
+        self.short.update(hand_data)
+    
+    def get_exploit_adjustments(self):
+        """
+        Return a dict of adjustments to apply to the neural net's decisions.
+        Each adjustment is a float multiplier around 1.0.
+        >1.0 means "do this more", <1.0 means "do this less".
+        
+        Only activate after 50+ hands of data.
+        """
+        if self.hands_observed < 50:
+            return {}  # Not enough data, play default strategy
+        
+        adjustments = {}
+        
+        # === Detect if opponent is adapting ===
+        adaptation_score = self._detect_adaptation()
+        if adaptation_score > 0.3:
+            # Opponent is adjusting to us — pull back toward default
+            return {"note": "opponent_adapting", "caution_multiplier": 0.5}
+        
+        # === Exploit fold frequency ===
+        fold_to_cbet = self.long.fold_to_cbet
+        if fold_to_cbet > 0.55:
+            # They fold to cbets too much — cbet more, bluff more
+            adjustments['cbet_frequency_mult'] = 1.4
+            adjustments['bluff_frequency_mult'] = 1.5
+        elif fold_to_cbet < 0.25:
+            # They never fold to cbets — stop bluffing, value bet thinner
+            adjustments['cbet_frequency_mult'] = 0.7
+            adjustments['bluff_frequency_mult'] = 0.3
+            adjustments['value_bet_threshold_mult'] = 0.85  # bet with weaker hands
+        
+        # === Exploit river tendencies ===
+        fold_to_river = self.long.fold_to_river_bet
+        if fold_to_river > 0.60:
+            adjustments['river_bluff_mult'] = 2.0  # Massive bluff river
+        elif fold_to_river < 0.20:
+            adjustments['river_bluff_mult'] = 0.1  # Never bluff, they always call
+            adjustments['river_value_bet_mult'] = 1.5
+        
+        # === Exploit preflop tendencies ===
+        if self.long.vpip > 0.70:
+            # They play too many hands — tighten up and value bet more
+            adjustments['preflop_raise_value_mult'] = 1.3
+        elif self.long.vpip < 0.30:
+            # They're too tight — steal blinds aggressively
+            adjustments['preflop_steal_mult'] = 1.6
+        
+        # === Exploit bet sizing tells ===
+        if self.long.sizing_variance < 0.05:
+            # They always bet the same size — their sizing gives no info
+            # But check if they bet big = strong, small = weak
+            if self.long.big_bet_showdown_strength > self.long.small_bet_showdown_strength:
+                adjustments['fold_to_big_bet_mult'] = 1.3
+                adjustments['call_small_bet_mult'] = 0.7  # they're weak when small
+        
+        # === Exploit discard patterns ===
+        if self.long.discards_ace_frequency > 0.5:
+            # They frequently discard aces — their range is draw-heavy
+            # Bet into them on dry boards (no draws complete)
+            adjustments['bet_dry_board_mult'] = 1.3
+        
+        return adjustments
+    
+    def _detect_adaptation(self):
+        """
+        Compare short-term vs long-term stats.
+        Large divergence = opponent is changing strategy.
+        """
+        if self.hands_observed < 100:
+            return 0.0
+        
+        diffs = []
+        for stat in ['vpip', 'pfr', 'fold_to_cbet', 'aggression_factor']:
+            long_val = getattr(self.long, stat, 0.5)
+            short_val = getattr(self.short, stat, 0.5)
+            if long_val > 0:
+                diffs.append(abs(short_val - long_val) / max(long_val, 0.01))
+        
+        return sum(diffs) / max(len(diffs), 1)
+
+
+class StatTracker:
+    """Exponential moving average tracker for opponent statistics."""
+    
+    def __init__(self, alpha=0.05):
+        self.alpha = alpha
+        self.vpip = 0.5          # Voluntarily put in pot
+        self.pfr = 0.3           # Preflop raise
+        self.aggression_factor = 1.0
+        self.fold_to_cbet = 0.4
+        self.fold_to_turn_barrel = 0.4
+        self.fold_to_river_bet = 0.4
+        self.check_raise_freq = 0.05
+        self.wtsd = 0.3          # Went to showdown
+        self.wsd = 0.5           # Won at showdown
+        self.avg_raise_sizing = 0.5
+        self.sizing_variance = 0.1
+        self.discards_ace_frequency = 0.2
+        self.big_bet_showdown_strength = 0.5
+        self.small_bet_showdown_strength = 0.5
+    
+    def update(self, hand_data):
+        """Update all stats with new hand data using EMA."""
+        a = self.alpha
+        # Update each stat: new = (1-a)*old + a*observed
+        # Implementation per stat based on hand_data...
+        pass
+```
+
+---
+
+## Optimization 4: Discard Decision Override
+
+The discard decision is the single most important decision unique to this variant. The neural net learned discards from training, but the precomputed optimal discard table is EXACT. Use the table, not the neural net.
+
+```python
+# In bot/bot.py, override the discard head entirely:
+
+def act(self, observation):
+    valid = observation['valid_actions']
+    
+    # DISCARD: Always use precomputed optimal table
+    if valid[4]:  # DISCARD action valid
+        my_cards = [c for c in observation['my_cards'] if c != -1]
+        community = [c for c in observation['community_cards'] if c != -1]
+        
+        # Look up optimal keep pair from exhaustive precomputation
+        # This is BETTER than the neural net because it's computed
+        # by enumerating every possible outcome, not learned from data
+        optimal_keep = self.discard_table.lookup(
+            tuple(sorted(my_cards)), 
+            tuple(sorted(community))
+        )
+        
+        if optimal_keep is not None:
+            return (4, 0, optimal_keep[0], optimal_keep[1])
+        
+        # Fallback to neural net if lookup misses (shouldn't happen)
+        return self._nn_discard(observation)
+    
+    # BETTING: Use neural net + MC override for big pots
+    # ... rest of action logic
+```
+
+---
+
+## Optimization 5: Endgame Awareness (Hands 800-1000)
+
+Most bots play the same strategy hand 1 and hand 999. But the match result depends on CUMULATIVE chips. If you're ahead by 500 chips at hand 900, you should play extremely tight — just fold and protect your lead. If you're behind, you need to take more risks.
+
+```python
+# bot/endgame.py
+
+"""
+Endgame adjustments based on match state.
+
+Key insight: the goal is to WIN THE MATCH (have more chips after 1000 hands),
+not to maximize expected chips per hand. These are different objectives.
+
+When ahead: reduce variance. Fold marginal spots. Don't risk your lead.
+When behind: increase variance. Take more gambles. Push thin edges.
+When close: play normal but avoid coin-flip situations.
+"""
+
+class EndgameAdjuster:
+    def __init__(self):
+        self.cumulative_chips = 0
+        self.hand_number = 0
+    
+    def update(self, chips_this_hand):
+        self.cumulative_chips += chips_this_hand
+        self.hand_number += 1
+    
+    def get_adjustments(self):
+        """Return strategy adjustments based on match state."""
+        hands_remaining = 1000 - self.hand_number
+        
+        if hands_remaining > 200:
+            return {}  # Too early for endgame adjustments
+        
+        lead = self.cumulative_chips
+        
+        # How many chips can we expect to gain/lose in remaining hands?
+        # Rough estimate: ~2 chips per hand standard deviation
+        expected_swing = 2.0 * (hands_remaining ** 0.5)
+        
+        if lead > 3 * expected_swing:
+            # Massive lead — play ultra-tight, protect the win
+            return {
+                'preflop_tighten': 0.5,     # Play half as many hands
+                'bluff_disable': True,       # Never bluff
+                'fold_marginal': True,       # Fold anything that's not clear
+                'max_risk_per_hand': 10,     # Cap max chips at risk
+            }
+        
+        elif lead > 1.5 * expected_swing:
+            # Comfortable lead — slightly tighter
+            return {
+                'preflop_tighten': 0.8,
+                'bluff_frequency_mult': 0.5,
+                'fold_marginal': False,
+            }
+        
+        elif lead < -3 * expected_swing:
+            # Way behind — go wild, need variance
+            return {
+                'preflop_loosen': 1.5,       # Play more hands
+                'bluff_frequency_mult': 1.8,  # Bluff more
+                'raise_sizing_mult': 1.3,     # Bet bigger
+                'all_in_threshold_lower': True, # Shove lighter
+            }
+        
+        elif lead < -1.5 * expected_swing:
+            # Behind — take more risks
+            return {
+                'preflop_loosen': 1.2,
+                'bluff_frequency_mult': 1.3,
+            }
+        
+        return {}  # Close match, play normal
+```
+
+---
+
+## Optimization 6: The Combined Decision Pipeline
+
+Wire everything together into a single decision function that layers all optimizations:
+
+```python
+# bot/bot.py — the final act() method
+
+class Bot:
+    def __init__(self):
+        # Neural network (BC + RL trained)
+        self.model = load_model('poker_final.pt')
+        
+        # Precomputed tables
+        self.equity_table = load_table('tables/equity_preflop.npy')
+        self.discard_table = load_table('tables/optimal_discards.npy')
+        self.range_table = load_table('tables/opponent_ranges.npy')
+        
+        # Real-time search engine
+        self.searcher = RealtimeSearch(self.equity_table, self.range_table, evaluator)
+        
+        # Opponent model (adapts over 1000 hands)
+        self.opponent = OpponentModel()
+        
+        # Endgame adjuster
+        self.endgame = EndgameAdjuster()
+        
+        # Hand evaluator
+        self.evaluator = HandEvaluator27()
+        
+        # Match state
+        self.hand_number = 0
+        self.cumulative_chips = 0
+    
+    def act(self, observation):
+        valid = observation['valid_actions']
+        
+        # ============================
+        # LAYER 0: Discard (hard override)
+        # ============================
+        if valid[4]:
+            return self._optimal_discard(observation)
+        
+        # ============================
+        # LAYER 1: Neural net base decision
+        # ============================
+        features = extract_features(observation, self.opponent, self.endgame)
+        nn_action, nn_raise, nn_confidence = self._nn_decide(features, valid)
+        
+        # ============================
+        # LAYER 2: Opponent exploitation adjustments
+        # ============================
+        exploit = self.opponent.get_exploit_adjustments()
+        adjusted_action, adjusted_raise = self._apply_exploits(
+            nn_action, nn_raise, exploit, observation
+        )
+        
+        # ============================
+        # LAYER 3: Endgame adjustments
+        # ============================
+        endgame_adj = self.endgame.get_adjustments()
+        adjusted_action, adjusted_raise = self._apply_endgame(
+            adjusted_action, adjusted_raise, endgame_adj, observation
+        )
+        
+        # ============================
+        # LAYER 4: Monte Carlo override for big decisions
+        # ============================
+        pot_size = observation['my_bet'] + observation['opp_bet']
+        should_search, num_sims = self.searcher.should_search(
+            pot_size, observation['my_stack']  # estimated from obs
+        )
+        
+        if should_search:
+            my_cards = [c for c in observation['my_cards'] if c != -1]
+            community = [c for c in observation['community_cards'] if c != -1]
+            removed = self._get_all_known_removed(observation)
+            opp_range = self._estimate_opponent_range(observation)
+            
+            mc_equity = self.searcher.monte_carlo_equity(
+                tuple(my_cards), tuple(community), 
+                removed, opp_range, num_sims
+            )
+            
+            final_action = self.searcher.override_neural_net(
+                adjusted_action, nn_confidence, mc_equity, pot_size
+            )
+        else:
+            final_action = adjusted_action
+        
+        # ============================
+        # LAYER 5: Safety checks (NEVER return invalid action)
+        # ============================
+        return self._validate_and_format(final_action, adjusted_raise, observation)
+    
+    def hand_complete(self, result):
+        """Called at end of each hand to update models."""
+        self.hand_number += 1
+        self.cumulative_chips += result['chips_won_lost']
+        self.opponent.update(result)
+        self.endgame.update(result['chips_won_lost'])
+        self.searcher.hands_remaining = 1000 - self.hand_number
+    
+    def _optimal_discard(self, obs):
+        """Use precomputed table for perfect discard decisions."""
+        my_cards = [c for c in obs['my_cards'] if c != -1]
+        community = [c for c in obs['community_cards'] if c != -1]
+        
+        key = (tuple(sorted(my_cards)), tuple(sorted(community)))
+        optimal = self.discard_table.get(key)
+        
+        if optimal:
+            return (4, 0, optimal[0], optimal[1])
+        
+        # Fallback: use neural net discard head
+        features = extract_features(obs, self.opponent, self.endgame)
+        return self._nn_discard(features, obs)
+    
+    def _estimate_opponent_range(self, obs):
+        """
+        Use revealed discards to narrow opponent's possible holdings.
+        This is THE key information edge in this variant.
+        """
+        opp_discards = [c for c in obs['opp_discarded_cards'] if c != -1]
+        
+        if len(opp_discards) != 3:
+            return None  # No discard info yet (preflop)
+        
+        # Look up precomputed range
+        discard_key = tuple(sorted(opp_discards))
+        precomputed_range = self.range_table.get(discard_key)
+        
+        if precomputed_range:
+            # Filter out impossible hands (cards we can see)
+            my_cards = set(c for c in obs['my_cards'] if c != -1)
+            community = set(c for c in obs['community_cards'] if c != -1)
+            known = my_cards | community | set(opp_discards)
+            
+            filtered = {}
+            for hand, prob in precomputed_range.items():
+                if hand[0] not in known and hand[1] not in known:
+                    filtered[hand] = prob
+            
+            return filtered
+        
+        return None
+    
+    def _validate_and_format(self, action, raise_amount, obs):
+        """
+        CRITICAL: Ensure we NEVER return an invalid action.
+        Invalid actions are treated as folds in the tournament.
+        An accidental fold on a big pot can lose the match.
+        """
+        valid = obs['valid_actions']
+        action_map = {'fold': 0, 'raise': 1, 'check': 2, 'call': 3}
+        
+        action_type = action_map.get(action, 0)
+        
+        # Verify the action is valid
+        if not valid[action_type]:
+            # Fallback priority: check > call > fold (never raise as fallback)
+            if valid[2]:  # CHECK
+                return (2, 0, -1, -1)
+            elif valid[3]:  # CALL
+                return (3, 0, -1, -1)
+            elif valid[0]:  # FOLD
+                return (0, 0, -1, -1)
+        
+        # Clamp raise amount
+        if action_type == 1:
+            raise_amount = max(obs['min_raise'], min(raise_amount, obs['max_raise']))
+            return (1, int(raise_amount), -1, -1)
+        
+        return (action_type, 0, -1, -1)
+```
+
+---
+
+## Optimization 7: Position-Aware Strategy
+
+Small Blind and Big Blind play fundamentally differently. The SB acts first postflop (informational disadvantage) but can steal preflop. The BB defends their blind and acts second postflop. Train or adjust the model to play position-specific strategies.
+
+```
+POSITION ADJUSTMENTS:
+
+As Small Blind (acting first postflop):
+  - Tighter preflop range (we're out of position after flop)
+  - More continuation bets (take initiative before opponent can)
+  - Smaller bet sizes (we're building pot from weak position)
+  - More check-raises on strong hands (trap the in-position player)
+
+As Big Blind (acting second postflop):
+  - Wider preflop defense (we already paid 2 chips)
+  - More floats and calls (we have positional advantage)
+  - Larger bet sizes when leading (we have information)
+  - More check-calls with medium hands (let SB bluff into us)
+```
+
+---
+
+## Optimization 8: Torch JIT Compilation for Speed
+
+The tournament is CPU-only. Compile the model for maximum inference speed.
+
+```python
+# export/compile_model.py
+
+import torch
+
+def compile_for_tournament(model_path, output_path):
+    """
+    Compile model with torch.jit.trace for faster CPU inference.
+    This can reduce inference time from ~2ms to ~0.5ms.
+    """
+    model = PokerNetV2(card_dim=214, context_dim=63)
+    model.load_state_dict(torch.load(model_path, map_location='cpu'))
+    model.eval()
+    
+    # Create example inputs
+    example_card = torch.randn(1, 214)
+    example_ctx = torch.randn(1, 63)
+    
+    # Trace the model
+    traced = torch.jit.trace(model, (example_card, example_ctx))
+    
+    # Optimize for inference
+    traced = torch.jit.optimize_for_inference(traced)
+    
+    # Save
+    traced.save(output_path)
+    
+    # Verify speed
+    import time
+    times = []
+    for _ in range(1000):
+        start = time.time()
+        with torch.no_grad():
+            traced(example_card, example_ctx)
+        times.append(time.time() - start)
+    
+    avg_ms = sum(times) / len(times) * 1000
+    print(f"Average inference: {avg_ms:.2f}ms")
+    assert avg_ms < 5.0, f"Too slow: {avg_ms}ms > 5ms target"
+```
+
+---
+
+## Optimization 9: Variance Reduction in Training
+
+Before exporting the final model, do one last training pass with these specific improvements:
+
+```
+1. POPULATION-BASED TRAINING (PBT):
+   - Train 4 copies of the model simultaneously with different hyperparameters
+   - Every 50 cycles, copy the weights of the best-performing model
+     to the worst-performing one and mutate its hyperparameters
+   - This auto-tunes learning rate, entropy coef, and KL penalty
+   - AlphaHoldem found PBT significantly improved their final model
+
+2. SELF-PLAY WITH HISTORICAL POOL:
+   - Don't just train against current opponents
+   - Keep the last 20 checkpoints of YOUR OWN model
+   - Randomly play against old versions of yourself 30% of the time
+   - This prevents strategy cycling (A beats B, B beats C, C beats A)
+
+3. FINAL ANNEALING:
+   - Last 50 training cycles: drop learning rate to 1e-6
+   - Drop entropy coefficient to 0.001
+   - This "crystallizes" the policy — small refinements only
+   - Don't make any big changes near the end
+
+4. ENSEMBLE SELECTION:
+   - Don't just use the last checkpoint
+   - Run a round-robin tournament of the last 50 checkpoints
+   - Each plays 1000 hands against every opponent
+   - The checkpoint with the highest MINIMUM win rate across
+     all opponents is the most robust choice (not highest average)
+   - Maximizing minimum win rate is more important than
+     maximizing average win rate for tournament play
+```
+
+---
+
+## Priority Order (Do These In Sequence)
+
+1. **Precomputed discard table** — Easy, massive impact. Perfect discards every time.
+2. **Opponent model** — Moderate effort, huge edge. Exploit weaknesses over 1000 hands.  
+3. **Precomputed equity tables** — Takes overnight on Jetson, but gives instant lookups.
+4. **Monte Carlo override** — Medium effort. Catches the neural net's biggest mistakes.
+5. **Endgame adjustments** — Easy to implement, wins close matches.
+6. **Torch JIT compilation** — Easy, saves time budget for MC search.
+7. **Position-aware adjustments** — Medium effort, consistent small edge.
+8. **Ensemble selection** — Easy after training is done, picks the most robust model.
+9. **PBT / self-play pool** — Requires retraining, but produces a better model.
+
+---
+
+## Testing the Final Bot
+
+Before submitting, verify ALL of these:
+
+```
+[ ] Bot never returns invalid action (run 100,000 hands, check every action)
+[ ] Bot never crashes on any observation (including edge cases: all-in, min stack, -1 values)
+[ ] Inference < 5ms average on ARM64 CPU (test on actual ARM hardware if possible)
+[ ] Full 1000-hand match completes in < 1500 seconds
+[ ] Win rate > 90% vs every training opponent (3 runs of 1000 hands each)
+[ ] Win rate > 60% vs a fresh opponent the bot has never seen (generalization test)
+[ ] Discard decisions match precomputed optimal table > 99% of the time
+[ ] Opponent model correctly identifies known exploit patterns in test opponents
+[ ] Endgame adjustments activate correctly (test with simulated chip leads/deficits)
+[ ] Time budget management works (bot doesn't timeout in 1000-hand matches)
+[ ] Total submission size < 1GB (model + tables + code)
+[ ] Only uses allowed Python libraries
+[ ] No network calls, no filesystem access outside bot directory
+```

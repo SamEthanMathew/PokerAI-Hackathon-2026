@@ -14,7 +14,6 @@ Root causes addressed (from M1 log analysis):
   -1528 chips in 151 showdowns → improve discard quality & tighten river calls
   -569 vs loose opponent → archetype detection + dynamic sizing
   transparent keeps → opp discard model weights opponent's range
-  no bleed-out guard → added
 """
 
 import random
@@ -816,18 +815,6 @@ class GenesisV1Agent(Agent):
         if street == 0 and not valid[DISCARD]:
             self._select_mode()
 
-        # ── Bleed-out lock (early check) ─────────────────────────────────────
-        if not valid[DISCARD]:
-            hands_remaining = max(0, TOTAL_HANDS - self._hands_completed)
-            sb_left   = (hands_remaining + 1) // 2
-            bb_left   = hands_remaining // 2
-            max_bleed = sb_left + bb_left * 2
-            if self._running_pnl > max_bleed:
-                if valid[FOLD]:
-                    return (FOLD, 0, 0, 0)
-                if valid[CHECK]:
-                    return (CHECK, 0, 0, 0)
-
         # ── Discard phase ─────────────────────────────────────────────────────
         if valid[DISCARD]:
             result = self._act_discard(my_cards, community, opp_discards, my_discards)
@@ -846,17 +833,6 @@ class GenesisV1Agent(Agent):
             my_cards, community, opp_discards, my_discards,
             valid, street, pot_size, my_bet, opp_bet, min_raise, max_raise,
         )
-
-        # ── Safety-net bleed-out ──────────────────────────────────────────────
-        hands_remaining = max(0, TOTAL_HANDS - self._hands_completed)
-        sb_left   = (hands_remaining + 1) // 2
-        bb_left   = hands_remaining // 2
-        max_bleed = sb_left + bb_left * 2
-        if self._running_pnl > max_bleed and result[0] in (RAISE, CALL):
-            if valid[FOLD]:
-                result = (FOLD, 0, 0, 0)
-            elif valid[CHECK]:
-                result = (CHECK, 0, 0, 0)
 
         self._last_was_bet = result[0] == RAISE
         self._last_street_seen = street
