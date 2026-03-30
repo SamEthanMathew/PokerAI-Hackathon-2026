@@ -2,6 +2,7 @@ import logging
 import multiprocessing
 import json
 import importlib
+import os
 
 from match import run_api_match
 
@@ -26,6 +27,11 @@ def main():
     bot0_class = load_agent_class(config['bot0']['file_path'])
     bot1_class = load_agent_class(config['bot1']['file_path'])
 
+    rollout = config.get("rollout", {})
+    os.environ["OMICRON_LIVE_STAGE"] = str(rollout.get("live_stage", 1))
+    os.environ["OMICRON_SHADOW_ONLY"] = "1" if rollout.get("shadow_only", False) else "0"
+    os.environ["OMICRON_DEBUG_VERBOSE"] = "1" if rollout.get("debug_verbose", False) else "0"
+
     # Create processes using the configuration (stream=True so agent logs appear in console)
     # To disable agent logs, set stream=False
     process0 = multiprocessing.Process(
@@ -49,7 +55,8 @@ def main():
         logger,
         csv_path=config['match_settings']['csv_output_path'],
         team_0_name=bot0_class.__name__,
-        team_1_name=bot1_class.__name__
+        team_1_name=bot1_class.__name__,
+        num_hands=int(config.get("match_settings", {}).get("num_hands", 1000)),
     )
     logger.info(f"Match result: {result}")
 

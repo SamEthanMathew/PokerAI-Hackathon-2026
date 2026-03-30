@@ -183,7 +183,10 @@ def run_api_match(
     Run a match of multiple hands between two API-based agents.
     Each iteration creates a new PokerEnv instance representing one hand.
     """
-    global bankrolls
+    global bankrolls, time_used_0, time_used_1
+    bankrolls = [0, 0]
+    time_used_0 = 0.0
+    time_used_1 = 0.0
     csv_headers = [
         "hand_number",
         "street",
@@ -201,6 +204,15 @@ def run_api_match(
         "team_1_discarded",
         "team_0_bet",
         "team_1_bet",
+        "invalid_action",
+        "policy_tag",
+        "exploit_stage",
+        "action_category_changed",
+        "size_changed_only",
+        "baseline_action_type",
+        "baseline_action_amount",
+        "final_action_type",
+        "final_action_amount",
     ]
 
     with open(csv_path, "w", newline="") as csv_file:
@@ -345,6 +357,15 @@ def play_hand(
             "action_amount": act_amount,
             "action_keep_1": act_keep1,
             "action_keep_2": act_keep2,
+            "invalid_action": False,
+            "policy_tag": action.get("policy_tag", ""),
+            "exploit_stage": action.get("exploit_stage", ""),
+            "action_category_changed": action.get("action_category_changed", ""),
+            "size_changed_only": action.get("size_changed_only", ""),
+            "baseline_action_type": action.get("baseline_action_type", ""),
+            "baseline_action_amount": action.get("baseline_action_amount", ""),
+            "final_action_type": action.get("final_action_type", ""),
+            "final_action_amount": action.get("final_action_amount", ""),
         }
 
         # Step environment
@@ -352,6 +373,7 @@ def play_hand(
         # If the engine treated this move as invalid (auto-fold), record it as a FOLD in the CSV.
         if info.get("invalid_action"):
             current_state["action_type"] = PokerEnv.ActionType.FOLD.name
+            current_state["invalid_action"] = True
 
         writer.writerow(current_state)
         info["hand_number"] = hand_number  # Maintain hand number after each step
