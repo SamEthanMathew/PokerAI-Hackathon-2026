@@ -1,10 +1,11 @@
 # Contributors
 
-People who contributed to this repository. **Edit this file before you publish or share** (add names, roles, optional links).
+People who contributed to this repository.
 
 | Name | Role / contribution |
 |------|---------------------|
-| *(add rows below)* | |
+| [Sam Ethan Mathew](https://github.com/SamEthanMathew) | Project lead, engine & submission work, repo structure and documentation |
+| [Rudy](https://github.com/rudabot) (@rudabot) | Co-contributor — bot strategy, tooling, and collaboration on the codebase |
 
 ## How to update
 
