@@ -7,6 +7,7 @@ import json
 import logging
 import time
 import traceback
+from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
@@ -175,7 +176,7 @@ def run_api_match(
     base_url_1: str,
     logger: logging.Logger,
     num_hands: int = 1000,
-    csv_path: str = "./match.csv",
+    csv_path: str = "outputs/match.csv",
     team_0_name: str = "Team 0",
     team_1_name: str = "Team 1",
 ) -> Dict[str, Any]:
@@ -215,6 +216,7 @@ def run_api_match(
         "final_action_amount",
     ]
 
+    Path(csv_path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
     with open(csv_path, "w", newline="") as csv_file:
         # Comment header
         csv_file.write(f"# Team 0: {team_0_name}, Team 1: {team_1_name}\n")

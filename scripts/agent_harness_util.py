@@ -1,7 +1,7 @@
 """
 Shared helpers for stopping API agent child processes between matches.
 
-Used by agent_test.py and run.py so fixed ports (e.g. 8000/8001) are released
+Used by tests/agent_test.py and run.py so fixed ports (e.g. 8000/8001) are released
 reliably before the next subprocess bind (avoids errno 98 cascades).
 """
 

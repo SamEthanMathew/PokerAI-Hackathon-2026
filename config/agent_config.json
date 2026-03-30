@@ -10,6 +10,6 @@
         "player_id": "bot1"
     },
     "match_settings": {
-        "csv_output_path": "./match.csv"
+        "csv_output_path": "outputs/match.csv"
     }
 } 

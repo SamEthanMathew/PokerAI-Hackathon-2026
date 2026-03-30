@@ -39,10 +39,14 @@ Python **3.12+** is required (`pyproject.toml`).
 
 | Area | Purpose |
 |------|---------|
-| **Core (repo root)** | `run.py`, `match.py`, `gym_env.py`, `agent_test.py`, `agent_config.json` — engine and quick runs. |
+| **Core (repo root)** | `run.py`, `match.py`, `gym_env.py` — tournament engine entrypoints (import path for `gym_env` stays at root). |
+| `config/` | `agent_config.json` (bots, ports, CSV path), `RULES.txt`. |
+| `outputs/` | Default match CSVs (e.g. `outputs/match.csv`); generated files are gitignored. |
 | `submission/` | Tournament entry (`player.py` = OMICRON V2) plus alternate bots (`OMICRoN_V1.py`, genesis modules, etc.). |
 | `agents/` | Built-in agents, RL/probability helpers, **Libratus** (`libratus_agent.py`, `libratus/`). |
-| `tests/`, `scripts/`, `docs/` | Tests, tooling scripts, documentation. |
+| `tests/` | `api_test.py`, `engine_test.py`, `agent_test.py`, tournaments and validation scripts. |
+| `scripts/` | One-off tools: log/match analyzers, `run_50_hands.py`, `train_libratus.py`, `create_release.sh`, `verify_player_fixes.py`, `street0_score_demo.py`, etc. |
+| `docs/` | Documentation. |
 | `genesis/` | Genesis-line experiment code preserved from earlier work. |
 | `legacy/poker-engine-2026-work/` | Full snapshot of the second team repo (Phoenix / bleed / `submission_v15`, HRT, validation, etc.). |
 | `apps/poker-bot-trainer/` | Next.js trainer UI + Python training scripts (`training/`). |
@@ -71,7 +75,7 @@ pytest --cov=gym_env --cov-report=term-missing --cov-report=html --cov-branch
 1. Quick multi-bot check (5 hands each):
 
    ```bash
-   python agent_test.py
+   python tests/agent_test.py
    ```
 
 2. Full match (e.g. 1000 hands) via config:
@@ -80,7 +84,7 @@ pytest --cov=gym_env --cov-report=term-missing --cov-report=html --cov-branch
    python run.py
    ```
 
-Configure opponents in `agent_config.json` (module paths for each bot).
+Configure opponents in `config/agent_config.json` (module paths for each bot). Match CSV path defaults to `outputs/match.csv`.
 
 ## Optional tools
 

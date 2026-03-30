@@ -1,11 +1,15 @@
-import os
 import random
+import sys
+from pathlib import Path
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
-# Import our poker environment and opponent agent classes.
+_REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_REPO))
+
 from gym_env import PokerEnv
 from agents.agent import Agent
 from agents.prob_agent import ProbabilityAgent
@@ -166,7 +170,7 @@ class RLAgent:
 
 def train_agent(num_episodes=500, save_every=50, weight_path=None):
     if weight_path is None:
-        weight_path = os.path.join(os.path.dirname(__file__), "agents", "rl_agent_weights.pth")
+        weight_path = str(_REPO / "agents" / "rl_agent_weights.pth")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     env = PokerEnv()

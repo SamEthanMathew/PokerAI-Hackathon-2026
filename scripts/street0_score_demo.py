@@ -1,5 +1,14 @@
-"""Quick functional test for street0_score."""
+"""Quick functional test for street0_score.
+
+Usage (from repo root):  python scripts/street0_score_demo.py
+"""
+import sys
 import time
+from pathlib import Path
+
+_REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_REPO))
+
 from submission.street0_score import (
     final_street0_score, hand_structure_features, classify_discard,
     classify_board_texture, OpponentProfile, all_keeps, rank, suit, card_str

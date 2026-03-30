@@ -1,10 +1,13 @@
+import importlib
+import json
 import logging
 import multiprocessing
-import json
-import importlib
 import os
+from pathlib import Path
 
 from match import run_api_match
+
+_REPO_ROOT = Path(__file__).resolve().parent
 
 def load_agent_class(file_path):
     """
@@ -17,7 +20,9 @@ def load_agent_class(file_path):
 
 def main():
     # Load configuration
-    with open('agent_config.json', 'r') as f:
+    (_REPO_ROOT / "outputs").mkdir(exist_ok=True)
+    cfg_path = _REPO_ROOT / "config" / "agent_config.json"
+    with open(cfg_path, encoding="utf-8") as f:
         config = json.load(f)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")

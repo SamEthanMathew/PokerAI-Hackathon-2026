@@ -1,23 +1,20 @@
 """
 Train the Libratus blueprint strategy by running MCCFR and saving the result.
-Run from project root: python train_libratus.py
+Run from repo root: python scripts/train_libratus.py
 """
 
 import argparse
-import os
 import sys
+from pathlib import Path
 
-# Ensure project root is on path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+_REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_REPO))
 
 from agents.libratus.abstraction import CardAbstraction
 from agents.libratus.cfr import MCCFR
 from agents.libratus.strategy_store import save_strategy
 
-
-DEFAULT_STRATEGY_PATH = os.path.join(
-    os.path.dirname(__file__), "agents", "libratus", "blueprint_strategy.json"
-)
+DEFAULT_STRATEGY_PATH = str(_REPO / "agents" / "libratus" / "blueprint_strategy.json")
 
 
 def main():

@@ -1,6 +1,8 @@
 """
 Cross-test for the overhauled player.py (MetaBot v2).
 
+Manual regression checks for submission/player.py (not run by pytest).
+
 Tests (each is self-contained and prints PASS/FAIL):
   T1  – opp_last_action present (uppercase): stats accumulate via act()
   T2  – opp_last_action absent: bet-change inference in observe is gone; stats via act()
@@ -19,8 +21,10 @@ Tests (each is self-contained and prints PASS/FAIL):
 """
 
 import sys
-import os
-sys.path.insert(0, os.path.dirname(__file__))
+from pathlib import Path
+
+_REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_REPO))  # repo root (script lives in scripts/)
 
 PASS = "\033[92mPASS\033[0m"
 FAIL = "\033[91mFAIL\033[0m"

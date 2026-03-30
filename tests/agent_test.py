@@ -2,15 +2,15 @@
 Basic Test Suite for PlayerAgent which checks that it never does an invalid action
 """
 
-from ast import Call
 import importlib.util
+import logging
 import multiprocessing
 import os
 import socket
 import sys
 import time
-import logging
 from logging import getLogger
+from pathlib import Path
 from typing import Optional, Type
 
 from agents.agent import Agent
@@ -19,6 +19,16 @@ from match import run_api_match
 
 NUM_HANDS = 5
 TIME_PER_HAND = 25
+
+
+def _repo_root() -> Path:
+    """Dev layout (tests/agent_test.py) or release zip (agent_test.py next to match.py)."""
+    here = Path(__file__).resolve().parent
+    if (here / "match.py").is_file():
+        return here
+    if (here.parent / "match.py").is_file():
+        return here.parent
+    return here.parent
 
 
 def _shutdown_process(proc: multiprocessing.Process, join_timeout: float = 10.0) -> None:
@@ -134,7 +144,7 @@ def run_test_match(test_agent_class: Agent, logger):
             f"http://127.0.0.1:{port1}",
             logger,
             num_hands=NUM_HANDS,
-            csv_path=f"./match_{test_agent_class.__name__}.csv",
+            csv_path=f"outputs/match_{test_agent_class.__name__}.csv",
         )
 
         return result
@@ -163,6 +173,10 @@ def main():
             - timeout_errors: int
             - passed: bool
     """
+    root = _repo_root()
+    os.chdir(root)
+    (root / "outputs").mkdir(exist_ok=True)
+
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     logger = getLogger(__name__)
     # Keep telemetry overhead low during verification runs.

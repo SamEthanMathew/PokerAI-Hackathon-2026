@@ -1,8 +1,17 @@
-"""Run a short match: ALPHANiT (bot0) vs default player (bot1)."""
+"""Run a short match: ALPHANiT (bot0) vs default player (bot1).
+
+Usage (from repo root):  python scripts/run_alphanit_vs_player.py
+"""
+import importlib
+import json
 import logging
 import multiprocessing
-import json
-import importlib
+import sys
+from pathlib import Path
+
+_REPO = Path(__file__).resolve().parents[1]
+if str(_REPO) not in sys.path:
+    sys.path.insert(0, str(_REPO))
 
 from match import run_api_match
 
@@ -16,7 +25,7 @@ def load_agent_class(file_path):
 
 
 def main():
-    with open("agent_config.json", "r") as f:
+    with open(_REPO / "config" / "agent_config.json", encoding="utf-8") as f:
         config = json.load(f)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")

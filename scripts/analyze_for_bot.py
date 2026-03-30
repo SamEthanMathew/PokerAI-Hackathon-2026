@@ -3,7 +3,7 @@ Data-driven analysis of match CSVs for ALPHANiT (Nit bot). Computes hand-type
 and value-bet stats, then writes logs/bot_profile.json and prints a report.
 Does not suggest widening pre-flop range (stay Nit).
 
-Usage:  python analyze_for_bot.py [csv_path ...]
+Usage:  python scripts/analyze_for_bot.py [csv_path ...]
         Default: glob logs/*.CSV
 """
 import ast

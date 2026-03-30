@@ -3,7 +3,7 @@ Analyze match CSV(s) for Ctrl+Alt+Defeat (our bot). Supports multiple files,
 infers "our team" from header, normalizes Pre-Flop/Preflop, and reports
 blind leak, folded premium pair, and value-left-on-table.
 
-Usage:  python analyze_logs.py [csv_path ...]
+Usage:  python scripts/analyze_logs.py [csv_path ...]
         Default: logs/M1.CSV logs/M2.CSV logs/M3.CSV logs/M4.CSV logs/M5.CSV
         With team name in header: "Team 0: Ctrl+Alt+Defeat" -> we are team 0
 """

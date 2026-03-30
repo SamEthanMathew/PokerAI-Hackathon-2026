@@ -1,7 +1,4 @@
-ile with one row per **action** (not per hand):
-
-- **Config:** `agent_config.json` → `match_settings.csv_output_path` (e.g. `./match.csv`).
-- **Contents:** `hand_number`, `street`, `act# Match data logging in the bot engine
+# Match data logging in the bot engine
 
 This doc explains **where** match data is logged and **how** to add or use it for any bot (including ALPHANiTV6/V7, DELTA V2, METAV5).
 
@@ -12,7 +9,10 @@ This doc explains **where** match data is logged and **how** to add or use it fo
 **File:** `match.py`  
 **When:** Every match run via `run.py` (or any caller of `run_api_match()`).
 
-The **match runner** writes a single CSV five_team`, `team_0_bankroll`, `team_1_bankroll`, `action_type`, `action_amount`, `action_keep_1`, `action_keep_2`, `team_0_cards`, `team_1_cards`, `board_cards`, `team_0_discarded`, `team_1_discarded`, `team_0_bet`, `team_1_bet`.
+The **match runner** writes a single CSV file with one row per **action** (not per hand):
+
+- **Config:** `config/agent_config.json` → `match_settings.csv_output_path` (e.g. `outputs/match.csv`).
+- **Contents:** `hand_number`, `street`, `active_team`, `team_0_bankroll`, `team_1_bankroll`, `action_type`, `action_amount`, `action_keep_1`, `action_keep_2`, `team_0_cards`, `team_1_cards`, `board_cards`, `team_0_discarded`, `team_1_discarded`, `team_0_bet`, `team_1_bet`, plus telemetry columns through `final_action_amount`.
 - **Written in:** `play_hand()` → `writer.writerow(current_state)` after each env.step().
 
 So **every** scrimmage (any two bots) produces this CSV. No bot code is required; it’s the engine’s log.
@@ -104,7 +104,7 @@ That way ALPHANiTV6/V7 (or any bot) can “log data as well” in a structured w
 
 | Source              | What is logged                          | Where                                      | When / which bot      |
 |---------------------|-----------------------------------------|--------------------------------------------|------------------------|
-| **match.py**        | One row per action (full state)         | CSV path from config (e.g. `match.csv`)    | Every match, any bots  |
+| **match.py**        | One row per action (full state)         | CSV path from config (e.g. `outputs/match.csv`) | Every match, any bots  |
 | **Agent base**      | Whatever bot writes with `self.logger`  | `agent_logs/match_{MATCH_ID}_{PLAYER_ID}.log` | Any bot that calls it  |
 | **METAV5**          | Mode, stats, RAISE/FOLD lines            | Same as Agent base                         | When METAV5 is used    |
 | **ALPHANiTV6/V7**   | Nothing (no logger calls)               | —                                          | Only engine CSV        |

@@ -2,8 +2,8 @@
 Analyze a match CSV and show where bot0 (ALPHANiT) is losing/winning chips
 and where it could improve.
 
-Usage:  python analyze_match.py [match_csv_path]
-        Default: ./match_50_hands.csv
+Usage:  python scripts/analyze_match.py [match_csv_path]
+        Default: outputs/match_50_hands.csv
 """
 import csv
 import sys
@@ -247,5 +247,5 @@ def analyze(path):
 
 
 if __name__ == "__main__":
-    csv_path = sys.argv[1] if len(sys.argv) > 1 else "./match_50_hands.csv"
+    csv_path = sys.argv[1] if len(sys.argv) > 1 else "outputs/match_50_hands.csv"
     analyze(csv_path)

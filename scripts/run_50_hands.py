@@ -1,12 +1,20 @@
 """
-Run a short match of 50 hands using agent_config.json.
+Run a short match of 50 hands using config/agent_config.json.
 Prints result and a compute-rules check (time per hand vs tournament limits).
+
+Usage (from repo root):  python scripts/run_50_hands.py
 """
+import importlib
 import json
 import logging
 import multiprocessing
-import importlib
+import sys
 import time
+from pathlib import Path
+
+_REPO = Path(__file__).resolve().parents[1]
+if str(_REPO) not in sys.path:
+    sys.path.insert(0, str(_REPO))
 
 import match as match_module
 from match import run_api_match
@@ -31,7 +39,8 @@ def main():
     match_module.time_used_0 = 0.0
     match_module.time_used_1 = 0.0
 
-    with open("agent_config.json", "r") as f:
+    (_REPO / "outputs").mkdir(exist_ok=True)
+    with open(_REPO / "config" / "agent_config.json", encoding="utf-8") as f:
         config = json.load(f)
 
     logging.basicConfig(
@@ -67,7 +76,7 @@ def main():
             f"http://localhost:{config['bot1']['port']}",
             logger,
             num_hands=NUM_HANDS,
-            csv_path="./match_50_hands.csv",
+            csv_path="outputs/match_50_hands.csv",
             team_0_name=bot0_class.__name__,
             team_1_name=bot1_class.__name__,
         )

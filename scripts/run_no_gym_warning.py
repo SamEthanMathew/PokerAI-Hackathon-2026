@@ -3,7 +3,7 @@ Run a module with the gym deprecation warning suppressed (so it runs first).
 
 Usage (equivalent to `python -m gto.generate_tables --board-sample 50 ...` but no gym message):
 
-    python run_no_gym_warning.py gto.generate_tables --board-sample 50 --board-sample-preflop 100 ...
+    python scripts/run_no_gym_warning.py gto.generate_tables --board-sample 50 --board-sample-preflop 100 ...
 
 Or set once in the shell and use -m as usual:
 
