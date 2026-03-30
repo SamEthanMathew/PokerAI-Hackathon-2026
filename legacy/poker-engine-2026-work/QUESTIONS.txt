@@ -1,0 +1,374 @@
+# JumpStreet Bot — Statistical Analysis Questions
+## Match 70807 vs super-quantum-frogtron-500M-params
+
+Final result: **-69 chips over 1000 hands**. 898 wins, 96 losses, 6 ties.
+
+---
+
+## 1. BANKROLL & P&L DYNAMICS
+
+1. Plot running_pnl over all 1000 hands. Where are the inflection points?
+2. What is the P&L per hand in each 50-hand bucket? Which buckets were catastrophic?
+3. What is the cumulative P&L from showdown hands only vs fold-induced wins only?
+4. What is the average pnl per hand when `large_swing=true` vs `large_swing=false`?
+5. What % of total losses came from hands 100–300 vs hands 0–100 vs hands 300+?
+6. What is the max drawdown (peak-to-trough) and at which hand numbers does it occur?
+7. What is the Sharpe-like ratio (mean pnl / std pnl) across different match phases?
+8. How does cumulative P&L correlate with `lead_ratio` over time?
+9. What is the distribution of pnl values? Is it bimodal (many small wins, few big losses)?
+10. What is the total chips won from fold-induced wins vs total chips lost at showdown?
+
+---
+
+## 2. SHOWDOWN vs FOLD ANALYSIS
+
+11. What is the showdown win rate (wins / total showdowns)?
+12. What is the average pot size at showdown vs average pot size when opponent folds?
+13. How many total chips were won at showdown vs how many were lost at showdown?
+14. What is the net P&L from showdown hands only?
+15. What is the net P&L from non-showdown (fold-induced) hands only?
+16. When we win at showdown, what is the average pot? When we lose at showdown, what is the average pot?
+17. Is there a correlation between pot size and showdown loss rate (do we lose bigger pots more)?
+18. In showdown losses, how often did we have `strength=monster` but still lost?
+19. What % of our total hand count went to showdown vs ended in a fold?
+20. What is the W/L ratio in showdowns where the pot exceeded 50 chips? 100 chips?
+
+---
+
+## 3. PREFLOP DECISION ANALYSIS
+
+21. What is the P&L breakdown by preflop `reason` (equity_raise, premium_standard_open, equity_call, premium_slowplay, fold_no_equity, etc.)?
+22. What is the average pot size and win rate for each preflop `reason`?
+23. What is the P&L for hands where `is_premium=true` vs `is_premium=false`?
+24. What is the P&L for hands where `is_premium_pair=true` vs other premium hands?
+25. When `reason=premium_slowplay`, what is the outcome distribution? Does slowplaying premiums actually make more than raising?
+26. What is the correlation between preflop `equity` and hand outcome (pnl)?
+27. Is there a threshold of preflop equity below which we consistently lose money?
+28. What is the win rate for hands where preflop equity is null (premium bypasses equity calc) vs when equity is calculated?
+29. How does preflop raise `amount` correlate with opponent fold rate at preflop?
+30. What is the optimal preflop raise size? Plot raise_amount → opponent_fold_probability.
+31. When `eq_gate` changes (0.48 early vs 0.28 late), does the looser gate produce worse results?
+32. What is the P&L for hands opened with RAISE vs CALL vs CHECK at preflop?
+33. How often does the opponent fold preflop to different raise sizes (buckets: 2-4, 5-8, 9-12, 13+)?
+34. What is the P&L for hands where `pressure_adj > 0` vs `pressure_adj = 0`?
+35. What is the P&L for hands where `preflop_defense_adj > 0` vs `= 0`?
+
+---
+
+## 4. POSITION ANALYSIS
+
+36. What is the total P&L from SB vs BB?
+37. What is the per-hand P&L from SB vs BB?
+38. What is the showdown win rate from SB vs BB?
+39. What is the fold-induced win rate from SB vs BB?
+40. What is the average pot size in SB hands vs BB hands?
+41. Do we play tighter or looser from each position (fold rate, raise rate)?
+42. What is the preflop raise frequency from SB vs BB?
+43. What is our VPIP (voluntarily put $ in pot) rate by position?
+
+---
+
+## 5. DISCARD STRATEGY ANALYSIS
+
+44. What is the average `chosen_equity` across all discard decisions?
+45. What is the correlation between `chosen_equity` and hand outcome?
+46. What is the P&L for hands where `equity_margin` (gap between rank 1 and rank 2) is < 0.05 vs > 0.05 vs > 0.15?
+47. When `equity_margin` is small (close call between keep combos), is our win rate worse?
+48. How often do we choose the rank 1 combo vs a lower-ranked combo?
+49. What is the average `chosen_equity` for winning hands vs losing hands?
+50. When `opp_discards_known=true`, what is our win rate vs when `opp_discards_known=false`?
+51. What is the P&L difference when we see opponent discards vs when we don't?
+52. Do we discard more aggressively (keep fewer cards) when we see opponent discards?
+53. What is the correlation between number of cards kept (action_keep_1, action_keep_2) and outcome?
+54. When we keep 2 cards (discard 3), what is our win rate vs keeping 1 card vs keeping 0?
+55. What is the distribution of `chosen_equity` values? Are there clusters?
+56. How does `chosen_equity` compare to actual showdown equity (when we get to showdown)?
+57. Track `opp_model_weights` over time — which weights change most and when?
+58. Do the `opp_model_weights` converge or oscillate?
+59. Is there a relationship between `opp_model_weights` stability and match performance?
+60. What is the average `equity_margin` in the first 300 hands vs the rest?
+
+---
+
+## 6. POSTFLOP EQUITY & TEXTURE ANALYSIS
+
+61. What is the correlation between `raw_equity` and hand outcome (win/loss)?
+62. What is the correlation between `adj_equity` and hand outcome?
+63. Which is a better predictor of outcome: `raw_equity` or `adj_equity`?
+64. What is the average `raw_equity - adj_equity` gap (how much does texture penalize us)?
+65. On showdown hands, what is the calibration: does adj_equity of X actually win X% of the time?
+66. What is the average `texture_adj` by street (flop, turn, river)?
+67. How often is `texture_adj` negative? What's the distribution?
+68. What is our P&L on hands where `texture_adj < -0.15` vs `texture_adj >= 0` vs `texture_adj > 0`?
+69. Break down P&L by `texture_breakdown` components: what's our record on monotone boards? Connected boards? Draw-heavy boards?
+70. When `texture_breakdown.monotone < -0.1`, what is our showdown win rate? Is the penalty justified?
+71. When `texture_breakdown.flush_inference < 0`, are we correctly identifying when the opponent has flush draws?
+72. What is the distribution of `texture_dampen_factor`? When is it 0 vs 1 and how does it affect results?
+73. On boards where `flush_outs > 5`, what is our win rate? Are we overvaluing or undervaluing flush potential?
+74. On boards where `straight_outs > 5`, what is our win rate?
+75. How does `flush_outs + straight_outs` (combined draw equity) correlate with outcome?
+
+---
+
+## 7. HAND STRENGTH CLASSIFICATION ANALYSIS
+
+76. What is the P&L breakdown by `strength` category (monster, strong, medium, draw, weak)?
+77. What is the P&L per hand by `hand_cat` (trips_plus, two_pair, one_pair, nothing)?
+78. When `strength=monster`, how often do we actually bet vs check?
+79. When `strength=monster` but `adj_equity < 0.48`, what is our action and outcome?
+80. How often does `strength=monster` but the hand loses at showdown?
+81. What is the win rate for `hand_cat=nothing` hands? (Are our bluffs profitable?)
+82. When `hand_cat=nothing` AND `has_draw=true`, what is the win rate vs `has_draw=false`?
+83. Compare the average pnl for monster hands where we bet vs monster hands where we check.
+84. What is the average pot we win when strength=monster vs the average pot we win when strength=draw?
+85. How often does `strength` upgrade between streets (e.g., medium on flop → monster on turn)?
+86. When strength upgrades between streets, do we capitalize with a bet?
+
+---
+
+## 8. BETTING & SIZING ANALYSIS
+
+87. What is the distribution of `final_action` by street (flop RAISE%, CHECK%, FOLD%, CALL%)?
+88. What is the average `final_amount` when we RAISE on flop vs turn vs river?
+89. What is our bet-to-pot ratio by street?
+90. When we bet, what % of pot do we bet on average? Does this change over the match?
+91. Does bet size correlate with win rate? (Do bigger bets win more or less often?)
+92. What is the opponent's fold rate vs our bet size (by street)?
+93. When `baseline_action != final_action` (baseline_changed=true), what happens to outcomes?
+94. How often does `baseline_changed=true` occur? What triggers it?
+95. What is the P&L when `baseline_action=aggressive` and `final_action=RAISE` vs when baseline is overridden?
+96. What is the average pot size on each street when we reach it?
+97. What is our check-raise frequency? (Check then raise when opponent bets)
+98. What is our continuation bet frequency (raise preflop then bet flop)?
+
+---
+
+## 9. SEMI-BLUFF & BLUFF ANALYSIS
+
+99. When `semi_bluff_fired=true`, what is the win rate?
+100. When `semi_bluff_fired=true`, what % of the time does opponent fold vs call vs raise?
+101. What is the net P&L from all hands where a semi-bluff was fired?
+102. On hands where `semi_bluff_fired=true` and opponent CALLS, what is the outcome?
+103. What is the average equity when we fire a semi-bluff? Is there a minimum equity that makes it profitable?
+104. On which streets are semi-bluffs most profitable (flop, turn, river)?
+105. How does `semi_bluff_freq_adj` change over the match? Does it trend toward firing more or fewer bluffs?
+106. When `hand_cat=nothing` and `has_draw=false`, do we ever bluff? What's the result?
+107. What is the `bluff_freq_adj` value over time? Is it increasing (opponent is folding more) or decreasing?
+108. Compare P&L of hands where we bluff (nothing hand, we bet) vs where we check with nothing.
+
+---
+
+## 10. THRESHOLD & DECISION BOUNDARY ANALYSIS
+
+109. What are the threshold values over the match (monster, strong, good, call)? Do they ever change?
+110. How many hands have `adj_equity` between the `good` threshold (0.48) and `strong` threshold (0.65)? What's their outcome?
+111. How many hands have `adj_equity` between `strong` (0.65) and `monster` (0.82)? What's their outcome?
+112. What is the P&L for hands just above each threshold vs just below?
+113. If we lowered the monster threshold from 0.82 to 0.65, how many additional hands would we have bet? What were their outcomes?
+114. If we lowered the good threshold from 0.48 to 0.35, what additional hands would we play? Were those hands actually winners?
+115. What is the "correct" threshold based on actual showdown data — at what adj_equity do we start winning > 50%?
+116. Is there a different optimal threshold per street?
+117. How much EV did we leave on the table by checking hands with adj_equity between 0.48 and 0.82?
+
+---
+
+## 11. EXPLOIT ADJUSTMENT ANALYSIS
+
+118. Plot each `exploit_adj_active` field over time (bluff_freq_adj, value_bet_size_adj, semi_bluff_freq_adj, probe_freq_adj, delayed_barrel_adj, hero_fold_adj, trap_freq_adj).
+119. Which exploit adjustments move the most during the match?
+120. Which exploit adjustments are always near zero (not doing anything)?
+121. Is there a correlation between exploit adjustment magnitude and P&L performance?
+122. When `bluff_freq_adj` is positive (we should bluff more), are we actually bluffing more?
+123. When `value_bet_size_adj` is negative (we should bet smaller for value), does our sizing actually decrease?
+124. Does `probe_freq_adj` correlate with how often we bet into a checking opponent?
+125. Does `delayed_barrel_adj` correlate with check-then-bet-next-street patterns?
+126. When `trap_freq_adj` is active, do we check more with strong hands? Does it work?
+127. Is `hero_fold_adj` ever positive enough to cause us to fold a hand we would normally play? What happens?
+128. Compare the early-game exploit state vs late-game exploit state — did the adjustments converge on a correct opponent model?
+
+---
+
+## 12. OPPONENT MODELING & PROFILE ANALYSIS
+
+129. Plot the `opp_profile_snapshot` fold_rates over time (every 25 hands). Are they accurate?
+130. What is the opponent's actual fold rate to small/medium/large bets on each street, measured from the CSV? Does it match the model?
+131. What is the opponent's actual `raise_vs_bet` rate from the CSV? Does the model match reality?
+132. What are the opponent's actual `avg_bet_sizes` from the CSV? Does the model match?
+133. What is `regime_shift` over time? Does it spike when the opponent changes strategy?
+134. Break down `shift_signals` — which signal (fold_pressure, aggression, sizing, showdown_honesty) moves first when the opponent adapts?
+135. What is `style_volatility` over time? Does it correlate with our P&L?
+136. The opponent's barrel_rates are 0.0 for turn and river throughout. Is the opponent really never barreling? Verify from CSV.
+137. What is the lag between the opponent changing strategy and our model detecting it?
+138. At the point where our P&L crashed (hands 100–300), what was the opponent model showing? Was it behind?
+
+---
+
+## 13. TIMING & PHASE ANALYSIS
+
+139. What is the P&L for `early_phase=true` vs `early_phase=false`?
+140. At what hand number does `early_phase` switch to false?
+141. What is the per-hand P&L in each game phase: hands 0-100, 100-200, 200-300, 300-500, 500-750, 750-1000?
+142. How does `budget_per_hand` change over time? Does it correlate with risk-taking?
+143. When `budget_per_hand` is high (late game, lots of time budget), are we spending more per hand?
+144. What is the average decision time (ts difference between events) early vs late?
+145. Is there a correlation between time spent per decision and hand outcome?
+146. How does `hands_remaining` pressure affect bet sizing and aggression?
+147. Compare the average pot size in the first 300 hands vs the last 700 hands.
+
+---
+
+## 14. COMEBACK MODE & URGENCY ANALYSIS
+
+148. At what hand number does `comeback_mode` activate?
+149. What is the per-hand P&L during `comeback_mode=true` vs `comeback_mode=false`?
+150. When `urgency > 0`, does our preflop raise frequency increase?
+151. When `urgency > 0`, does our postflop aggression increase?
+152. Does `urgency` actually change any downstream behavior (bet sizes, bluff frequency)?
+153. What is the P&L when `protecting_lead=true` vs `protecting_lead=false`?
+154. Does `protecting_lead` mode cause us to tighten up? Does tightening up help or hurt?
+155. When `comeback_mode=true`, is `pressure_adj` ever nonzero? If not, why does comeback mode exist?
+156. What would our P&L have been if comeback mode changed bet sizing to 2x normal?
+157. During comeback mode, we win +1 or +2 per hand. What is the maximum comeback possible at this rate vs deficit size?
+
+---
+
+## 15. OPPONENT ACTION PATTERN ANALYSIS (from CSV)
+
+158. What is the opponent's overall VPIP (voluntarily puts chips in pot)?
+159. What is the opponent's preflop fold rate vs our open raise?
+160. What is the opponent's preflop 3-bet frequency?
+161. What is the opponent's fold-to-3bet rate?
+162. How often does the opponent check vs bet on each street?
+163. What is the opponent's average bet size on each street (from CSV)?
+164. How often does the opponent raise vs call vs fold when facing our bet on each street?
+165. What is the opponent's aggression factor (bets+raises / calls) per street?
+166. Does the opponent's strategy change after hand 300? Quantify the shift in fold rate, bet rate, etc.
+167. What hands does the opponent show at showdown? What is their average hand strength when they go to showdown?
+168. How often does the opponent bluff (show nothing/weak hand at showdown when they bet)?
+169. What is the opponent's c-bet frequency (raises preflop then bets flop)?
+170. What is the opponent's turn and river barreling frequency?
+
+---
+
+## 16. CARD & BOARD ANALYSIS
+
+171. What is our win rate when we hold an Ace in our final 2-card hand?
+172. What is our win rate when we hold a pocket pair in our final 2-card hand?
+173. What is our win rate when we hold suited cards vs offsuit?
+174. What is our win rate when we hold connected cards (within 2 ranks)?
+175. Does the number of cards we discard (3 always?) correlate with outcome?
+176. On monotone flops, what is our win rate?
+177. On connected flops (three cards within 4 ranks), what is our win rate?
+178. On paired boards, what is our win rate?
+179. When we have a flush draw (flush_outs ≥ 4), how often does it complete? Do we bet correctly?
+180. When we have a straight draw (straight_outs ≥ 4), how often does it complete?
+181. What is the average number of `flush_outs + straight_outs` for winning hands vs losing hands?
+
+---
+
+## 17. STREET-BY-STREET PROGRESSION ANALYSIS
+
+182. What % of hands reach flop? Turn? River?
+183. What is the average pot at each street?
+184. What is the most common action sequence pattern (e.g., raise-call-check-check-check-check)?
+185. On hands that reach showdown, what is the average number of total bets/raises?
+186. Do we win more on hands that end on the flop vs turn vs river?
+187. What is the pot contribution by street? (How much is bet pre-flop vs flop vs turn vs river?)
+188. On hands where we check flop and check turn, do we ever bet river? What happens?
+189. On hands where we bet flop and get called, do we barrel turn? What's the success rate?
+190. What is the "give up" rate — we bet one street then check the rest?
+191. How does `opp_last_action` on each street correlate with our decision and outcome?
+
+---
+
+## 18. BIG POT ANALYSIS (High Stakes Hands)
+
+192. List all hands where the final pot exceeded 50 chips. What is our record in these?
+193. List all hands where the final pot exceeded 100 chips. What is our record?
+194. What is our average adj_equity in big pot hands vs small pot hands?
+195. In big pots we lost, what was our hand strength? Were these bad beats or bad calls?
+196. In big pots, are we the one building the pot (raising) or is the opponent?
+197. What is the preflop pot-to-final-pot ratio in big pot hands? (How much escalation happens postflop?)
+198. What is the street where the pot becomes "big" (crosses 50 chips)? Is it preflop or postflop?
+199. In hands where preflop gets to 50+ chips, what is our win rate?
+200. How many big pot hands involve the opponent 3-betting or 4-betting preflop?
+
+---
+
+## 19. FOLD DECISION ANALYSIS
+
+201. When our bot folds (`we_folded=true`), what was the `equity` at time of fold?
+202. When the opponent folds, at what point in the hand do they fold (preflop, flop, turn, river)?
+203. What is the average pot we pick up when the opponent folds on each street?
+204. How often do we fold preflop? Is it too often or too little?
+205. When `reason=fold_no_equity`, what was the actual equity? Were these correct folds?
+206. When we fold and the opponent would have shown a weak hand (can we infer?), did we fold incorrectly?
+207. What is our fold-to-opponent-bet rate on each street?
+208. What is the opponent's fold-to-our-bet rate on each street (from CSV)?
+209. How does our fold rate change from early_phase to late game?
+210. After hand 300, the opponent appears to fold almost everything. At what exact hand does this begin?
+
+---
+
+## 20. MISSED VALUE ANALYSIS
+
+211. On hands where `strength=monster` and we checked all streets, what was the pot? How much did we win?
+212. How many chips did we leave on the table by checking with monster hands? (Estimate: if we bet 50% pot on each checked street with a monster)
+213. When `raw_equity > 0.7` and we check, what is the expected lost value?
+214. On how many hands did we have `adj_equity > 0.65` (strong+) and check?
+215. Compare monster hands where we bet vs monster hands where we checked: average pnl?
+216. On showdown wins, what was the final pot? Could it have been bigger if we bet?
+217. How many river checks with monster hands resulted in winning just the blinds/small pot?
+218. When we bet monsters on the flop, how often does the opponent fold vs continue?
+219. Is there a pattern where our monsters are on scary boards (monotone, connected) and we check too much?
+220. What is the correlation between `texture_adj` and checking with monster hands?
+
+---
+
+## 21. CROSS-VARIABLE CORRELATIONS
+
+221. Position × strength → P&L (are we better at extracting value with monsters from SB or BB?)
+222. Position × preflop_reason → P&L
+223. Street × hand_cat → P&L (is one_pair profitable on flop but not river?)
+224. equity_margin × outcome (do tight discard decisions produce worse results?)
+225. chosen_equity × pot_size → outcome (does high discard equity in big pots perform differently?)
+226. opp_discards_known × chosen_equity → outcome (do we discard better with info?)
+227. comeback_mode × final_action → outcome (do we change behavior in comeback mode?)
+228. urgency × raise_amount → outcome (does urgency make us size differently?)
+229. early_phase × strength × action → P&L (do we play monsters differently early vs late?)
+230. semi_bluff_fired × street × outcome (are flop semi-bluffs more profitable than turn semi-bluffs?)
+231. texture_adj × strength × action → outcome (three-way interaction: on scary boards with strong hands, what do we do and does it work?)
+232. raw_equity × adj_equity × outcome (when texture adjustments are large, are outcomes actually worse?)
+233. has_draw × final_action → outcome (do we play draws correctly?)
+234. flush_outs × bet_decision → outcome (do more flush outs predict better semi-bluff success?)
+235. pot_size × adj_equity → action (do we become more passive in big pots?)
+
+---
+
+## 22. TEMPORAL PATTERN ANALYSIS
+
+236. Plot rolling 20-hand P&L. Are there streaks? Are they random or structural?
+237. After a large loss (pnl < -50), what happens in the next 10 hands? Do we tilt?
+238. After a large win, what happens in the next 10 hands? Do we get complacent?
+239. Is there a detectable pattern to when the opponent plays vs auto-folds? (Timestamps show this clearly post-300)
+240. What is our decisions-per-second rate over time? Does it correlate with quality?
+241. At what hand number do exploit adjustments stabilize?
+242. Is there a correlation between opp_model_weights convergence and performance improvement?
+243. What is the entropy of our action distribution over time? Do we become predictable?
+244. Does the opponent's strategy correlate with their bankroll? (Do they get more aggressive when winning?)
+245. What is the autocorrelation of our hand outcomes? (Are wins/losses clustered or random?)
+
+---
+
+## 23. WHAT-IF SIMULATIONS
+
+246. If we bet 50% pot on every street where strength=monster and adj_equity > 0.30, what would our total P&L change be?
+247. If we never slowplayed preflop (always raised premiums), what would change?
+248. If we used raw_equity instead of adj_equity for decisions, how many action changes would there be?
+249. If we set the monster threshold to 0.50 instead of 0.82, how many more bets would we make?
+250. If we doubled bet sizes when comeback_mode=true, what would the theoretical P&L impact be?
+251. If we raised preflop to 4x instead of variable amounts, would fold rates change favorably?
+252. If we never fired semi-bluffs, what would the net P&L change be?
+253. If we always bet the river with two_pair or better, how many extra chips would we win?
+254. If texture_adj was halved (less conservative), how many more value bets would we make?
+255. If we detected the opponent's collapse at hand 300 and switched to max aggression, what's the ceiling?

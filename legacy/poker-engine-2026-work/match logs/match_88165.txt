@@ -1,0 +1,30 @@
+2026-03-21 23:56:24,779 - match_88165 - INFO - Starting agents
+2026-03-21 23:56:24,783 - match_88165 - INFO - Sending match start notification
+2026-03-21 23:56:24,842 - match_88165 - INFO - Starting match
+2026-03-21 23:56:24,848 - match_88165 - INFO - Backing off for 1 seconds before retry 1
+2026-03-21 23:56:25,852 - match_88165 - INFO - Backing off for 1 seconds before retry 1
+2026-03-21 23:56:27,650 - match_88165 - INFO - Hand number: 0, Pulp Ficshun bankroll: -100, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 100
+2026-03-21 23:56:45,932 - match_88165 - INFO - Hand number: 50, Pulp Ficshun bankroll: -586, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 586
+2026-03-21 23:57:00,040 - match_88165 - INFO - Hand number: 100, Pulp Ficshun bankroll: -978, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 978
+2026-03-21 23:57:11,843 - match_88165 - INFO - Hand number: 150, Pulp Ficshun bankroll: -817, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 817
+2026-03-21 23:57:25,264 - match_88165 - INFO - Hand number: 200, Pulp Ficshun bankroll: -884, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 884
+2026-03-21 23:57:37,924 - match_88165 - INFO - Hand number: 250, Pulp Ficshun bankroll: -1155, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 1155
+2026-03-21 23:57:39,439 - match_88165 - INFO - Hand number: 300, Pulp Ficshun bankroll: -1080, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 1080
+2026-03-21 23:57:40,941 - match_88165 - INFO - Hand number: 350, Pulp Ficshun bankroll: -1005, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 1005
+2026-03-21 23:57:43,021 - match_88165 - INFO - Hand number: 400, Pulp Ficshun bankroll: -930, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 930
+2026-03-21 23:57:44,225 - match_88165 - INFO - Hand number: 450, Pulp Ficshun bankroll: -859, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 859
+2026-03-21 23:57:45,749 - match_88165 - INFO - Hand number: 500, Pulp Ficshun bankroll: -784, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 784
+2026-03-21 23:57:47,015 - match_88165 - INFO - Hand number: 550, Pulp Ficshun bankroll: -712, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 712
+2026-03-21 23:57:48,063 - match_88165 - INFO - Hand number: 600, Pulp Ficshun bankroll: -637, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 637
+2026-03-21 23:57:49,088 - match_88165 - INFO - Hand number: 650, Pulp Ficshun bankroll: -562, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 562
+2026-03-21 23:57:50,135 - match_88165 - INFO - Hand number: 700, Pulp Ficshun bankroll: -487, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 487
+2026-03-21 23:57:51,289 - match_88165 - INFO - Hand number: 750, Pulp Ficshun bankroll: -412, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 412
+2026-03-21 23:57:52,330 - match_88165 - INFO - Hand number: 800, Pulp Ficshun bankroll: -337, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 337
+2026-03-21 23:57:53,622 - match_88165 - INFO - Hand number: 850, Pulp Ficshun bankroll: -262, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 262
+2026-03-21 23:57:55,625 - match_88165 - INFO - Hand number: 900, Pulp Ficshun bankroll: -187, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 187
+2026-03-21 23:57:57,322 - match_88165 - INFO - Hand number: 950, Pulp Ficshun bankroll: -118, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 118
+2026-03-21 23:57:58,470 - match_88165 - INFO - All hands completed
+2026-03-21 23:57:58,471 - match_88165 - INFO - Final results - Pulp Ficshun bankroll: -48, semielastic-super-quantum-frogtron-1B-quantized_v2 bankroll: 48
+2026-03-21 23:57:58,471 - match_88165 - INFO - Time used - Pulp Ficshun: 25.09 seconds, semielastic-super-quantum-frogtron-1B-quantized_v2: 57.78 seconds
+2026-03-21 23:57:58,471 - match_88165 - INFO - Time limit: 1500 seconds
+2026-03-21 23:57:58,471 - match_88165 - INFO - Terminating agents

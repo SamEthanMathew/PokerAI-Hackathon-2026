@@ -1,0 +1,29 @@
+2026-03-21 23:56:27,536 - match_88166 - INFO - Starting agents
+2026-03-21 23:56:27,541 - match_88166 - INFO - Sending match start notification
+2026-03-21 23:56:27,598 - match_88166 - INFO - Starting match
+2026-03-21 23:56:27,604 - match_88166 - INFO - Backing off for 1 seconds before retry 1
+2026-03-21 23:56:29,264 - match_88166 - INFO - Hand number: 0, Pulp Ficshun bankroll: 0, Me & Claude <3 bankroll: 0
+2026-03-21 23:56:51,873 - match_88166 - INFO - Hand number: 50, Pulp Ficshun bankroll: -275, Me & Claude <3 bankroll: 275
+2026-03-21 23:57:06,735 - match_88166 - INFO - Hand number: 100, Pulp Ficshun bankroll: -451, Me & Claude <3 bankroll: 451
+2026-03-21 23:57:15,028 - match_88166 - INFO - Hand number: 150, Pulp Ficshun bankroll: -485, Me & Claude <3 bankroll: 485
+2026-03-21 23:57:32,236 - match_88166 - INFO - Hand number: 200, Pulp Ficshun bankroll: -303, Me & Claude <3 bankroll: 303
+2026-03-21 23:57:45,840 - match_88166 - INFO - Hand number: 250, Pulp Ficshun bankroll: -375, Me & Claude <3 bankroll: 375
+2026-03-21 23:58:02,303 - match_88166 - INFO - Hand number: 300, Pulp Ficshun bankroll: -734, Me & Claude <3 bankroll: 734
+2026-03-21 23:58:21,367 - match_88166 - INFO - Hand number: 350, Pulp Ficshun bankroll: -18, Me & Claude <3 bankroll: 18
+2026-03-21 23:58:44,996 - match_88166 - INFO - Hand number: 400, Pulp Ficshun bankroll: -391, Me & Claude <3 bankroll: 391
+2026-03-21 23:59:03,284 - match_88166 - INFO - Hand number: 450, Pulp Ficshun bankroll: -428, Me & Claude <3 bankroll: 428
+2026-03-21 23:59:19,731 - match_88166 - INFO - Hand number: 500, Pulp Ficshun bankroll: -617, Me & Claude <3 bankroll: 617
+2026-03-21 23:59:41,627 - match_88166 - INFO - Hand number: 550, Pulp Ficshun bankroll: -1091, Me & Claude <3 bankroll: 1091
+2026-03-21 23:59:59,686 - match_88166 - INFO - Hand number: 600, Pulp Ficshun bankroll: -1466, Me & Claude <3 bankroll: 1466
+2026-03-22 00:00:20,314 - match_88166 - INFO - Hand number: 650, Pulp Ficshun bankroll: -2022, Me & Claude <3 bankroll: 2022
+2026-03-22 00:00:35,603 - match_88166 - INFO - Hand number: 700, Pulp Ficshun bankroll: -2145, Me & Claude <3 bankroll: 2145
+2026-03-22 00:00:48,616 - match_88166 - INFO - Hand number: 750, Pulp Ficshun bankroll: -2108, Me & Claude <3 bankroll: 2108
+2026-03-22 00:01:05,553 - match_88166 - INFO - Hand number: 800, Pulp Ficshun bankroll: -2164, Me & Claude <3 bankroll: 2164
+2026-03-22 00:01:20,029 - match_88166 - INFO - Hand number: 850, Pulp Ficshun bankroll: -2371, Me & Claude <3 bankroll: 2371
+2026-03-22 00:01:34,797 - match_88166 - INFO - Hand number: 900, Pulp Ficshun bankroll: -2131, Me & Claude <3 bankroll: 2131
+2026-03-22 00:01:54,795 - match_88166 - INFO - Hand number: 950, Pulp Ficshun bankroll: -2225, Me & Claude <3 bankroll: 2225
+2026-03-22 00:02:14,092 - match_88166 - INFO - All hands completed
+2026-03-22 00:02:14,092 - match_88166 - INFO - Final results - Pulp Ficshun bankroll: -2122, Me & Claude <3 bankroll: 2122
+2026-03-22 00:02:14,092 - match_88166 - INFO - Time used - Pulp Ficshun: 59.55 seconds, Me & Claude <3: 272.46 seconds
+2026-03-22 00:02:14,092 - match_88166 - INFO - Time limit: 1500 seconds
+2026-03-22 00:02:14,092 - match_88166 - INFO - Terminating agents
