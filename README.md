@@ -48,7 +48,9 @@ Python **3.12+** is required (`pyproject.toml`).
 | `poker-bot-trainer/` | Next.js trainer UI and training scripts (from genesis line). |
 | `tests/`, `scripts/` | Tests and utilities. |
 
-`main` merges the histories of **poker-engine-2026-work** (under `legacy/…`) and feature branches **genesis-v1**, **ML/RL**, **libratus-agent**, **monte-carlo-analysis**, **omimax**, plus work branch **sigedit** (integrated via the legacy import and merge).
+**Consolidation:** All team work lives on **`main`**. Former feature branches (`genesis-v1`, `ML/RL`, `libratus-agent`, `monte-carlo-analysis`, `omimax`, `genesis`, and the separate `poker-engine-2026-work` repo under `legacy/…`, including **sigedit**) were merged here; those remote branches are removed from GitHub to avoid drift.
+
+**`.claude/`:** Local assistant/IDE config is not tracked (see `.gitignore`) and was removed from Git history in a one-time cleanup—do not commit `.claude` directories.
 
 ## Running tests
 

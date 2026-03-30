@@ -168,6 +168,10 @@ cython_debug/
 # Poker engine logs
 agent_logs/
 
+# Local Claude / IDE assistant config (never commit)
+.claude/
+**/.claude/
+
 # Libratus blueprint (too large for git; regenerate with train_libratus.py)
 agents/libratus/blueprint_strategy.json
 # Trainer app dependencies/build cache
