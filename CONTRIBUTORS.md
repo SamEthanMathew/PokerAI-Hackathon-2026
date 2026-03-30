@@ -4,8 +4,8 @@ People who contributed to this repository.
 
 | Name | Role / contribution |
 |------|---------------------|
-| [Sam Ethan Mathew](https://github.com/SamEthanMathew) | Project lead, engine & submission work, repo structure and documentation |
-| [Rudy](https://github.com/rudabot) (@rudabot) | Co-contributor — bot strategy, tooling, and collaboration on the codebase |
+| [Sam Ethan Mathew](https://github.com/SamEthanMathew) | strategy, engine & submission work, repo structure and documentation, AI/ML Bot training |
+| [Rudy](https://github.com/rudabot) (@rudabot) | bot strategy, tooling, and collaboration on the codebase, bot tuning |
 
 ## How to update
 
