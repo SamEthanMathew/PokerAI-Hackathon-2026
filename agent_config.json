@@ -1,6 +1,6 @@
 {
     "bot0": {
-        "file_path": "submission.Libratus.PlayerAgent",
+        "file_path": "agents.libratus_agent.LibratusAgent",
         "port": 8000,
         "player_id": "bot0"
     },
