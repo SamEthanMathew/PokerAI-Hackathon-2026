@@ -1,0 +1,30 @@
+2026-03-21 04:14:38,979 - match_75338 - INFO - Starting agents
+2026-03-21 04:14:38,984 - match_75338 - INFO - Sending match start notification
+2026-03-21 04:14:39,044 - match_75338 - INFO - Starting match
+2026-03-21 04:14:39,052 - match_75338 - INFO - Backing off for 1 seconds before retry 1
+2026-03-21 04:14:40,053 - match_75338 - INFO - Backing off for 2 seconds before retry 2
+2026-03-21 04:14:42,061 - match_75338 - INFO - Hand number: 0, Attention Is All You Need bankroll: -1, Ctrl+Alt+Defeat bankroll: 1
+2026-03-21 04:14:58,255 - match_75338 - INFO - Hand number: 50, Attention Is All You Need bankroll: 141, Ctrl+Alt+Defeat bankroll: -141
+2026-03-21 04:15:15,780 - match_75338 - INFO - Hand number: 100, Attention Is All You Need bankroll: 354, Ctrl+Alt+Defeat bankroll: -354
+2026-03-21 04:15:27,914 - match_75338 - INFO - Hand number: 150, Attention Is All You Need bankroll: 199, Ctrl+Alt+Defeat bankroll: -199
+2026-03-21 04:15:41,830 - match_75338 - INFO - Hand number: 200, Attention Is All You Need bankroll: 479, Ctrl+Alt+Defeat bankroll: -479
+2026-03-21 04:16:01,454 - match_75338 - INFO - Hand number: 250, Attention Is All You Need bankroll: 196, Ctrl+Alt+Defeat bankroll: -196
+2026-03-21 04:16:17,746 - match_75338 - INFO - Hand number: 300, Attention Is All You Need bankroll: 92, Ctrl+Alt+Defeat bankroll: -92
+2026-03-21 04:16:35,024 - match_75338 - INFO - Hand number: 350, Attention Is All You Need bankroll: 233, Ctrl+Alt+Defeat bankroll: -233
+2026-03-21 04:16:54,802 - match_75338 - INFO - Hand number: 400, Attention Is All You Need bankroll: 80, Ctrl+Alt+Defeat bankroll: -80
+2026-03-21 04:17:15,607 - match_75338 - INFO - Hand number: 450, Attention Is All You Need bankroll: 522, Ctrl+Alt+Defeat bankroll: -522
+2026-03-21 04:17:34,937 - match_75338 - INFO - Hand number: 500, Attention Is All You Need bankroll: 98, Ctrl+Alt+Defeat bankroll: -98
+2026-03-21 04:17:50,174 - match_75338 - INFO - Hand number: 550, Attention Is All You Need bankroll: 41, Ctrl+Alt+Defeat bankroll: -41
+2026-03-21 04:18:03,543 - match_75338 - INFO - Hand number: 600, Attention Is All You Need bankroll: 185, Ctrl+Alt+Defeat bankroll: -185
+2026-03-21 04:18:19,870 - match_75338 - INFO - Hand number: 650, Attention Is All You Need bankroll: -47, Ctrl+Alt+Defeat bankroll: 47
+2026-03-21 04:18:38,326 - match_75338 - INFO - Hand number: 700, Attention Is All You Need bankroll: 189, Ctrl+Alt+Defeat bankroll: -189
+2026-03-21 04:18:54,693 - match_75338 - INFO - Hand number: 750, Attention Is All You Need bankroll: 252, Ctrl+Alt+Defeat bankroll: -252
+2026-03-21 04:18:58,029 - match_75338 - INFO - Hand number: 800, Attention Is All You Need bankroll: 392, Ctrl+Alt+Defeat bankroll: -392
+2026-03-21 04:18:58,924 - match_75338 - INFO - Hand number: 850, Attention Is All You Need bankroll: 324, Ctrl+Alt+Defeat bankroll: -324
+2026-03-21 04:18:59,935 - match_75338 - INFO - Hand number: 900, Attention Is All You Need bankroll: 249, Ctrl+Alt+Defeat bankroll: -249
+2026-03-21 04:19:01,168 - match_75338 - INFO - Hand number: 950, Attention Is All You Need bankroll: 176, Ctrl+Alt+Defeat bankroll: -176
+2026-03-21 04:19:02,424 - match_75338 - INFO - All hands completed
+2026-03-21 04:19:02,424 - match_75338 - INFO - Final results - Attention Is All You Need bankroll: 102, Ctrl+Alt+Defeat bankroll: -102
+2026-03-21 04:19:02,424 - match_75338 - INFO - Time used - Attention Is All You Need: 236.71 seconds, Ctrl+Alt+Defeat: 14.32 seconds
+2026-03-21 04:19:02,424 - match_75338 - INFO - Time limit: 1500 seconds
+2026-03-21 04:19:02,424 - match_75338 - INFO - Terminating agents

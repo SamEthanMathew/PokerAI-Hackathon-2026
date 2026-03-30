@@ -1,0 +1,29 @@
+2026-03-21 07:24:45,047 - match_77401 - INFO - Starting agents
+2026-03-21 07:24:45,051 - match_77401 - INFO - Sending match start notification
+2026-03-21 07:24:45,108 - match_77401 - INFO - Starting match
+2026-03-21 07:24:45,114 - match_77401 - INFO - Backing off for 1 seconds before retry 1
+2026-03-21 07:24:46,299 - match_77401 - INFO - Hand number: 0, Poker? I Barely Know Her bankroll: 8, Ctrl+Alt+Defeat bankroll: -8
+2026-03-21 07:24:54,930 - match_77401 - INFO - Hand number: 50, Poker? I Barely Know Her bankroll: 419, Ctrl+Alt+Defeat bankroll: -419
+2026-03-21 07:25:03,580 - match_77401 - INFO - Hand number: 100, Poker? I Barely Know Her bankroll: 144, Ctrl+Alt+Defeat bankroll: -144
+2026-03-21 07:25:12,061 - match_77401 - INFO - Hand number: 150, Poker? I Barely Know Her bankroll: 42, Ctrl+Alt+Defeat bankroll: -42
+2026-03-21 07:25:21,350 - match_77401 - INFO - Hand number: 200, Poker? I Barely Know Her bankroll: 186, Ctrl+Alt+Defeat bankroll: -186
+2026-03-21 07:25:30,640 - match_77401 - INFO - Hand number: 250, Poker? I Barely Know Her bankroll: -99, Ctrl+Alt+Defeat bankroll: 99
+2026-03-21 07:25:38,801 - match_77401 - INFO - Hand number: 300, Poker? I Barely Know Her bankroll: 129, Ctrl+Alt+Defeat bankroll: -129
+2026-03-21 07:25:47,676 - match_77401 - INFO - Hand number: 350, Poker? I Barely Know Her bankroll: -401, Ctrl+Alt+Defeat bankroll: 401
+2026-03-21 07:25:56,696 - match_77401 - INFO - Hand number: 400, Poker? I Barely Know Her bankroll: 139, Ctrl+Alt+Defeat bankroll: -139
+2026-03-21 07:26:05,759 - match_77401 - INFO - Hand number: 450, Poker? I Barely Know Her bankroll: 747, Ctrl+Alt+Defeat bankroll: -747
+2026-03-21 07:26:06,779 - match_77401 - INFO - Hand number: 500, Poker? I Barely Know Her bankroll: 782, Ctrl+Alt+Defeat bankroll: -782
+2026-03-21 07:26:07,204 - match_77401 - INFO - Hand number: 550, Poker? I Barely Know Her bankroll: 707, Ctrl+Alt+Defeat bankroll: -707
+2026-03-21 07:26:07,638 - match_77401 - INFO - Hand number: 600, Poker? I Barely Know Her bankroll: 635, Ctrl+Alt+Defeat bankroll: -635
+2026-03-21 07:26:08,079 - match_77401 - INFO - Hand number: 650, Poker? I Barely Know Her bankroll: 560, Ctrl+Alt+Defeat bankroll: -560
+2026-03-21 07:26:08,514 - match_77401 - INFO - Hand number: 700, Poker? I Barely Know Her bankroll: 485, Ctrl+Alt+Defeat bankroll: -485
+2026-03-21 07:26:08,955 - match_77401 - INFO - Hand number: 750, Poker? I Barely Know Her bankroll: 410, Ctrl+Alt+Defeat bankroll: -410
+2026-03-21 07:26:09,392 - match_77401 - INFO - Hand number: 800, Poker? I Barely Know Her bankroll: 335, Ctrl+Alt+Defeat bankroll: -335
+2026-03-21 07:26:09,833 - match_77401 - INFO - Hand number: 850, Poker? I Barely Know Her bankroll: 260, Ctrl+Alt+Defeat bankroll: -260
+2026-03-21 07:26:10,254 - match_77401 - INFO - Hand number: 900, Poker? I Barely Know Her bankroll: 185, Ctrl+Alt+Defeat bankroll: -185
+2026-03-21 07:26:10,676 - match_77401 - INFO - Hand number: 950, Poker? I Barely Know Her bankroll: 110, Ctrl+Alt+Defeat bankroll: -110
+2026-03-21 07:26:11,090 - match_77401 - INFO - All hands completed
+2026-03-21 07:26:11,091 - match_77401 - INFO - Final results - Poker? I Barely Know Her bankroll: 36, Ctrl+Alt+Defeat bankroll: -36
+2026-03-21 07:26:11,091 - match_77401 - INFO - Time used - Poker? I Barely Know Her: 61.87 seconds, Ctrl+Alt+Defeat: 13.70 seconds
+2026-03-21 07:26:11,091 - match_77401 - INFO - Time limit: 1500 seconds
+2026-03-21 07:26:11,091 - match_77401 - INFO - Terminating agents

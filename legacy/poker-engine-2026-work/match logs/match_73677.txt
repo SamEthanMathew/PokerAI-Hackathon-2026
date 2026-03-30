@@ -1,0 +1,29 @@
+2026-03-21 01:39:44,387 - match_73677 - INFO - Starting agents
+2026-03-21 01:39:44,392 - match_73677 - INFO - Sending match start notification
+2026-03-21 01:39:44,454 - match_73677 - INFO - Starting match
+2026-03-21 01:39:44,462 - match_73677 - INFO - Backing off for 1 seconds before retry 1
+2026-03-21 01:39:45,680 - match_73677 - INFO - Hand number: 0, What's for Dinner bankroll: -13, Ctrl+Alt+Defeat bankroll: 13
+2026-03-21 01:39:55,147 - match_73677 - INFO - Hand number: 50, What's for Dinner bankroll: 346, Ctrl+Alt+Defeat bankroll: -346
+2026-03-21 01:40:04,008 - match_73677 - INFO - Hand number: 100, What's for Dinner bankroll: 25, Ctrl+Alt+Defeat bankroll: -25
+2026-03-21 01:40:14,695 - match_73677 - INFO - Hand number: 150, What's for Dinner bankroll: -44, Ctrl+Alt+Defeat bankroll: 44
+2026-03-21 01:40:22,759 - match_73677 - INFO - Hand number: 200, What's for Dinner bankroll: 393, Ctrl+Alt+Defeat bankroll: -393
+2026-03-21 01:40:32,807 - match_73677 - INFO - Hand number: 250, What's for Dinner bankroll: 438, Ctrl+Alt+Defeat bankroll: -438
+2026-03-21 01:40:41,934 - match_73677 - INFO - Hand number: 300, What's for Dinner bankroll: 435, Ctrl+Alt+Defeat bankroll: -435
+2026-03-21 01:40:51,407 - match_73677 - INFO - Hand number: 350, What's for Dinner bankroll: 306, Ctrl+Alt+Defeat bankroll: -306
+2026-03-21 01:41:00,498 - match_73677 - INFO - Hand number: 400, What's for Dinner bankroll: 109, Ctrl+Alt+Defeat bankroll: -109
+2026-03-21 01:41:09,829 - match_73677 - INFO - Hand number: 450, What's for Dinner bankroll: 343, Ctrl+Alt+Defeat bankroll: -343
+2026-03-21 01:41:19,451 - match_73677 - INFO - Hand number: 500, What's for Dinner bankroll: 333, Ctrl+Alt+Defeat bankroll: -333
+2026-03-21 01:41:30,318 - match_73677 - INFO - Hand number: 550, What's for Dinner bankroll: 711, Ctrl+Alt+Defeat bankroll: -711
+2026-03-21 01:41:40,340 - match_73677 - INFO - Hand number: 600, What's for Dinner bankroll: 825, Ctrl+Alt+Defeat bankroll: -825
+2026-03-21 01:41:50,731 - match_73677 - INFO - Hand number: 650, What's for Dinner bankroll: 668, Ctrl+Alt+Defeat bankroll: -668
+2026-03-21 01:42:01,385 - match_73677 - INFO - Hand number: 700, What's for Dinner bankroll: 977, Ctrl+Alt+Defeat bankroll: -977
+2026-03-21 01:42:11,329 - match_73677 - INFO - Hand number: 750, What's for Dinner bankroll: 782, Ctrl+Alt+Defeat bankroll: -782
+2026-03-21 01:42:22,382 - match_73677 - INFO - Hand number: 800, What's for Dinner bankroll: 870, Ctrl+Alt+Defeat bankroll: -870
+2026-03-21 01:42:32,240 - match_73677 - INFO - Hand number: 850, What's for Dinner bankroll: 974, Ctrl+Alt+Defeat bankroll: -974
+2026-03-21 01:42:42,361 - match_73677 - INFO - Hand number: 900, What's for Dinner bankroll: 920, Ctrl+Alt+Defeat bankroll: -920
+2026-03-21 01:42:52,843 - match_73677 - INFO - Hand number: 950, What's for Dinner bankroll: 789, Ctrl+Alt+Defeat bankroll: -789
+2026-03-21 01:43:02,973 - match_73677 - INFO - All hands completed
+2026-03-21 01:43:02,973 - match_73677 - INFO - Final results - What's for Dinner bankroll: 991, Ctrl+Alt+Defeat bankroll: -991
+2026-03-21 01:43:02,973 - match_73677 - INFO - Time used - What's for Dinner: 155.54 seconds, Ctrl+Alt+Defeat: 25.66 seconds
+2026-03-21 01:43:02,973 - match_73677 - INFO - Time limit: 1500 seconds
+2026-03-21 01:43:02,974 - match_73677 - INFO - Terminating agents

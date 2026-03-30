@@ -1,0 +1,32 @@
+2026-03-21 07:24:43,991 - match_77364 - INFO - Starting agents
+2026-03-21 07:24:43,997 - match_77364 - INFO - Sending match start notification
+2026-03-21 07:24:44,064 - match_77364 - INFO - Starting match
+2026-03-21 07:24:44,073 - match_77364 - INFO - Backing off for 1 seconds before retry 1
+2026-03-21 07:24:45,074 - match_77364 - INFO - Backing off for 2 seconds before retry 2
+2026-03-21 07:24:47,075 - match_77364 - INFO - Backing off for 4 seconds before retry 3
+2026-03-21 07:24:51,077 - match_77364 - INFO - Backing off for 8 seconds before retry 4
+2026-03-21 07:24:59,932 - match_77364 - INFO - Hand number: 0, Stockfish 🐟 3.0 bankroll: -6, Ctrl+Alt+Defeat bankroll: 6
+2026-03-21 07:25:38,237 - match_77364 - INFO - Hand number: 50, Stockfish 🐟 3.0 bankroll: -30, Ctrl+Alt+Defeat bankroll: 30
+2026-03-21 07:26:03,514 - match_77364 - INFO - Hand number: 100, Stockfish 🐟 3.0 bankroll: -65, Ctrl+Alt+Defeat bankroll: 65
+2026-03-21 07:26:36,964 - match_77364 - INFO - Hand number: 150, Stockfish 🐟 3.0 bankroll: 16, Ctrl+Alt+Defeat bankroll: -16
+2026-03-21 07:27:05,659 - match_77364 - INFO - Hand number: 200, Stockfish 🐟 3.0 bankroll: 556, Ctrl+Alt+Defeat bankroll: -556
+2026-03-21 07:27:27,122 - match_77364 - INFO - Hand number: 250, Stockfish 🐟 3.0 bankroll: 314, Ctrl+Alt+Defeat bankroll: -314
+2026-03-21 07:28:01,279 - match_77364 - INFO - Hand number: 300, Stockfish 🐟 3.0 bankroll: 156, Ctrl+Alt+Defeat bankroll: -156
+2026-03-21 07:28:38,616 - match_77364 - INFO - Hand number: 350, Stockfish 🐟 3.0 bankroll: 152, Ctrl+Alt+Defeat bankroll: -152
+2026-03-21 07:29:05,230 - match_77364 - INFO - Hand number: 400, Stockfish 🐟 3.0 bankroll: -763, Ctrl+Alt+Defeat bankroll: 763
+2026-03-21 07:29:50,008 - match_77364 - INFO - Hand number: 450, Stockfish 🐟 3.0 bankroll: -701, Ctrl+Alt+Defeat bankroll: 701
+2026-03-21 07:30:10,858 - match_77364 - INFO - Hand number: 500, Stockfish 🐟 3.0 bankroll: -234, Ctrl+Alt+Defeat bankroll: 234
+2026-03-21 07:30:35,018 - match_77364 - INFO - Hand number: 550, Stockfish 🐟 3.0 bankroll: 57, Ctrl+Alt+Defeat bankroll: -57
+2026-03-21 07:31:05,517 - match_77364 - INFO - Hand number: 600, Stockfish 🐟 3.0 bankroll: 114, Ctrl+Alt+Defeat bankroll: -114
+2026-03-21 07:31:27,596 - match_77364 - INFO - Hand number: 650, Stockfish 🐟 3.0 bankroll: -54, Ctrl+Alt+Defeat bankroll: 54
+2026-03-21 07:31:42,913 - match_77364 - INFO - Hand number: 700, Stockfish 🐟 3.0 bankroll: 471, Ctrl+Alt+Defeat bankroll: -471
+2026-03-21 07:31:43,654 - match_77364 - INFO - Hand number: 750, Stockfish 🐟 3.0 bankroll: 396, Ctrl+Alt+Defeat bankroll: -396
+2026-03-21 07:31:44,398 - match_77364 - INFO - Hand number: 800, Stockfish 🐟 3.0 bankroll: 321, Ctrl+Alt+Defeat bankroll: -321
+2026-03-21 07:31:45,161 - match_77364 - INFO - Hand number: 850, Stockfish 🐟 3.0 bankroll: 249, Ctrl+Alt+Defeat bankroll: -249
+2026-03-21 07:31:45,920 - match_77364 - INFO - Hand number: 900, Stockfish 🐟 3.0 bankroll: 174, Ctrl+Alt+Defeat bankroll: -174
+2026-03-21 07:31:46,675 - match_77364 - INFO - Hand number: 950, Stockfish 🐟 3.0 bankroll: 99, Ctrl+Alt+Defeat bankroll: -99
+2026-03-21 07:31:47,395 - match_77364 - INFO - All hands completed
+2026-03-21 07:31:47,396 - match_77364 - INFO - Final results - Stockfish 🐟 3.0 bankroll: 28, Ctrl+Alt+Defeat bankroll: -28
+2026-03-21 07:31:47,396 - match_77364 - INFO - Time used - Stockfish 🐟 3.0: 367.38 seconds, Ctrl+Alt+Defeat: 33.25 seconds
+2026-03-21 07:31:47,396 - match_77364 - INFO - Time limit: 1500 seconds
+2026-03-21 07:31:47,396 - match_77364 - INFO - Terminating agents
