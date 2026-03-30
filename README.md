@@ -1,6 +1,6 @@
-# Poker Engine 2026 — CMU PokerAI
+# CMU PokerAI 26' - Team Ctrl+Alt+Defeat
 
-**A full-stack research codebase for CMU’s PokerAI course competition:** custom Hold’em variant, tournament engine, many generations of bots (from tight “Nit” play to hybrid solver + meta-learning stacks), human-in-the-loop training apps, RL pipelines, and analysis tooling—organized for clarity and reuse.
+**A full-stack competition research codebase for CMU’s PokerAI competition:** custom Hold’em variant, tournament engine, many generations of bots (from tight “Nit” play to hybrid solver + meta-learning stacks), human-in-the-loop training apps, RL pipelines, and analysis tooling—organized for clarity and reuse.
 
 ---
 
@@ -37,7 +37,7 @@
 
 ## Why this project exists
 
-This repository supports **CMU PokerAI-style** work: teams implement bots that plug into a **shared engine**, compete under fixed rules, and iterate on **preflop sizing, discard policy, postflop logic, and opponent modeling**. The codebase grew across design generations—**heuristic and Monte Carlo lines, modular “street” engines, meta-chassis bots with live stats, Libratus-style table lookups, and combined “Frankenstein” stacks**—before converging on the current tournament submission while preserving earlier experiments for study and RL opponent pools.
+This repository supports **CMU PokerAI** work: teams implement bots that plug into a **shared engine**, compete under fixed rules, and iterate on **preflop sizing, discard policy, postflop logic, and opponent modeling**. The codebase grew across design generations—**heuristic and Monte Carlo lines, modular “street” engines, meta-chassis bots with live stats, Libratus-style table lookups, and combined “Frankenstein” stacks**—before converging on the current tournament submission while preserving earlier experiments for study and RL opponent pools.
 
 If you are reading this as a **portfolio / showcase** repo: the interesting story is not only the final agent, but the **traceable evolution of ideas** (what we tried, what we kept, where code still lives).
 
