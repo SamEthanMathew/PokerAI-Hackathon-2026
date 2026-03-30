@@ -34,6 +34,7 @@ All bots run in a Python 3.12 runtime environment on ARM64 architecture (AWS Gra
   - The match immediately ends
   - The bot automatically forfeits the match
   - The opponent is awarded the win
+- Additionally, each individual action request has a 5 second timeout; if your server does not respond within 5 seconds, that action is treated as a failure and repeated failures can result in a timeout loss. We will make 5 attempts to get an action from your server. If all 5 attempts fail, your bot will take the default action to fold. After 3 failed decisions (your bot fails all 5 attempts on 3 different occasions), the match will terminate and the opposing team will be awarded the win.
 
 > **Important**: With 1000 hands per match, bots should aim to use their time efficiently to avoid depleting their time bank. For example, in Phase 3 with 1500 seconds, this means using no more than 1.5 seconds per hand on average.
 
@@ -117,7 +118,7 @@ In addition to regular matchmaking, teams can request specific matches:
 
 ### Finals (March 21, 2026)
 
-- **Format**: Round-robin tournament between top 12 teams by ELO
+- **Format**: Round-robin tournament between top 10 teams by ELO
 - **Location**: Giant Eagle Auditorium (Baker Hall A51)
 - **Scoring**: Winners determined by most matches won in the round-robin
 - **Note**: We reserve the right to invite additional teams if the ELO cutoff is close or if resources permit extra matches
