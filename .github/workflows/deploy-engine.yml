@@ -9,6 +9,10 @@ on:
 jobs:
   dispatch:
     runs-on: ubuntu-latest
+    # Skip when ENGINE_PAT is not configured (empty token makes repository-dispatch fail).
+    # Add repo secret ENGINE_PAT (fine-grained or classic PAT) with access to cmu-dsc/poker-infra-2026
+    # if you want every push to main to trigger infra redeploy.
+    if: ${{ secrets.ENGINE_PAT != '' }}
     steps:
       - name: Trigger rebuild and redeploy workflow
         uses: peter-evans/repository-dispatch@v3

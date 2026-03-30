@@ -32,7 +32,7 @@ jobs:
       run: uv pip install --system -r requirements.txt pytest pytest-asyncio
 
     - name: Run tests
-      run: pytest api_test.py engine_test.py -v
+      run: pytest tests/api_test.py tests/engine_test.py -v
 
     - name: Upload test results
       if: always()
