@@ -108,6 +108,210 @@ An in-repo **abstraction + MCCFR** path (`scripts/train_libratus.py`) can genera
 
 A separate pipeline with **behavioral cloning warm-up** and **PPO**-style settings (see `TrainingConfig` in `apps/poker-rl-trainer/config.py`), feature engineering from the env, and opponent diversity from archived bots—aimed at **learning policies** from data and self-play rather than hand-authored rules alone.
 
+### Deep Learning line (data-generation + policy-learning pipeline)
+
+Alongside the rule-based and solver-leaning bots, we also explored a **deep learning-oriented pipeline** built around one simple idea: use strong, diverse bots to generate large amounts of structured gameplay data, then train a model to imitate and generalize from those decisions.
+
+This was not a pure end-to-end "throw states into a neural net and hope it works" system. Instead, the DL line was designed as a **supervised policy learner** on top of a strong engineered foundation. The handcrafted bots produced the strategy, the simulator produced the volume, and the model tried to compress those patterns into something faster, smoother, and potentially more adaptable.
+
+#### Core idea
+
+The main bottleneck in this game was not a lack of possible decisions, but the difficulty of making good decisions consistently under uncertainty. The discard phase, the reduced 27-card deck, revealed information, and the reset-every-hand structure all created a setting where local mistakes compounded quickly.
+
+To address that, we used multiple bot variants as **teachers**:
+
+- conservative / low-variance bots
+- more aggressive exploitative bots
+- variants with different discard preferences
+- variants with different postflop thresholds and response logic
+
+By letting these bots play large numbers of games against each other and against other baselines, we generated a dataset of decision points paired with strong actions, outcomes, and contextual features. The deep learning model then learned from that distribution.
+
+#### Why we used multiple bots instead of one
+
+Training on a single bot would have made the model mostly an imitator of one fixed style. That would have limited both generalization and robustness. Using multiple strong variants gave us a broader decision distribution:
+
+- some spots were played for safety
+- some were played for value extraction
+- some were played as pressure or denial
+- some were only good because of opponent context
+
+That variety mattered. It gave the model exposure to a richer set of strategic patterns and reduced the chance that it would overfit to one narrow style of play.
+
+In practice, this made the data-generation loop far more valuable than expected. The bots were originally deployed to produce training data, but at one point those same variants were also occupying the top three leaderboard spots, which was a strong signal that the generated data was coming from genuinely competitive policies rather than weak synthetic play.
+
+#### Data generation pipeline
+
+The DL workflow started with self-play and cross-play.
+
+##### 1. Run bot leagues
+
+We deployed multiple bot variants and had them play repeated matches against:
+
+- each other
+- previous archived versions
+- simpler baselines
+- targeted opponent styles when available
+
+This produced a large set of state-action trajectories across many strategic regimes.
+
+##### 2. Log structured decision states
+
+For each decision point, we recorded the game state in a machine-readable form. The exact schema can vary, but conceptually it included:
+
+- private hand information
+- public board state
+- discard information and revealed signals
+- betting history and action sequence
+- pot / bankroll context
+- street identifier
+- opponent behavior summaries
+- equity estimates or strength proxies from the engine
+- final chosen action
+- eventual hand outcome when relevant
+
+This mattered because raw cards alone were not enough. A good action depended heavily on context: street, opponent type, prior aggression, reveal signals, and risk posture.
+
+##### 3. Build labels from high-quality actions
+
+The training labels came from the actions selected by the strongest available bot logic at the time. Depending on the experiment, this could mean:
+
+- direct action labels such as `fold`, `check`, `call`, `bet_small`, `bet_large`, `raise`
+- discard-choice labels for which subset of cards to keep
+- value targets such as estimated EV, win probability, or calibrated equity bucket
+- auxiliary labels such as opponent archetype or board texture class
+
+This let the model learn both **what to do** and, in some experiments, **why the state looked favorable or dangerous**.
+
+#### Model objective
+
+The deep learning line was most naturally framed as a **policy approximation** problem.
+
+Given a state representation `s`, the model predicts either:
+
+1. the best action directly, or  
+2. a distribution over actions, where higher probability corresponds to stronger choices under that state.
+
+In some variants, the model could also predict auxiliary outputs such as:
+
+- hand strength bucket
+- opponent aggression class
+- probability of continuing profitably
+- discard quality score
+- risk level for the current line
+
+These auxiliary targets were useful because they forced the model to learn internal structure instead of blindly memorizing surface patterns.
+
+#### Input representation
+
+A major design choice was how to represent game state. The strongest version was not just "cards in, action out." It combined several feature groups:
+
+##### Hand and board features
+- encoded private cards
+- encoded board cards
+- made-hand indicators
+- draw indicators
+- blockers / suit structure / pair structure
+- discard-related combinational features
+
+##### Betting context
+- current street
+- pot size
+- effective commitment / risk posture
+- prior action sequence
+- bet-size ratios
+- whether the line showed strength, weakness, or capped range behavior
+
+##### Opponent features
+- VPIP / PFR-style behavior stats
+- fold-to-bet tendencies
+- aggression metrics
+- discard tendencies
+- sizing tells
+- recent regime shifts or short-term EMA-based behavior summaries
+
+##### Engine-derived features
+- Monte Carlo equity estimates
+- calibrated equity bucket
+- danger / pressure score
+- board texture class
+- sequence-based threat indicators
+
+This hybrid representation was important. The model worked best when it did not have to rediscover everything from scratch. Engine features gave it strong priors, while learned layers helped combine them more flexibly.
+
+#### Training loop
+
+The training process followed a practical cycle:
+
+##### Step 1: Generate data
+Run a large volume of matches using multiple bot variants.
+
+##### Step 2: Filter and clean
+Remove broken logs, inconsistent states, and low-information samples. In some cases, downweight trivial spots and upweight higher-leverage decisions.
+
+##### Step 3: Train supervised models
+Train a model to predict the teacher action from the recorded state. Typical loss functions would be cross-entropy for action selection and MSE or ranking loss for value-style targets.
+
+##### Step 4: Evaluate against held-out matches
+Check whether the learned model reproduced strong decisions on unseen samples and whether it could compete in live play.
+
+##### Step 5: Redeploy and iterate
+Use the improved model or updated bot population to generate new data, then retrain. This created a feedback loop where better policies generated better training examples.
+
+That feedback loop was one of the most valuable parts of the system. It made progress feel compounding rather than linear.
+
+#### Where the DL approach helped
+
+The learned model was most useful in places where purely handwritten logic became brittle or too fragmented.
+
+##### 1. Smoother decision boundaries
+Handwritten thresholds often create discontinuities. A learned model can interpolate between similar states more naturally.
+
+##### 2. Better compression of many interacting signals
+Opponent stats, board texture, sequence danger, and equity estimates all interact. A neural model can combine these signals without requiring hundreds of manually tuned if-statements.
+
+##### 3. Faster approximation of expensive reasoning
+If trained well, the model can approximate the output of heavier logic more quickly, which matters in repeated or latency-sensitive settings.
+
+##### 4. Better generalization across adjacent states
+Instead of memorizing exact hand categories, the model can learn strategic shape: when pressure is credible, when thin value is justified, and when revealed information changes the range interaction.
+
+#### Where the DL approach was limited
+
+The deep learning line was promising, but it was not magic.
+
+##### Data quality ceiling
+The model could not surpass the quality of the data distribution unless it learned genuinely better abstractions. If the teacher bots had blind spots, the model could inherit them.
+
+##### Distribution shift
+A model trained on one population of opponents might degrade against very different styles.
+
+##### Interpretability
+Compared to handcrafted logic, neural policies are harder to debug. When performance drops, it is often less obvious whether the issue comes from the representation, label quality, sampling bias, or the model itself.
+
+##### Adversarial environments
+Because this is a strategic game, strong opponents can adapt. A learned policy that performs well against the training mix can still be exploited if it becomes too predictable.
+
+#### Best way to think about this line
+
+The DL algorithm worked best not as a replacement for the engineered system, but as an additional layer on top of it.
+
+The rule-based and solver-inspired bots gave us:
+
+- structure
+- strong priors
+- interpretable decisions
+- reliable data generation
+
+The deep learning layer gave us:
+
+- policy compression
+- smoother generalization
+- the ability to learn from many interacting signals
+- a framework for turning large-scale bot self-play into a reusable model
+
+So the real value of the DL line was not that it magically solved poker by itself. The value was that it converted a growing archive of competitive gameplay into a trainable decision model. In that sense, it acted as a bridge between handcrafted game-theoretic intuition and scalable learned policy behavior.
+
 ---
 
 ## What we built (systems)
